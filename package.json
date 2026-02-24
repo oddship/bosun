@@ -1,0 +1,34 @@
+{
+  "name": "bosun",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bosun — personal multi-agent Pi coding environment",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "init": "bun run scripts/init.ts",
+    "postinstall": "cd node_modules/@tobilu/qmd && [ -d dist ] || bun run build"
+  },
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "^0.54.2",
+    "@tobilu/qmd": "https://github.com/tobi/qmd",
+    "pi-agents": "workspace:*",
+    "pi-daemon": "workspace:*",
+    "pi-mcp-adapter": "^2.1.2",
+    "pi-mesh": "^0.1.2",
+    "pi-meta-skills": "workspace:*",
+    "pi-q": "workspace:*",
+    "pi-question": "workspace:*",
+    "pi-sandbox": "workspace:*",
+    "pi-session-context": "workspace:*",
+    "pi-tmux": "workspace:*",
+    "pi-web-access": "^0.10.2"
+  },
+  "devDependencies": {
+    "@iarna/toml": "^3.0.0",
+    "@types/bun": "latest"
+  }
+}

@@ -1,0 +1,21 @@
+[workflow]
+name = "fill-handoff"
+description = "Fill pending handoff documents with session context"
+type = "agent"
+
+[trigger]
+schedule = "hourly"
+startup = true
+
+[validators]
+input = "validate-input.ts"
+
+[agent]
+model = "lite"
+prompt = "Find and fill pending handoff documents. Scan workspace/users/$USER/handoffs/ for files with status: pending in frontmatter. Read the linked session, fill placeholder sections, and change status to ready."
+
+[retry]
+max_attempts = 2
+
+[timeout]
+minutes = 5

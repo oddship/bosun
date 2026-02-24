@@ -1,0 +1,25 @@
+{
+  "name": "pi-question",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Enhanced interactive question tool for Pi with TUI, multiple selection, and custom input",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-question"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  }
+}

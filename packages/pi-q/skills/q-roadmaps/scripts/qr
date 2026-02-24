@@ -1,0 +1,729 @@
+#!/usr/bin/env bun
+
+import { parseArgs } from "util";
+import { z } from "zod";
+import matter from "gray-matter";
+import yaml from "js-yaml";
+import { readdir, readFile, writeFile, mkdir, unlink } from "fs/promises";
+import { existsSync } from "fs";
+import { join } from "path";
+import { spawn } from "child_process";
+
+// Custom matter parser that disables automatic date conversion
+// This ensures dates like "2026-01-12" stay as strings, not Date objects
+const matterOptions = {
+  engines: {
+    yaml: (s: string) => yaml.load(s, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>,
+  },
+};
+
+function parseFrontmatter(content: string) {
+  return matter(content, matterOptions);
+}
+
+// ============================================================================
+// Schema
+// ============================================================================
+
+const RoadmapSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.enum(["active", "completed"]),
+  created: z.string(),
+  updated: z.string(),
+  teams: z.array(z.string()),
+  start: z.string().nullable().optional(),
+  end: z.string().nullable().optional(),
+  owner: z.string().nullable().optional(),
+  repos: z.array(z.string()).optional().default([]),
+  projects: z.array(z.string()).optional().default([]),
+  promoted_from: z.string().nullable().optional(),
+  health: z.enum(["green", "yellow", "red"]).optional().default("green"),
+  progress: z.number().optional().default(0),
+}).passthrough();
+
+type Roadmap = z.infer<typeof RoadmapSchema>;
+
+// ============================================================================
+// Paths
+// ============================================================================
+
+function getRoadmapsDir(): string {
+  const user = process.env.USER || process.env.LOGNAME || "unknown";
+  const base = process.env.BESON_ROOT || process.cwd();
+  return join(base, "workspace", "users", user, "roadmaps");
+}
+
+function getUpdateLogPath(): string {
+  return join(getRoadmapsDir(), "_update-log.md");
+}
+
+function getQpPath(): string {
+  const base = process.env.BESON_ROOT || process.cwd();
+  return join(base, ".pi", "skills", "q-projects", "scripts", "qp");
+}
+
+// ============================================================================
+// Utilities
+// ============================================================================
+
+function generateId(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 32);
+}
+
+function today(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+function now(): string {
+  return new Date().toISOString().split("T")[1].slice(0, 5);
+}
+
+async function ensureDir(dir: string): Promise<void> {
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+}
+
+function output(data: unknown, json: boolean): void {
+  if (json) {
+    console.log(JSON.stringify(data, null, 2));
+  } else if (typeof data === "string") {
+    console.log(data);
+  } else {
+    console.log(JSON.stringify(data, null, 2));
+  }
+}
+
+function error(message: string, code: string, details?: Record<string, unknown>): never {
+  console.error(JSON.stringify({ error: message, code, ...details }));
+  process.exit(1);
+}
+
+// ID validation to prevent path traversal
+function validateId(id: string): void {
+  if (!id || typeof id !== "string") {
+    error("ID is required", "INVALID_ID");
+  }
+  // Only allow alphanumeric and hyphens, max 32 chars
+  if (!/^[a-z0-9\-]{1,32}$/i.test(id)) {
+    error("Invalid ID format (alphanumeric and hyphens only)", "INVALID_ID", { id });
+  }
+  // Explicitly block path traversal
+  if (id.includes("..") || id.includes("/") || id.includes("\\")) {
+    error("ID cannot contain path traversal sequences", "INVALID_ID", { id });
+  }
+}
+
+// ============================================================================
+// Roadmap I/O
+// ============================================================================
+
+// Find a file by ID with flexible matching: {id}.md or {id}-*.md
+async function findFileById(dir: string, id: string): Promise<string | null> {
+  if (!existsSync(dir)) return null;
+  
+  const files = await readdir(dir);
+  const match = files.find(f => 
+    (f === `${id}.md`) || (f.startsWith(`${id}-`) && f.endsWith('.md'))
+  );
+  
+  return match ? join(dir, match) : null;
+}
+
+async function loadRoadmap(id: string): Promise<{ roadmap: Roadmap; path: string; content: string } | null> {
+  validateId(id);
+  const roadmapsDir = getRoadmapsDir();
+  
+  // Try flexible matching
+  const path = await findFileById(roadmapsDir, id);
+  if (path) {
+    const raw = await readFile(path, "utf-8");
+    const { data, content } = parseFrontmatter(raw);
+    const roadmap = RoadmapSchema.parse(data);
+    return { roadmap, path, content };
+  }
+  
+  return null;
+}
+
+async function saveRoadmap(roadmap: Roadmap, content: string, path?: string): Promise<string> {
+  const roadmapsDir = getRoadmapsDir();
+  await ensureDir(roadmapsDir);
+  
+  const filePath = path || join(roadmapsDir, `${roadmap.id}.md`);
+  const fileContent = matter.stringify(content, roadmap);
+  await writeFile(filePath, fileContent);
+  return filePath;
+}
+
+async function loadAllRoadmaps(): Promise<Array<{ roadmap: Roadmap; path: string }>> {
+  const roadmapsDir = getRoadmapsDir();
+  const roadmaps: Array<{ roadmap: Roadmap; path: string }> = [];
+  
+  if (!existsSync(roadmapsDir)) {
+    return roadmaps;
+  }
+  
+  const files = await readdir(roadmapsDir);
+  for (const file of files) {
+    if (file.endsWith(".md") && !file.startsWith("_")) {
+      const path = join(roadmapsDir, file);
+      const raw = await readFile(path, "utf-8");
+      const { data } = parseFrontmatter(raw);
+      try {
+        const roadmap = RoadmapSchema.parse(data);
+        roadmaps.push({ roadmap, path });
+      } catch {
+        // Skip invalid files
+      }
+    }
+  }
+  
+  return roadmaps;
+}
+
+// ============================================================================
+// Update Log
+// ============================================================================
+
+async function appendLog(roadmapId: string, title: string, message: string): Promise<void> {
+  const logPath = getUpdateLogPath();
+  await ensureDir(getRoadmapsDir());
+  
+  const todayStr = today();
+  const timeStr = now();
+  const entry = `- **${timeStr}** ${message}\n`;
+  const roadmapHeader = `### ${roadmapId}: ${title}\n`;
+  const dateHeader = `## ${todayStr}\n\n`;
+  
+  let content = "";
+  if (existsSync(logPath)) {
+    content = await readFile(logPath, "utf-8");
+  } else {
+    content = "# Roadmap Update Log\n\n";
+  }
+  
+  if (!content.includes(dateHeader.trim())) {
+    const titleEnd = content.indexOf("\n\n") + 2;
+    content = content.slice(0, titleEnd) + dateHeader + content.slice(titleEnd);
+  }
+  
+  const dateIndex = content.indexOf(dateHeader.trim());
+  const nextDateIndex = content.indexOf("\n## ", dateIndex + 1);
+  const sectionEnd = nextDateIndex === -1 ? content.length : nextDateIndex;
+  
+  const todaySection = content.slice(dateIndex, sectionEnd);
+  if (todaySection.includes(roadmapHeader.trim())) {
+    const roadmapIndex = content.indexOf(roadmapHeader.trim(), dateIndex);
+    const roadmapEndIndex = content.indexOf("\n### ", roadmapIndex + 1);
+    const insertPoint = roadmapEndIndex === -1 || roadmapEndIndex > sectionEnd
+      ? sectionEnd
+      : roadmapEndIndex;
+    content = content.slice(0, insertPoint) + entry + content.slice(insertPoint);
+  } else {
+    const insertPoint = dateIndex + dateHeader.length;
+    content = content.slice(0, insertPoint) + roadmapHeader + entry + "\n" + content.slice(insertPoint);
+  }
+  
+  await writeFile(logPath, content);
+}
+
+// ============================================================================
+// Qp Integration
+// ============================================================================
+
+async function runQp(args: string[]): Promise<{ success: boolean; data?: unknown; error?: string }> {
+  return new Promise((resolve) => {
+    const qpPath = getQpPath();
+    const safeArgs = args.map(arg => {
+      if (arg.startsWith("--") || /^[a-zA-Z0-9\-_,\.]+$/.test(arg)) return arg;
+      throw new Error(`Invalid argument: ${arg}`);
+    });
+    const proc = spawn(qpPath, [...safeArgs, "--json"], { stdio: ["pipe", "pipe", "pipe"] });
+    
+    let stdout = "";
+    let stderr = "";
+    
+    proc.stdout.on("data", (data) => { stdout += data; });
+    proc.stderr.on("data", (data) => { stderr += data; });
+    
+    proc.on("close", (code) => {
+      if (code === 0) {
+        try {
+          resolve({ success: true, data: JSON.parse(stdout) });
+        } catch {
+          resolve({ success: true, data: stdout });
+        }
+      } else {
+        try {
+          resolve({ success: false, error: JSON.parse(stderr).error || stderr });
+        } catch {
+          resolve({ success: false, error: stderr || stdout });
+        }
+      }
+    });
+  });
+}
+
+// ============================================================================
+// Commands
+// ============================================================================
+
+async function cmdNew(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      teams: { type: "string" },
+      start: { type: "string" },
+      end: { type: "string" },
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const title = positionals.join(" ");
+  if (!title) {
+    error("Roadmap title is required", "MISSING_TITLE");
+  }
+  
+  if (!values.teams) {
+    error("Teams are required (--teams team1,team2)", "MISSING_TEAMS");
+  }
+  
+  const id = generateId(title);
+  const todayStr = today();
+  const user = process.env.USER || process.env.LOGNAME || "unknown";
+  const teams = values.teams.split(",").map(t => t.trim());
+  
+  const roadmap: Roadmap = {
+    id,
+    title,
+    status: "active",
+    created: todayStr,
+    updated: todayStr,
+    teams,
+    start: values.start || todayStr,
+    end: values.end || null,
+    owner: user,
+    repos: [],
+    projects: [],
+    promoted_from: null,
+    health: "green",
+    progress: 0,
+  };
+  
+  const content = `
+## Overview
+
+[Add roadmap overview]
+
+## Key Objectives
+
+1. Objective 1
+2. Objective 2
+3. Objective 3
+
+## Milestones
+
+- **Milestone 1**: [Date] - [Description]
+- **Milestone 2**: [Date] - [Description]
+
+## Risks
+
+[Potential risks and mitigations]
+
+## Notes
+
+[Key decisions and context]
+`;
+  
+  await saveRoadmap(roadmap, content.trim());
+  await appendLog(id, title, "Created roadmap");
+  
+  output({ success: true, operation: "new", roadmap }, values.json);
+}
+
+async function cmdShow(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Roadmap ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadRoadmap(id);
+  if (!data) {
+    error("Roadmap not found", "ROADMAP_NOT_FOUND", { id });
+  }
+  
+  if (values.json) {
+    output({ success: true, operation: "show", roadmap: data.roadmap }, true);
+  } else {
+    const raw = await readFile(data.path, "utf-8");
+    console.log(raw);
+  }
+}
+
+async function cmdList(args: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args,
+    options: {
+      status: { type: "string" },
+      team: { type: "string" },
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  let roadmaps = await loadAllRoadmaps();
+  
+  if (values.status) {
+    roadmaps = roadmaps.filter(r => r.roadmap.status === values.status);
+  }
+  
+  if (values.team) {
+    roadmaps = roadmaps.filter(r => r.roadmap.teams.includes(values.team!));
+  }
+  
+  roadmaps.sort((a, b) => {
+    if (a.roadmap.status !== b.roadmap.status) {
+      return a.roadmap.status === "active" ? -1 : 1;
+    }
+    return (b.roadmap.progress || 0) - (a.roadmap.progress || 0);
+  });
+  
+  if (values.json) {
+    output({ success: true, operation: "list", count: roadmaps.length, roadmaps: roadmaps.map(r => r.roadmap) }, true);
+  } else {
+    if (roadmaps.length === 0) {
+      console.log("No roadmaps found");
+    } else {
+      for (const { roadmap } of roadmaps) {
+        const progress = Math.round((roadmap.progress || 0) * 100);
+        const teams = roadmap.teams.join(", ");
+        console.log(`${roadmap.id} [${teams}] ${roadmap.title} (${progress}%)`);
+      }
+    }
+  }
+}
+
+async function cmdProjects(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Roadmap ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadRoadmap(id);
+  if (!data) {
+    error("Roadmap not found", "ROADMAP_NOT_FOUND", { id });
+  }
+  
+  const result = await runQp(["list", "--include-archived"]);
+  
+  if (!result.success) {
+    error(result.error || "Failed to get projects", "QP_ERROR");
+  }
+  
+  const allProjects = (result.data as { projects?: Array<{ id: string; roadmap?: string; title: string; progress: number; health: string }> })?.projects || [];
+  const roadmapProjects = allProjects.filter(p => 
+    data.roadmap.projects.includes(p.id) || p.roadmap === id
+  );
+  
+  if (values.json) {
+    output({ success: true, operation: "projects", roadmap_id: id, count: roadmapProjects.length, projects: roadmapProjects }, true);
+  } else {
+    if (roadmapProjects.length === 0) {
+      console.log(`No projects found for roadmap: ${id}`);
+    } else {
+      console.log(`Projects for ${data.roadmap.title}:\n`);
+      for (const project of roadmapProjects) {
+        const progress = Math.round((project.progress || 0) * 100);
+        const health = project.health === "green" ? "" : ` [${project.health?.toUpperCase()}]`;
+        console.log(`  ${project.id} ${project.title} (${progress}%)${health}`);
+      }
+    }
+  }
+}
+
+async function cmdProgress(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Roadmap ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadRoadmap(id);
+  if (!data) {
+    error("Roadmap not found", "ROADMAP_NOT_FOUND", { id });
+  }
+  
+  const result = await runQp(["list", "--include-archived"]);
+  const allProjects = (result.data as { projects?: Array<{ id: string; roadmap?: string; progress: number; health: string; status: string }> })?.projects || [];
+  const roadmapProjects = allProjects.filter(p => 
+    data.roadmap.projects.includes(p.id) || p.roadmap === id
+  );
+  
+  const total = roadmapProjects.length;
+  const completed = roadmapProjects.filter(p => p.status === "completed").length;
+  const atRisk = roadmapProjects.filter(p => p.health === "red").length;
+  const progress = total > 0 
+    ? roadmapProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / total 
+    : 0;
+  
+  let health: "green" | "yellow" | "red" = "green";
+  if (atRisk > 0) {
+    health = "red";
+  } else if (data.roadmap.end) {
+    const endDate = new Date(data.roadmap.end);
+    const now = new Date();
+    const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) {
+      health = "red";
+    } else if (daysLeft < 14 && progress < 0.8) {
+      health = "yellow";
+    }
+  }
+  
+  if (Math.abs(data.roadmap.progress - progress) > 0.01 || data.roadmap.health !== health) {
+    data.roadmap.progress = progress;
+    data.roadmap.health = health;
+    data.roadmap.updated = today();
+    await saveRoadmap(data.roadmap, data.content, data.path);
+  }
+  
+  const daysRemaining = data.roadmap.end 
+    ? Math.ceil((new Date(data.roadmap.end).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  
+  const progressResult = {
+    success: true,
+    operation: "progress",
+    roadmap_id: id,
+    title: data.roadmap.title,
+    progress: Math.round(progress * 100) / 100,
+    health,
+    projects: { total, completed, at_risk: atRisk },
+    days_remaining: daysRemaining,
+  };
+  
+  if (values.json) {
+    output(progressResult, true);
+  } else {
+    console.log(`Roadmap: ${data.roadmap.title}`);
+    console.log(`Progress: ${Math.round(progress * 100)}%`);
+    console.log(`Health: ${health}`);
+    if (daysRemaining !== null) {
+      console.log(`Days remaining: ${daysRemaining}`);
+    }
+    console.log(`\nProjects:`);
+    console.log(`  Total: ${total}`);
+    console.log(`  Completed: ${completed}`);
+    console.log(`  At risk: ${atRisk}`);
+  }
+}
+
+async function cmdLog(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const logPath = getUpdateLogPath();
+  
+  if (!existsSync(logPath)) {
+    output({ success: true, operation: "log", entries: [] }, values.json);
+    return;
+  }
+  
+  const content = await readFile(logPath, "utf-8");
+  
+  const specificId = positionals[0];
+  if (specificId) {
+    const lines = content.split("\n");
+    const filtered: string[] = [];
+    let inRoadmap = false;
+    
+    for (const line of lines) {
+      if (line.startsWith("### ")) {
+        inRoadmap = line.includes(specificId);
+      }
+      if (inRoadmap || line.startsWith("# ") || line.startsWith("## ")) {
+        filtered.push(line);
+      }
+    }
+    
+    console.log(filtered.join("\n"));
+  } else {
+    console.log(content);
+  }
+}
+
+async function cmdPublish(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Roadmap ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadRoadmap(id);
+  if (!data) {
+    error("Roadmap not found", "ROADMAP_NOT_FOUND", { id });
+  }
+  
+  const user = process.env.USER || process.env.LOGNAME || "unknown";
+  const base = process.env.BESON_ROOT || process.cwd();
+  const publicRoadmapsDir = join(base, "workspace", "users", user, "public", "roadmaps");
+  await ensureDir(publicRoadmapsDir);
+  
+  const publicPath = join(publicRoadmapsDir, `${id}.md`);
+  const raw = await readFile(data.path, "utf-8");
+  await writeFile(publicPath, raw);
+  
+  await appendLog(id, data.roadmap.title, "Published to public/roadmaps/");
+  
+  output({ success: true, operation: "publish", roadmap: data.roadmap, public_path: publicPath }, values.json);
+}
+
+async function cmdEdit(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Roadmap ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadRoadmap(id);
+  if (!data) {
+    error("Roadmap not found", "ROADMAP_NOT_FOUND", { id });
+  }
+  
+  const editor = process.env.EDITOR || process.env.VISUAL || "vi";
+  const { spawn: spawnSync } = await import("child_process");
+  
+  const proc = spawnSync(editor, [data.path], { 
+    stdio: "inherit",
+    env: process.env,
+  });
+  
+  await new Promise<void>((resolve, reject) => {
+    proc.on("close", (code) => {
+      code === 0 ? resolve() : reject(new Error(`Editor exited with code ${code}`));
+    });
+    proc.on("error", reject);
+  });
+  
+  const editedData = await loadRoadmap(id);
+  if (!editedData) {
+    error("Roadmap file was deleted during edit", "EDIT_ERROR", { id });
+  }
+  
+  await appendLog(id, editedData.roadmap.title, "Edited via editor");
+  
+  if (values.json) {
+    output({ success: true, operation: "edit", roadmap: editedData.roadmap }, true);
+  } else {
+    console.log(`Roadmap ${id} updated successfully`);
+  }
+}
+
+// ============================================================================
+// Main
+// ============================================================================
+
+const commands: Record<string, (args: string[]) => Promise<void>> = {
+  new: cmdNew,
+  edit: cmdEdit,
+  show: cmdShow,
+  list: cmdList,
+  projects: cmdProjects,
+  progress: cmdProgress,
+  log: cmdLog,
+  publish: cmdPublish,
+};
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const command = args[0];
+  
+  if (!command || command === "help" || command === "--help") {
+    console.log(`qr - Roadmap planning CLI for Q agent
+
+Usage: qr <command> [options]
+
+Commands:
+  new <title>     Create a new roadmap
+  show <id>       Show roadmap details
+  edit <id>       Edit roadmap in $EDITOR
+  list            List roadmaps
+  projects <id>   List roadmap projects
+  progress <id>   Calculate roadmap progress
+  log [id]        Show update log
+  publish <id>    Publish to public/
+
+Options:
+  --json          Output as JSON
+  --help          Show help
+
+Examples:
+  qr new "Q1 2026" --teams frontend,backend
+  qr list
+  qr projects q1-2026
+  qr progress q1-2026
+`);
+    return;
+  }
+  
+  const handler = commands[command];
+  if (!handler) {
+    error(`Unknown command: ${command}`, "UNKNOWN_COMMAND", { command });
+  }
+  
+  await handler(args.slice(1));
+}
+
+main().catch(err => {
+  console.error(JSON.stringify({ error: err.message, code: "INTERNAL_ERROR" }));
+  process.exit(1);
+});

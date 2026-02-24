@@ -1,0 +1,113 @@
+# Bosun Configuration
+# Copy to config.toml and customize: cp config.sample.toml config.toml
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+# Model tiers — referenced by tier name in agent frontmatter (e.g., model: lite)
+
+[models]
+lite = "claude-haiku-4-5-20251001"       # Fast, cheap — context gathering, summaries
+medium = "claude-sonnet-4-5-20250929"    # Balanced — most coding tasks
+high = "claude-opus-4-6"                 # Best — complex planning, orchestration
+oracle = "gpt-5.3-codex"                 # Deep reasoning — architecture, hard debugging
+
+# =============================================================================
+# Workspace
+# =============================================================================
+
+[workspace]
+path = "workspace"                        # Relative to BOSUN_ROOT
+
+# =============================================================================
+# Agent Configuration
+# =============================================================================
+
+[agents]
+default_agent = "bosun"
+# extra_paths = ["node_modules/pi-q/agents"]
+
+# =============================================================================
+# Spawn Backend
+# =============================================================================
+
+[backend]
+type = "tmux"
+socket = ".bosun-home/tmux.sock"
+command_prefix = "scripts/sandbox.sh"
+
+# =============================================================================
+# Environment Variables (passed into bwrap sandbox)
+# =============================================================================
+
+[env]
+allowed = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GEMINI_API_KEY",
+  "PERPLEXITY_API_KEY",
+  "OPENROUTER_API_KEY",
+  "USER",
+  "LOGNAME",
+  "TERM",
+  "COLORTERM",
+  "LANG",
+  "TZ",
+]
+
+# =============================================================================
+# Sandbox Paths (process-level, bwrap)
+# =============================================================================
+
+[paths]
+# Additional read-only bind mounts beyond defaults
+ro_bind = []
+
+# =============================================================================
+# Tool-level Sandbox (pi-sandbox)
+# =============================================================================
+
+[sandbox]
+enabled = true
+
+[sandbox.filesystem]
+deny_read = ["~/.ssh", "~/.aws", "~/.gnupg"]
+allow_write = [".", "/tmp"]
+deny_write = [".env", ".env.*", "*.pem", "*.key"]
+
+# =============================================================================
+# Daemon Configuration
+# =============================================================================
+
+[daemon]
+enabled = true
+heartbeat_interval_seconds = 30
+log_level = "info"
+# Workflows are auto-discovered from packages/*/workflows/, .pi/workflows/,
+# and workspace/workflows/. No manual rules or watchers needed.
+
+# =============================================================================
+# Web Access (pi-web-access)
+# =============================================================================
+
+[web_access]
+# perplexity_api_key = "pplx-..."
+# gemini_api_key = "AIza..."
+# provider = "auto"                      # auto | perplexity | gemini
+
+# =============================================================================
+# Pi Keybindings (overrides Pi TUI defaults)
+# =============================================================================
+# See: https://github.com/badlogic/pi-mono docs/keybindings.md
+# Format: action = ["key1", "key2"] or action = "key"
+# Common fix: remap cursorLineStart to free Ctrl+A for tmux prefix
+
+[keybindings]
+cursorLineStart = ["home"]
+
+# =============================================================================
+# Q System
+# =============================================================================
+
+[q]
+data_dir = "workspace/users"

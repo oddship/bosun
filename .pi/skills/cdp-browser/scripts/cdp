@@ -1,0 +1,841 @@
+#!/usr/bin/env node
+/**
+ * CDP CLI - Chrome DevTools Protocol command-line interface
+ * Connects to Chrome/Chromium running with --remote-debugging-port=9222
+ * 
+ * Usage: cdp <command> [args] [--json] [--tab=<id|title>]
+ */
+
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+// Configuration
+const CDP_HOST = process.env.CDP_HOST || 'localhost';
+const CDP_PORT = process.env.CDP_PORT || 9222;
+const CDP_TIMEOUT = parseInt(process.env.CDP_TIMEOUT || '30000', 10);
+const DEFAULT_SCREENSHOT_PATH = 'workspace/temp/screenshot.png';
+
+// Parse flags
+let jsonOutput = false;
+let tabSelector = null;
+const args = process.argv.slice(2).filter(arg => {
+  if (arg === '--json') {
+    jsonOutput = true;
+    return false;
+  }
+  if (arg.startsWith('--tab=')) {
+    tabSelector = arg.slice(6);
+    return false;
+  }
+  return true;
+});
+
+// Output helper
+function output(data) {
+  if (jsonOutput) {
+    console.log(JSON.stringify(data, null, 2));
+  } else if (typeof data === 'string') {
+    console.log(data);
+  } else {
+    console.log(JSON.stringify(data, null, 2));
+  }
+}
+
+function error(msg, exitCode = 1) {
+  if (jsonOutput) {
+    console.log(JSON.stringify({ error: msg }));
+  } else {
+    console.error(`Error: ${msg}`);
+  }
+  process.exit(exitCode);
+}
+
+// HTTP GET helper
+function httpGet(url) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Request timeout after ${CDP_TIMEOUT}ms`));
+    }, CDP_TIMEOUT);
+
+    http.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        clearTimeout(timeout);
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve(data);
+        }
+      });
+    }).on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+  });
+}
+
+// Get page WebSocket URL
+async function getPageWs() {
+  let pages;
+  try {
+    pages = await httpGet(`http://${CDP_HOST}:${CDP_PORT}/json`);
+  } catch (err) {
+    if (err.code === 'ECONNREFUSED') {
+      throw new Error(`Cannot connect to Chrome at ${CDP_HOST}:${CDP_PORT}. Is Chrome running with --remote-debugging-port=${CDP_PORT}?`);
+    }
+    throw err;
+  }
+
+  if (!Array.isArray(pages) || pages.length === 0) {
+    throw new Error('No browser tabs found. Open a tab in Chrome first.');
+  }
+
+  let page;
+  if (tabSelector) {
+    page = pages.find(p => 
+      p.id === tabSelector || 
+      p.id.startsWith(tabSelector) ||
+      (p.title && p.title.toLowerCase().includes(tabSelector.toLowerCase()))
+    );
+    if (!page) {
+      throw new Error(`Tab not found: "${tabSelector}". Use 'cdp tabs' to list available tabs.`);
+    }
+  } else {
+    // Get first non-extension page
+    page = pages.find(p => p.type === 'page' && !p.url.startsWith('chrome-extension://')) || pages[0];
+  }
+
+  if (!page.webSocketDebuggerUrl) {
+    throw new Error('Page has no WebSocket URL. It may be a special page that cannot be controlled.');
+  }
+
+  return page.webSocketDebuggerUrl;
+}
+
+// Send CDP command via WebSocket
+async function sendCommand(wsUrl, method, params = {}) {
+  const WebSocket = require('ws');
+
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+    const id = 1;
+    let resolved = false;
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        ws.close();
+        reject(new Error(`CDP command timeout after ${CDP_TIMEOUT}ms`));
+      }
+    }, CDP_TIMEOUT);
+
+    ws.on('open', () => {
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data.toString());
+      if (msg.id === id) {
+        clearTimeout(timeout);
+        resolved = true;
+        ws.close();
+        if (msg.error) {
+          reject(new Error(msg.error.message));
+        } else {
+          resolve(msg.result);
+        }
+      }
+    });
+
+    ws.on('error', (err) => {
+      if (!resolved) {
+        clearTimeout(timeout);
+        resolved = true;
+        reject(err);
+      }
+    });
+  });
+}
+
+// Commands
+const commands = {
+  async tabs() {
+    const pages = await httpGet(`http://${CDP_HOST}:${CDP_PORT}/json`);
+    
+    if (jsonOutput) {
+      return pages.map(p => ({
+        id: p.id,
+        title: p.title,
+        url: p.url,
+        type: p.type
+      }));
+    }
+    
+    if (pages.length === 0) {
+      return 'No tabs found';
+    }
+    
+    return pages.map((p, i) => 
+      `${i}: ${p.id.slice(0, 8)} | ${(p.title || '').slice(0, 40).padEnd(40)} | ${p.url}`
+    ).join('\n');
+  },
+
+  async info() {
+    const wsUrl = await getPageWs();
+    const [title, url] = await Promise.all([
+      sendCommand(wsUrl, 'Runtime.evaluate', { expression: 'document.title' }),
+      sendCommand(wsUrl, 'Runtime.evaluate', { expression: 'location.href' })
+    ]);
+    
+    return {
+      title: title.result?.value || '',
+      url: url.result?.value || ''
+    };
+  },
+
+  async navigate(url) {
+    if (!url) throw new Error('URL required. Usage: cdp navigate <url>');
+    
+    // Add protocol if missing
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    
+    const wsUrl = await getPageWs();
+    await sendCommand(wsUrl, 'Page.navigate', { url });
+    
+    // Wait for initial load
+    await new Promise(r => setTimeout(r, 1500));
+    
+    if (jsonOutput) {
+      return { success: true, url };
+    }
+    return `Navigated to: ${url}`;
+  },
+
+  async screenshot(outputPath) {
+    const screenshotPath = outputPath || DEFAULT_SCREENSHOT_PATH;
+    
+    // Ensure directory exists
+    const dir = path.dirname(screenshotPath);
+    if (dir && !fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    const wsUrl = await getPageWs();
+    const result = await sendCommand(wsUrl, 'Page.captureScreenshot', { 
+      format: 'png',
+      captureBeyondViewport: false
+    });
+    
+    fs.writeFileSync(screenshotPath, Buffer.from(result.data, 'base64'));
+    
+    if (jsonOutput) {
+      return { success: true, path: screenshotPath, size: result.data.length };
+    }
+    return `Screenshot saved: ${screenshotPath}`;
+  },
+
+  async snapshot() {
+    const wsUrl = await getPageWs();
+    const result = await sendCommand(wsUrl, 'Accessibility.getFullAXTree');
+
+    if (!result.nodes?.length) {
+      return jsonOutput ? { nodes: [] } : 'No accessibility tree available';
+    }
+
+    if (jsonOutput) {
+      return result;
+    }
+
+    // Build tree from flat list
+    const nodeMap = new Map();
+    result.nodes.forEach(n => nodeMap.set(n.nodeId, n));
+    result.nodes.forEach(n => {
+      if (n.childIds) {
+        n.children = n.childIds.map(id => nodeMap.get(id)).filter(Boolean);
+      }
+    });
+
+    // Format as readable tree
+    const lines = [];
+    function formatNode(node, depth = 0) {
+      const indent = '  '.repeat(depth);
+      const role = node.role?.value || 'unknown';
+      const name = node.name?.value || '';
+      const props = [];
+
+      if (node.value?.value) props.push(`value="${node.value.value}"`);
+      if (node.checked?.value) props.push('[checked]');
+      if (node.disabled?.value) props.push('[disabled]');
+      if (node.focused?.value) props.push('[focused]');
+
+      let line = `${indent}- ${role}`;
+      if (name) line += ` "${name.slice(0, 50)}"`;
+      if (props.length) line += ` ${props.join(' ')}`;
+
+      lines.push(line);
+
+      if (node.children) {
+        node.children.forEach(child => formatNode(child, depth + 1));
+      }
+    }
+
+    formatNode(result.nodes[0]);
+    return lines.join('\n');
+  },
+
+  async click(selector) {
+    if (!selector) throw new Error('Selector required. Usage: cdp click <css-selector>');
+    
+    const wsUrl = await getPageWs();
+
+    // Get element position
+    const result = await sendCommand(wsUrl, 'Runtime.evaluate', {
+      expression: `
+        (function() {
+          const el = document.querySelector(${JSON.stringify(selector)});
+          if (!el) return { error: 'Element not found' };
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) return { error: 'Element has no size' };
+          return { x: rect.x + rect.width/2, y: rect.y + rect.height/2 };
+        })()
+      `,
+      returnByValue: true
+    });
+
+    const pos = result.result?.value;
+    if (!pos) throw new Error('Failed to evaluate selector');
+    if (pos.error) throw new Error(pos.error + `: ${selector}`);
+
+    // Scroll element into view first
+    await sendCommand(wsUrl, 'Runtime.evaluate', {
+      expression: `document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({ block: 'center' })`
+    });
+    await new Promise(r => setTimeout(r, 100));
+
+    // Re-get position after scroll
+    const result2 = await sendCommand(wsUrl, 'Runtime.evaluate', {
+      expression: `
+        (function() {
+          const el = document.querySelector(${JSON.stringify(selector)});
+          const rect = el.getBoundingClientRect();
+          return { x: rect.x + rect.width/2, y: rect.y + rect.height/2 };
+        })()
+      `,
+      returnByValue: true
+    });
+    const { x, y } = result2.result?.value || pos;
+
+    // Click
+    await sendCommand(wsUrl, 'Input.dispatchMouseEvent', {
+      type: 'mousePressed', x, y, button: 'left', clickCount: 1
+    });
+    await sendCommand(wsUrl, 'Input.dispatchMouseEvent', {
+      type: 'mouseReleased', x, y, button: 'left', clickCount: 1
+    });
+
+    if (jsonOutput) {
+      return { success: true, selector, x, y };
+    }
+    return `Clicked: ${selector} at (${Math.round(x)}, ${Math.round(y)})`;
+  },
+
+  async fill(selector, value) {
+    if (!selector) throw new Error('Selector required. Usage: cdp fill <selector> <value>');
+    if (value === undefined) throw new Error('Value required. Usage: cdp fill <selector> <value>');
+    
+    const wsUrl = await getPageWs();
+
+    // Focus, clear, and fill
+    const result = await sendCommand(wsUrl, 'Runtime.evaluate', {
+      expression: `
+        (function() {
+          const el = document.querySelector(${JSON.stringify(selector)});
+          if (!el) return { error: 'Element not found' };
+          if (!('value' in el)) return { error: 'Element is not an input' };
+          el.focus();
+          el.value = '';
+          el.value = ${JSON.stringify(value)};
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return { success: true };
+        })()
+      `,
+      returnByValue: true
+    });
+
+    const res = result.result?.value;
+    if (!res) throw new Error('Failed to evaluate selector');
+    if (res.error) throw new Error(res.error + `: ${selector}`);
+
+    if (jsonOutput) {
+      return { success: true, selector, value };
+    }
+    return `Filled: ${selector} = "${value}"`;
+  },
+
+  async type(selector, text) {
+    if (!selector) throw new Error('Selector required. Usage: cdp type <selector> <text>');
+    if (text === undefined) throw new Error('Text required. Usage: cdp type <selector> <text>');
+    
+    const wsUrl = await getPageWs();
+
+    // Focus the element first
+    await sendCommand(wsUrl, 'Runtime.evaluate', {
+      expression: `document.querySelector(${JSON.stringify(selector)})?.focus()`
+    });
+
+    // Type character by character
+    for (const char of text) {
+      await sendCommand(wsUrl, 'Input.dispatchKeyEvent', {
+        type: 'keyDown',
+        text: char
+      });
+      await sendCommand(wsUrl, 'Input.dispatchKeyEvent', {
+        type: 'keyUp',
+        text: char
+      });
+    }
+
+    if (jsonOutput) {
+      return { success: true, selector, text };
+    }
+    return `Typed "${text}" into ${selector}`;
+  },
+
+  async eval(expression) {
+    if (!expression) throw new Error('Expression required. Usage: cdp eval <js-expression>');
+    
+    const wsUrl = await getPageWs();
+    const result = await sendCommand(wsUrl, 'Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true
+    });
+
+    if (result.exceptionDetails) {
+      throw new Error(result.exceptionDetails.text || 'Evaluation failed');
+    }
+
+    return result.result?.value;
+  },
+
+  async wait(ms) {
+    const duration = parseInt(ms, 10);
+    if (isNaN(duration) || duration < 0) {
+      throw new Error('Invalid duration. Usage: cdp wait <milliseconds>');
+    }
+    
+    await new Promise(r => setTimeout(r, duration));
+    
+    if (jsonOutput) {
+      return { success: true, waited: duration };
+    }
+    return `Waited ${duration}ms`;
+  },
+
+  async waitfor(selector, timeout) {
+    if (!selector) throw new Error('Selector required. Usage: cdp waitfor <selector> [timeout]');
+    
+    const maxWait = parseInt(timeout, 10) || 10000;
+    const wsUrl = await getPageWs();
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWait) {
+      const result = await sendCommand(wsUrl, 'Runtime.evaluate', {
+        expression: `!!document.querySelector(${JSON.stringify(selector)})`,
+        returnByValue: true
+      });
+
+      if (result.result?.value === true) {
+        if (jsonOutput) {
+          return { success: true, selector, elapsed: Date.now() - startTime };
+        }
+        return `Found: ${selector} (after ${Date.now() - startTime}ms)`;
+      }
+
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    throw new Error(`Timeout waiting for: ${selector}`);
+  },
+
+  async html(selector) {
+    const wsUrl = await getPageWs();
+    
+    const expression = selector 
+      ? `document.querySelector(${JSON.stringify(selector)})?.outerHTML || null`
+      : `document.documentElement.outerHTML`;
+    
+    const result = await sendCommand(wsUrl, 'Runtime.evaluate', {
+      expression,
+      returnByValue: true
+    });
+
+    if (selector && !result.result?.value) {
+      throw new Error(`Element not found: ${selector}`);
+    }
+
+    return result.result?.value;
+  },
+
+  async text(selector) {
+    if (!selector) throw new Error('Selector required. Usage: cdp text <selector>');
+    
+    const wsUrl = await getPageWs();
+    const result = await sendCommand(wsUrl, 'Runtime.evaluate', {
+      expression: `document.querySelector(${JSON.stringify(selector)})?.innerText || null`,
+      returnByValue: true
+    });
+
+    if (!result.result?.value) {
+      throw new Error(`Element not found or empty: ${selector}`);
+    }
+
+    return result.result.value;
+  },
+
+  async console(duration) {
+    const collectTime = parseInt(duration, 10) || 3000; // Default 3 seconds
+    const wsUrl = await getPageWs();
+    const WebSocket = require('ws');
+    
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(wsUrl);
+      const messages = [];
+      let msgId = 1;
+      
+      const timeout = setTimeout(() => {
+        ws.close();
+        finalize();
+      }, collectTime);
+
+      function finalize() {
+        clearTimeout(timeout);
+        
+        if (messages.length === 0) {
+          if (jsonOutput) {
+            resolve({ messages: [], count: 0 });
+          } else {
+            resolve('No console messages captured');
+          }
+          return;
+        }
+
+        if (jsonOutput) {
+          resolve({ messages, count: messages.length });
+        } else {
+          const lines = messages.map(m => {
+            const prefix = m.type === 'error' ? '\x1b[31m[ERROR]\x1b[0m' :
+                          m.type === 'warning' ? '\x1b[33m[WARN]\x1b[0m' :
+                          m.type === 'info' ? '\x1b[36m[INFO]\x1b[0m' :
+                          '[LOG]';
+            const source = m.source ? ` (${m.source})` : '';
+            return `${prefix} ${m.text}${source}`;
+          });
+          resolve(lines.join('\n'));
+        }
+      }
+
+      ws.on('open', () => {
+        // Enable Runtime to receive console events
+        ws.send(JSON.stringify({ id: msgId++, method: 'Runtime.enable' }));
+      });
+
+      ws.on('message', (data) => {
+        const msg = JSON.parse(data.toString());
+        
+        // Handle console API calls (console.log, console.error, etc.)
+        if (msg.method === 'Runtime.consoleAPICalled') {
+          const { type, args, timestamp, stackTrace } = msg.params;
+          const text = args.map(arg => {
+            if (arg.value !== undefined) return String(arg.value);
+            if (arg.description) return arg.description;
+            return JSON.stringify(arg);
+          }).join(' ');
+          
+          const source = stackTrace?.callFrames?.[0];
+          messages.push({
+            type,
+            text,
+            timestamp,
+            source: source ? `${source.url}:${source.lineNumber}` : null
+          });
+        }
+        
+        // Handle uncaught exceptions
+        if (msg.method === 'Runtime.exceptionThrown') {
+          const { exceptionDetails, timestamp } = msg.params;
+          const text = exceptionDetails.exception?.description || 
+                      exceptionDetails.text || 
+                      'Unknown error';
+          const source = exceptionDetails.url ? 
+            `${exceptionDetails.url}:${exceptionDetails.lineNumber}` : null;
+          
+          messages.push({
+            type: 'error',
+            text,
+            timestamp,
+            source,
+            stackTrace: exceptionDetails.stackTrace?.callFrames?.map(f => 
+              `  at ${f.functionName || '(anonymous)'} (${f.url}:${f.lineNumber}:${f.columnNumber})`
+            ).join('\n')
+          });
+        }
+      });
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+  },
+
+  async errors() {
+    // Quick command to get just errors (console + exceptions)
+    const wsUrl = await getPageWs();
+    const WebSocket = require('ws');
+    
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(wsUrl);
+      const errors = [];
+      let msgId = 1;
+      
+      const timeout = setTimeout(() => {
+        ws.close();
+        finalize();
+      }, 2000); // 2 second collection
+
+      function finalize() {
+        clearTimeout(timeout);
+        
+        if (errors.length === 0) {
+          if (jsonOutput) {
+            resolve({ errors: [], count: 0 });
+          } else {
+            resolve('No errors captured');
+          }
+          return;
+        }
+
+        if (jsonOutput) {
+          resolve({ errors, count: errors.length });
+        } else {
+          const lines = errors.map(e => {
+            const stack = e.stackTrace ? '\n' + e.stackTrace : '';
+            return `\x1b[31m[ERROR]\x1b[0m ${e.text}${stack}`;
+          });
+          resolve(lines.join('\n\n'));
+        }
+      }
+
+      ws.on('open', () => {
+        ws.send(JSON.stringify({ id: msgId++, method: 'Runtime.enable' }));
+      });
+
+      ws.on('message', (data) => {
+        const msg = JSON.parse(data.toString());
+        
+        // Only capture errors and exceptions
+        if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
+          const { args, timestamp, stackTrace } = msg.params;
+          const text = args.map(arg => {
+            if (arg.value !== undefined) return String(arg.value);
+            if (arg.description) return arg.description;
+            return JSON.stringify(arg);
+          }).join(' ');
+          
+          errors.push({
+            type: 'console.error',
+            text,
+            timestamp,
+            stackTrace: stackTrace?.callFrames?.map(f => 
+              `  at ${f.functionName || '(anonymous)'} (${f.url}:${f.lineNumber})`
+            ).join('\n')
+          });
+        }
+        
+        if (msg.method === 'Runtime.exceptionThrown') {
+          const { exceptionDetails, timestamp } = msg.params;
+          const text = exceptionDetails.exception?.description || 
+                      exceptionDetails.text || 
+                      'Unknown error';
+          
+          errors.push({
+            type: 'exception',
+            text,
+            timestamp,
+            stackTrace: exceptionDetails.stackTrace?.callFrames?.map(f => 
+              `  at ${f.functionName || '(anonymous)'} (${f.url}:${f.lineNumber}:${f.columnNumber})`
+            ).join('\n')
+          });
+        }
+      });
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+  },
+
+  async network(duration) {
+    const collectTime = parseInt(duration, 10) || 5000; // Default 5 seconds
+    const wsUrl = await getPageWs();
+    const WebSocket = require('ws');
+    
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(wsUrl);
+      const requests = new Map();
+      let msgId = 1;
+      
+      const timeout = setTimeout(() => {
+        ws.close();
+        finalize();
+      }, collectTime);
+
+      function finalize() {
+        clearTimeout(timeout);
+        
+        const completed = Array.from(requests.values()).filter(r => r.status);
+        
+        if (completed.length === 0) {
+          if (jsonOutput) {
+            resolve({ requests: [], count: 0 });
+          } else {
+            resolve('No network requests captured');
+          }
+          return;
+        }
+
+        if (jsonOutput) {
+          resolve({ requests: completed, count: completed.length });
+        } else {
+          const lines = completed.map(r => {
+            const status = r.status >= 400 ? `\x1b[31m${r.status}\x1b[0m` :
+                          r.status >= 300 ? `\x1b[33m${r.status}\x1b[0m` :
+                          `\x1b[32m${r.status}\x1b[0m`;
+            return `${r.method} ${status} ${r.url.slice(0, 80)}`;
+          });
+          resolve(lines.join('\n'));
+        }
+      }
+
+      ws.on('open', () => {
+        ws.send(JSON.stringify({ id: msgId++, method: 'Network.enable' }));
+      });
+
+      ws.on('message', (data) => {
+        const msg = JSON.parse(data.toString());
+        
+        if (msg.method === 'Network.requestWillBeSent') {
+          const { requestId, request, timestamp, type } = msg.params;
+          requests.set(requestId, {
+            url: request.url,
+            method: request.method,
+            type,
+            timestamp
+          });
+        }
+        
+        if (msg.method === 'Network.responseReceived') {
+          const { requestId, response } = msg.params;
+          const req = requests.get(requestId);
+          if (req) {
+            req.status = response.status;
+            req.statusText = response.statusText;
+            req.mimeType = response.mimeType;
+          }
+        }
+      });
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+  }
+};
+
+// Help text
+const helpText = `CDP CLI - Chrome DevTools Protocol
+
+Usage: cdp <command> [args] [options]
+
+Commands:
+  tabs                      List open browser tabs
+  info                      Get current page title and URL
+  navigate <url>            Navigate to URL
+  screenshot [path]         Take screenshot (default: workspace/temp/screenshot.png)
+  snapshot                  Get accessibility tree (for finding elements)
+  click <selector>          Click element by CSS selector
+  fill <selector> <value>   Set input value (instant)
+  type <selector> <text>    Type text character by character
+  eval <expression>         Evaluate JavaScript and return result
+  wait <ms>                 Wait for milliseconds
+  waitfor <selector> [ms]   Wait for element to appear (default timeout: 10s)
+  html [selector]           Get HTML content (full page if no selector)
+  text <selector>           Get text content of element
+
+Debugging:
+  console [duration]        Capture console messages (default: 3000ms)
+  errors                    Capture only errors and exceptions (2000ms)
+  network [duration]        Monitor network requests (default: 5000ms)
+
+Options:
+  --json                    Output results as JSON
+  --tab=<id|title>          Select tab by ID or title substring
+
+Environment:
+  CDP_HOST                  Chrome host (default: localhost)
+  CDP_PORT                  Chrome port (default: 9222)
+  CDP_TIMEOUT               Command timeout in ms (default: 30000)
+
+Examples:
+  cdp tabs
+  cdp navigate https://example.com
+  cdp snapshot > page-structure.txt
+  cdp click "button[type=submit]"
+  cdp fill "input[name=email]" "test@example.com"
+  cdp screenshot workspace/temp/result.png
+  cdp eval "document.querySelectorAll('a').length"
+  cdp --json info
+  
+  # Debugging
+  cdp console                     # Capture console for 3 seconds
+  cdp console 10000               # Capture for 10 seconds
+  cdp errors                      # Capture only errors
+  cdp network 5000                # Monitor network for 5 seconds
+  cdp --json console              # JSON output for parsing
+
+Prerequisites:
+  Start Chrome with: chromium --remote-debugging-port=9222
+`;
+
+// Main
+async function main() {
+  const [cmd, ...cmdArgs] = args;
+
+  if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {
+    console.log(helpText);
+    return;
+  }
+
+  if (!commands[cmd]) {
+    error(`Unknown command: ${cmd}. Run 'cdp help' for usage.`);
+  }
+
+  try {
+    const result = await commands[cmd](...cmdArgs);
+    if (result !== undefined) {
+      output(result);
+    }
+  } catch (err) {
+    error(err.message);
+  }
+}
+
+main();

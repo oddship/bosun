@@ -1,0 +1,30 @@
+{
+  "name": "pi-daemon",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Background automation daemon for Pi \u2014 file watchers, rules engine, task queue",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-daemon"
+  },
+  "bin": {
+    "pi-daemon": "./src/index.ts"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "dependencies": {
+    "chokidar": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  }
+}

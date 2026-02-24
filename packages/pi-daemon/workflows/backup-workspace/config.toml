@@ -1,0 +1,16 @@
+[workflow]
+name = "backup-workspace"
+description = "Daily tar.gz snapshots of workspace and config"
+type = "script"
+
+[trigger]
+schedule = "daily:02"
+
+[script]
+command = "backup.ts"
+
+[retry]
+max_attempts = 1
+
+[timeout]
+minutes = 5

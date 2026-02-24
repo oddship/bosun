@@ -1,0 +1,40 @@
+
+*~
+.bosun-daemon/
+.bosun-home/
+# Bosun runtime
+# Build output
+.claude/
+/config.toml
+# Dependencies
+.direnv/
+.DS_Store
+# Editor/IDE
+# Generated config files (from `just init`)
+.idea/
+# Legacy (remove after full migration)
+moat/moat
+# Nix / direnv
+node_modules/
+# OS
+.pi/agents.json
+.pi/bwrap.json
+.pi/daemon.json
+.pi/mesh/
+.pi/npm/
+.pi/pi-mesh.json
+.pi/pi-q.json
+.pi/sandbox.json
+pi-session-*.html
+.pi/settings.json
+result
+result-*
+# Root config only (contains API keys) — workflow config.toml files are safe to track
+# Session exports
+_site/
+*.swo
+*.swp
+Thumbs.db
+# User config (contains secrets)
+.vscode/
+workspace/

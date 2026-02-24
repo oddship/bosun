@@ -1,0 +1,16 @@
+{
+  "name": "pi-meta-skills",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Meta skills for Pi — create skills, extensions, tools, and prompt templates",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-meta-skills"
+  },
+  "pi": {
+    "skills": ["./skills"]
+  }
+}

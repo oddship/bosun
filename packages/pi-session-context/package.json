@@ -1,0 +1,24 @@
+{
+  "name": "pi-session-context",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Session info and handoff creation tool for Pi",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-session-context"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  }
+}

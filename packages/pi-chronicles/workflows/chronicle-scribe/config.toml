@@ -1,0 +1,21 @@
+[workflow]
+name = "chronicle-scribe"
+description = "Write builder's log chronicles from journey analysis"
+type = "agent"
+
+[trigger]
+schedule = "hourly"
+
+[agent]
+model = "lite"
+prompt = "Check for unprocessed chronicle analyses and write builder's log chronicles. Find analysis JSONs in workspace/users/$USER/chronicles/analysis/ that don't have corresponding chronicle markdowns in workspace/users/$USER/public/chronicles/."
+
+[retry]
+max_attempts = 2
+
+[validators]
+input = "validate-input.ts"
+output = "validate-output.ts"
+
+[timeout]
+minutes = 10

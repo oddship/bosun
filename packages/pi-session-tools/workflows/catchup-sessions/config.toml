@@ -1,0 +1,21 @@
+[workflow]
+name = "catchup-sessions"
+description = "Scan for unsummarized session JSONL files and generate summaries"
+type = "agent"
+
+[trigger]
+schedule = "hourly"
+startup = true
+
+[agent]
+model = "lite"
+prompt = "Check for unsummarized session JSONL files and generate markdown summaries for any that are missing. Use BOSUN_ROOT env var to find paths."
+
+[validators]
+input = "validate-input.ts"
+
+[retry]
+max_attempts = 2
+
+[timeout]
+minutes = 10

@@ -1,0 +1,24 @@
+{
+  "name": "pi-sandbox",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tool-level sandboxing for Pi \u2014 restrict bash, write, and edit calls per config",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-sandbox"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  }
+}

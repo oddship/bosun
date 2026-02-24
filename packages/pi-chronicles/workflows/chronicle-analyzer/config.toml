@@ -1,0 +1,21 @@
+[workflow]
+name = "chronicle-analyzer"
+description = "Analyze session summaries and group into journeys for chronicle generation"
+type = "agent"
+
+[trigger]
+schedule = "hourly"
+
+[agent]
+model = "lite"
+prompt = "Analyze today's session summaries and generate a journey analysis. Check the current date, find session summaries, group them into journeys, and write the analysis JSON output."
+
+[retry]
+max_attempts = 2
+
+[validators]
+input = "validate-input.ts"
+output = "validate-output.ts"
+
+[timeout]
+minutes = 10

@@ -1,0 +1,979 @@
+#!/usr/bin/env bun
+
+import { parseArgs } from "util";
+import { z } from "zod";
+import matter from "gray-matter";
+import yaml from "js-yaml";
+import { readdir, readFile, writeFile, mkdir, unlink } from "fs/promises";
+import { existsSync } from "fs";
+import { join, basename } from "path";
+import { spawn } from "child_process";
+
+// Custom matter parser that disables automatic date conversion
+// This ensures dates like "2026-01-12" stay as strings, not Date objects
+const matterOptions = {
+  engines: {
+    yaml: (s: string) => yaml.load(s, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>,
+  },
+};
+
+function parseFrontmatter(content: string) {
+  return matter(content, matterOptions);
+}
+
+// ============================================================================
+// Schema
+// ============================================================================
+
+const ProjectSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.enum(["planning", "active", "blocked", "completed", "archived"]),
+  priority: z.enum(["P0", "P1", "P2", "P3"]),
+  created: z.string(),
+  updated: z.string(),
+  due: z.string().nullable().optional(),
+  completed: z.string().nullable().optional(),
+  archived: z.string().nullable().optional(),
+  owner: z.string().nullable().optional(),
+  repos: z.array(z.string()).optional().default([]),
+  team: z.string().nullable().optional(),
+  stakeholders: z.array(z.string()).optional().default([]),
+  roadmap: z.string().nullable().optional(),
+  promoted_from: z.string().nullable().optional(),
+  promoted_to: z.string().nullable().optional(),
+  parent: z.string().nullable().optional(),
+  children: z.array(z.string()).optional().default([]),
+  health: z.enum(["green", "yellow", "red"]).optional().default("green"),
+  progress: z.number().optional().default(0),
+  tags: z.array(z.string()).optional().default([]),
+  wiki: z.string().nullable().optional(),
+  sprint: z.string().nullable().optional(),
+}).passthrough();
+
+type Project = z.infer<typeof ProjectSchema>;
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const PROJECT_ARCHIVE_RETENTION_DAYS = 60;
+
+// ============================================================================
+// Paths
+// ============================================================================
+
+function getProjectsDir(): string {
+  const user = process.env.USER || process.env.LOGNAME || "unknown";
+  const base = process.env.BESON_ROOT || process.cwd();
+  return join(base, "workspace", "users", user, "projects");
+}
+
+function getArchiveDir(yearMonth: string): string {
+  return join(getProjectsDir(), "archive", yearMonth);
+}
+
+function getUpdateLogPath(): string {
+  return join(getProjectsDir(), "_update-log.md");
+}
+
+function getQtPath(): string {
+  const base = process.env.BESON_ROOT || process.cwd();
+  return join(base, ".pi", "skills", "q-tasks", "scripts", "qt");
+}
+
+// ============================================================================
+// Utilities
+// ============================================================================
+
+function generateId(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 32);
+}
+
+function today(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+function now(): string {
+  return new Date().toISOString().split("T")[1].slice(0, 5);
+}
+
+function yearMonth(): string {
+  return today().slice(0, 7);
+}
+
+async function ensureDir(dir: string): Promise<void> {
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+}
+
+function output(data: unknown, json: boolean): void {
+  if (json) {
+    console.log(JSON.stringify(data, null, 2));
+  } else if (typeof data === "string") {
+    console.log(data);
+  } else {
+    console.log(JSON.stringify(data, null, 2));
+  }
+}
+
+// Normalize progress values - handles both decimal (0.85) and percentage (85) formats
+function normalizeProgress(value: number | undefined): number {
+  if (value === undefined || value === null) return 0;
+  // If value > 1, assume it's stored as percentage (85 -> 0.85)
+  // If value <= 1, assume it's already decimal
+  return value > 1 ? value / 100 : value;
+}
+
+function error(message: string, code: string, details?: Record<string, unknown>): never {
+  console.error(JSON.stringify({ error: message, code, ...details }));
+  process.exit(1);
+}
+
+// ID validation to prevent path traversal
+function validateId(id: string): void {
+  if (!id || typeof id !== "string") {
+    error("ID is required", "INVALID_ID");
+  }
+  // Only allow alphanumeric and hyphens, max 32 chars
+  if (!/^[a-z0-9\-]{1,32}$/i.test(id)) {
+    error("Invalid ID format (alphanumeric and hyphens only)", "INVALID_ID", { id });
+  }
+  // Explicitly block path traversal
+  if (id.includes("..") || id.includes("/") || id.includes("\\")) {
+    error("ID cannot contain path traversal sequences", "INVALID_ID", { id });
+  }
+}
+
+// ============================================================================
+// Project I/O
+// ============================================================================
+
+// Find a file by ID with flexible matching: {id}.md or {id}-*.md
+async function findFileById(dir: string, id: string): Promise<string | null> {
+  if (!existsSync(dir)) return null;
+  
+  const files = await readdir(dir);
+  const match = files.find(f => 
+    (f === `${id}.md`) || (f.startsWith(`${id}-`) && f.endsWith('.md'))
+  );
+  
+  return match ? join(dir, match) : null;
+}
+
+async function loadProject(id: string, includeArchived = false): Promise<{ project: Project; path: string; content: string } | null> {
+  validateId(id);
+  const projectsDir = getProjectsDir();
+  
+  // Try active projects with flexible matching
+  const activePath = await findFileById(projectsDir, id);
+  if (activePath) {
+    const raw = await readFile(activePath, "utf-8");
+    const { data, content } = parseFrontmatter(raw);
+    const project = ProjectSchema.parse(data);
+    return { project, path: activePath, content };
+  }
+  
+  if (includeArchived) {
+    const archiveBase = join(projectsDir, "archive");
+    if (existsSync(archiveBase)) {
+      const months = await readdir(archiveBase);
+      for (const month of months) {
+        const monthDir = join(archiveBase, month);
+        const archivePath = await findFileById(monthDir, id);
+        if (archivePath) {
+          const raw = await readFile(archivePath, "utf-8");
+          const { data, content } = parseFrontmatter(raw);
+          const project = ProjectSchema.parse(data);
+          return { project, path: archivePath, content };
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+async function saveProject(project: Project, content: string, path?: string): Promise<string> {
+  const projectsDir = getProjectsDir();
+  await ensureDir(projectsDir);
+  
+  const filePath = path || join(projectsDir, `${project.id}.md`);
+  const fileContent = matter.stringify(content, project);
+  await writeFile(filePath, fileContent);
+  return filePath;
+}
+
+async function loadAllProjects(includeArchived = false): Promise<Array<{ project: Project; path: string }>> {
+  const projectsDir = getProjectsDir();
+  const projects: Array<{ project: Project; path: string }> = [];
+  
+  if (!existsSync(projectsDir)) {
+    return projects;
+  }
+  
+  const files = await readdir(projectsDir);
+  for (const file of files) {
+    if (file.endsWith(".md") && !file.startsWith("_")) {
+      const path = join(projectsDir, file);
+      const raw = await readFile(path, "utf-8");
+      const { data } = parseFrontmatter(raw);
+      try {
+        const project = ProjectSchema.parse(data);
+        projects.push({ project, path });
+      } catch {
+        // Skip invalid files
+      }
+    }
+  }
+  
+  if (includeArchived) {
+    const archiveBase = join(projectsDir, "archive");
+    if (existsSync(archiveBase)) {
+      const months = await readdir(archiveBase);
+      for (const month of months) {
+        const monthDir = join(archiveBase, month);
+        const archiveFiles = await readdir(monthDir);
+        for (const file of archiveFiles) {
+          if (file.endsWith(".md") && !file.startsWith("_")) {
+            const path = join(monthDir, file);
+            const raw = await readFile(path, "utf-8");
+            const { data } = parseFrontmatter(raw);
+            try {
+              const project = ProjectSchema.parse(data);
+              projects.push({ project, path });
+            } catch {
+              // Skip invalid files
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return projects;
+}
+
+// ============================================================================
+// Update Log
+// ============================================================================
+
+async function appendLog(projectId: string, title: string, message: string): Promise<void> {
+  const logPath = getUpdateLogPath();
+  await ensureDir(getProjectsDir());
+  
+  const todayStr = today();
+  const timeStr = now();
+  const entry = `- **${timeStr}** ${message}\n`;
+  const projectHeader = `### ${projectId}: ${title}\n`;
+  const dateHeader = `## ${todayStr}\n\n`;
+  
+  let content = "";
+  if (existsSync(logPath)) {
+    content = await readFile(logPath, "utf-8");
+  } else {
+    content = "# Project Update Log\n\n";
+  }
+  
+  if (!content.includes(dateHeader.trim())) {
+    const titleEnd = content.indexOf("\n\n") + 2;
+    content = content.slice(0, titleEnd) + dateHeader + content.slice(titleEnd);
+  }
+  
+  const dateIndex = content.indexOf(dateHeader.trim());
+  const nextDateIndex = content.indexOf("\n## ", dateIndex + 1);
+  const sectionEnd = nextDateIndex === -1 ? content.length : nextDateIndex;
+  
+  const todaySection = content.slice(dateIndex, sectionEnd);
+  if (todaySection.includes(projectHeader.trim())) {
+    const projectIndex = content.indexOf(projectHeader.trim(), dateIndex);
+    const projectEndIndex = content.indexOf("\n### ", projectIndex + 1);
+    const insertPoint = projectEndIndex === -1 || projectEndIndex > sectionEnd
+      ? sectionEnd
+      : projectEndIndex;
+    content = content.slice(0, insertPoint) + entry + content.slice(insertPoint);
+  } else {
+    const insertPoint = dateIndex + dateHeader.length;
+    content = content.slice(0, insertPoint) + projectHeader + entry + "\n" + content.slice(insertPoint);
+  }
+  
+  await writeFile(logPath, content);
+}
+
+// ============================================================================
+// Qt Integration
+// ============================================================================
+
+async function runQt(args: string[]): Promise<{ success: boolean; data?: unknown; error?: string }> {
+  return new Promise((resolve) => {
+    const qtPath = getQtPath();
+    const safeArgs = args.map(arg => {
+      if (arg.startsWith("--") || /^[a-zA-Z0-9\-_,\.]+$/.test(arg)) return arg;
+      throw new Error(`Invalid argument: ${arg}`);
+    });
+    const proc = spawn(qtPath, [...safeArgs, "--json"], { stdio: ["pipe", "pipe", "pipe"] });
+    
+    let stdout = "";
+    let stderr = "";
+    
+    proc.stdout.on("data", (data) => { stdout += data; });
+    proc.stderr.on("data", (data) => { stderr += data; });
+    
+    proc.on("close", (code) => {
+      if (code === 0) {
+        try {
+          resolve({ success: true, data: JSON.parse(stdout) });
+        } catch {
+          resolve({ success: true, data: stdout });
+        }
+      } else {
+        try {
+          resolve({ success: false, error: JSON.parse(stderr).error || stderr });
+        } catch {
+          resolve({ success: false, error: stderr || stdout });
+        }
+      }
+    });
+  });
+}
+
+// ============================================================================
+// Commands
+// ============================================================================
+
+async function cmdNew(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      priority: { type: "string", short: "p", default: "P1" },
+      due: { type: "string", short: "d" },
+      repo: { type: "string" },
+      tags: { type: "string", short: "t" },
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const title = positionals.join(" ");
+  if (!title) {
+    error("Project title is required", "MISSING_TITLE");
+  }
+  
+  const id = generateId(title);
+  const todayStr = today();
+  const user = process.env.USER || process.env.LOGNAME || "unknown";
+  
+  const repos = values.repo ? [values.repo] : [];
+  const team = values.repo?.split("/")[1] || null;
+  const tags = values.tags?.split(",").map(s => s.trim()).filter(Boolean) || [];
+  
+  const project: Project = {
+    id,
+    title,
+    status: "planning",
+    priority: values.priority as "P0" | "P1" | "P2" | "P3",
+    created: todayStr,
+    updated: todayStr,
+    due: values.due || null,
+    owner: user,
+    repos,
+    team,
+    stakeholders: [],
+    roadmap: null,
+    promoted_from: null,
+    promoted_to: null,
+    parent: null,
+    children: [],
+    health: "green",
+    progress: 0,
+    tags,
+  };
+  
+  const content = `
+## Overview
+
+[Add project overview]
+
+## Goals
+
+- [ ] Goal 1
+- [ ] Goal 2
+
+## Milestones
+
+1. **Phase 1**: [Description]
+2. **Phase 2**: [Description]
+
+## Notes
+
+[Key decisions and context]
+
+## Risks
+
+[Potential risks and mitigations]
+`;
+  
+  await saveProject(project, content.trim());
+  await appendLog(id, title, "Created project");
+  
+  output({ success: true, operation: "new", project }, values.json);
+}
+
+async function cmdShow(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Project ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadProject(id, true);
+  if (!data) {
+    error("Project not found", "PROJECT_NOT_FOUND", { id });
+  }
+  
+  if (values.json) {
+    output({ success: true, operation: "show", project: data.project }, true);
+  } else {
+    const raw = await readFile(data.path, "utf-8");
+    console.log(raw);
+  }
+}
+
+async function cmdList(args: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args,
+    options: {
+      status: { type: "string" },
+      priority: { type: "string" },
+      repo: { type: "string" },
+      team: { type: "string" },
+      tags: { type: "string", short: "t" },
+      "include-archived": { type: "boolean", default: false },
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  let projects = await loadAllProjects(values["include-archived"]);
+  
+  if (values.status) {
+    projects = projects.filter(p => p.project.status === values.status);
+  } else if (!values["include-archived"]) {
+    projects = projects.filter(p => !["completed", "archived"].includes(p.project.status));
+  }
+  
+  if (values.priority) {
+    projects = projects.filter(p => p.project.priority === values.priority);
+  }
+  
+  if (values.repo) {
+    projects = projects.filter(p => p.project.repos?.some(r => r.includes(values.repo!)));
+  }
+  
+  if (values.team) {
+    projects = projects.filter(p => p.project.team === values.team);
+  }
+  
+  if (values.tags) {
+    const filterTags = values.tags.split(",").map(s => s.trim()).filter(Boolean);
+    projects = projects.filter(p => 
+      filterTags.some(tag => p.project.tags?.includes(tag))
+    );
+  }
+  
+  const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3 };
+  projects.sort((a, b) => {
+    const pDiff = priorityOrder[a.project.priority] - priorityOrder[b.project.priority];
+    if (pDiff !== 0) return pDiff;
+    return normalizeProgress(b.project.progress) - normalizeProgress(a.project.progress);
+  });
+  
+  if (values.json) {
+    output({ success: true, operation: "list", count: projects.length, projects: projects.map(p => p.project) }, true);
+  } else {
+    if (projects.length === 0) {
+      console.log("No projects found");
+    } else {
+      for (const { project } of projects) {
+        const progress = Math.round(normalizeProgress(project.progress) * 100);
+        const health = project.health === "green" ? "" : ` [${project.health?.toUpperCase()}]`;
+        console.log(`${project.id} [${project.priority}] ${project.title} (${progress}%)${health}`);
+      }
+    }
+  }
+}
+
+async function cmdTasks(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      status: { type: "string" },
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Project ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadProject(id);
+  if (!data) {
+    error("Project not found", "PROJECT_NOT_FOUND", { id });
+  }
+  
+  const qtArgs = ["list", "--project", id];
+  if (values.status) {
+    qtArgs.push("--status", values.status);
+  }
+  
+  const result = await runQt(qtArgs);
+  
+  if (!result.success) {
+    error(result.error || "Failed to get tasks", "QT_ERROR");
+  }
+  
+  if (values.json) {
+    output(result.data, true);
+  } else {
+    const taskData = result.data as { tasks?: Array<{ id: string; priority: string; title: string; status: string }> };
+    if (!taskData.tasks || taskData.tasks.length === 0) {
+      console.log(`No tasks found for project: ${id}`);
+    } else {
+      console.log(`Tasks for ${data.project.title}:\n`);
+      for (const task of taskData.tasks) {
+        const statusStr = task.status === "blocked" ? " [BLOCKED]" : "";
+        console.log(`  ${task.id} [${task.priority}] ${task.title}${statusStr}`);
+      }
+    }
+  }
+}
+
+async function cmdProgress(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Project ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadProject(id);
+  if (!data) {
+    error("Project not found", "PROJECT_NOT_FOUND", { id });
+  }
+  
+  const result = await runQt(["list", "--project", id, "--include-archived"]);
+  const taskData = result.data as { tasks?: Array<{ status: string }> } || { tasks: [] };
+  const tasks = taskData.tasks || [];
+  
+  const total = tasks.length;
+  const done = tasks.filter(t => t.status === "done").length;
+  const active = tasks.filter(t => t.status === "active").length;
+  const blocked = tasks.filter(t => t.status === "blocked").length;
+  const inbox = tasks.filter(t => t.status === "inbox").length;
+  
+  const progress = total > 0 ? done / total : 0;
+  let health: "green" | "yellow" | "red" = "green";
+  if (blocked > 0) {
+    health = "yellow";
+  }
+  if (data.project.due) {
+    const dueDate = new Date(data.project.due);
+    const now = new Date();
+    const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) {
+      health = "red";
+    } else if (daysLeft < 7 && progress < 0.8) {
+      health = "yellow";
+    }
+  }
+  
+  if (Math.abs(data.project.progress - progress) > 0.01 || data.project.health !== health) {
+    data.project.progress = progress;
+    data.project.health = health;
+    data.project.updated = today();
+    await saveProject(data.project, data.content, data.path);
+  }
+  
+  const progressResult = {
+    success: true,
+    operation: "progress",
+    project_id: id,
+    title: data.project.title,
+    progress: Math.round(progress * 100) / 100,
+    health,
+    tasks: { total, done, active, blocked, inbox },
+  };
+  
+  if (values.json) {
+    output(progressResult, true);
+  } else {
+    console.log(`Project: ${data.project.title}`);
+    console.log(`Progress: ${Math.round(progress * 100)}%`);
+    console.log(`Health: ${health}`);
+    console.log(`\nTasks:`);
+    console.log(`  Total: ${total}`);
+    console.log(`  Done: ${done}`);
+    console.log(`  Active: ${active}`);
+    console.log(`  Blocked: ${blocked}`);
+    console.log(`  Inbox: ${inbox}`);
+  }
+}
+
+async function cmdArchive(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      "dry-run": { type: "boolean", default: false },
+      "older-than": { type: "string" },
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const specificId = positionals[0];
+  const todayStr = today();
+  const ym = yearMonth();
+  
+  let toArchive: Array<{ project: Project; path: string }> = [];
+  
+  if (specificId) {
+    const data = await loadProject(specificId);
+    if (!data) {
+      error("Project not found", "PROJECT_NOT_FOUND", { id: specificId });
+    }
+    if (data.project.status !== "completed") {
+      error("Only completed projects can be archived", "INVALID_STATUS", { status: data.project.status });
+    }
+    toArchive = [{ project: data.project, path: data.path }];
+  } else {
+    const projects = await loadAllProjects();
+    const daysThreshold = values["older-than"]
+      ? parseInt(values["older-than"].replace("d", ""))
+      : PROJECT_ARCHIVE_RETENTION_DAYS;
+    
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - daysThreshold);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+    
+    toArchive = projects.filter(({ project }) => {
+      if (project.status !== "completed") return false;
+      const completedDate = project.completed || project.updated;
+      return completedDate && completedDate <= cutoffStr;
+    });
+  }
+  
+  if (values["dry-run"]) {
+    output({
+      success: true,
+      operation: "archive",
+      dry_run: true,
+      count: toArchive.length,
+      projects: toArchive.map(p => ({ id: p.project.id, title: p.project.title })),
+    }, values.json);
+    return;
+  }
+  
+  const archiveDir = getArchiveDir(ym);
+  await ensureDir(archiveDir);
+  
+  for (const { project, path } of toArchive) {
+    project.archived = todayStr;
+    project.status = "archived";
+    project.updated = todayStr;
+    
+    const raw = await readFile(path, "utf-8");
+    const { content } = parseFrontmatter(raw);
+    
+    const newPath = join(archiveDir, basename(path));
+    await saveProject(project, content, newPath);
+    await unlink(path);
+    await appendLog(project.id, project.title, `Archived to ${ym}`);
+  }
+  
+  output({
+    success: true,
+    operation: "archive",
+    count: toArchive.length,
+    projects: toArchive.map(p => ({ id: p.project.id, title: p.project.title })),
+  }, values.json);
+}
+
+async function cmdUnarchive(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Project ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadProject(id, true);
+  if (!data) {
+    error("Project not found", "PROJECT_NOT_FOUND", { id });
+  }
+  
+  if (!data.path.includes("/archive/")) {
+    error("Project is not archived", "NOT_ARCHIVED", { id });
+  }
+  
+  const todayStr = today();
+  data.project.archived = null;
+  data.project.status = "active";
+  data.project.updated = todayStr;
+  
+  const projectsDir = getProjectsDir();
+  const newPath = join(projectsDir, `${id}.md`);
+  
+  const raw = await readFile(data.path, "utf-8");
+  const { content } = parseFrontmatter(raw);
+  
+  await saveProject(data.project, content, newPath);
+  await unlink(data.path);
+  await appendLog(id, data.project.title, "Unarchived, status: -> active");
+  
+  output({ success: true, operation: "unarchive", project: data.project }, values.json);
+}
+
+async function cmdLog(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const logPath = getUpdateLogPath();
+  
+  if (!existsSync(logPath)) {
+    output({ success: true, operation: "log", entries: [] }, values.json);
+    return;
+  }
+  
+  const content = await readFile(logPath, "utf-8");
+  
+  const specificId = positionals[0];
+  if (specificId) {
+    const lines = content.split("\n");
+    const filtered: string[] = [];
+    let inProject = false;
+    
+    for (const line of lines) {
+      if (line.startsWith("### ")) {
+        inProject = line.includes(specificId);
+      }
+      if (inProject || line.startsWith("# ") || line.startsWith("## ")) {
+        filtered.push(line);
+      }
+    }
+    
+    console.log(filtered.join("\n"));
+  } else {
+    console.log(content);
+  }
+}
+
+async function cmdPublish(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Project ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadProject(id);
+  if (!data) {
+    error("Project not found", "PROJECT_NOT_FOUND", { id });
+  }
+  
+  const user = process.env.USER || process.env.LOGNAME || "unknown";
+  const base = process.env.BESON_ROOT || process.cwd();
+  const publicProjectsDir = join(base, "workspace", "users", user, "public", "projects");
+  await ensureDir(publicProjectsDir);
+  
+  const publicPath = join(publicProjectsDir, `${id}.md`);
+  const raw = await readFile(data.path, "utf-8");
+  await writeFile(publicPath, raw);
+  
+  await appendLog(id, data.project.title, "Published to public/projects/");
+  
+  output({ success: true, operation: "publish", project: data.project, public_path: publicPath }, values.json);
+}
+
+async function cmdUnpublish(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Project ID is required", "MISSING_ID");
+  }
+  
+  const user = process.env.USER || process.env.LOGNAME || "unknown";
+  const base = process.env.BESON_ROOT || process.cwd();
+  const publicPath = join(base, "workspace", "users", user, "public", "projects", `${id}.md`);
+  
+  if (!existsSync(publicPath)) {
+    error("Project is not published", "NOT_PUBLISHED", { id });
+  }
+  
+  await unlink(publicPath);
+  
+  const data = await loadProject(id);
+  if (data) {
+    await appendLog(id, data.project.title, "Unpublished from public/projects/");
+  }
+  
+  output({ success: true, operation: "unpublish", id }, values.json);
+}
+
+async function cmdEdit(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  
+  const id = positionals[0];
+  if (!id) {
+    error("Project ID is required", "MISSING_ID");
+  }
+  
+  const data = await loadProject(id);
+  if (!data) {
+    error("Project not found", "PROJECT_NOT_FOUND", { id });
+  }
+  
+  const editor = process.env.EDITOR || process.env.VISUAL || "vi";
+  const { spawn: spawnSync } = await import("child_process");
+  
+  const proc = spawnSync(editor, [data.path], { 
+    stdio: "inherit",
+    env: process.env,
+  });
+  
+  await new Promise<void>((resolve, reject) => {
+    proc.on("close", (code) => {
+      code === 0 ? resolve() : reject(new Error(`Editor exited with code ${code}`));
+    });
+    proc.on("error", reject);
+  });
+  
+  const editedData = await loadProject(id);
+  if (!editedData) {
+    error("Project file was deleted during edit", "EDIT_ERROR", { id });
+  }
+  
+  await appendLog(id, editedData.project.title, "Edited via editor");
+  
+  if (values.json) {
+    output({ success: true, operation: "edit", project: editedData.project }, true);
+  } else {
+    console.log(`Project ${id} updated successfully`);
+  }
+}
+
+// ============================================================================
+// Main
+// ============================================================================
+
+const commands: Record<string, (args: string[]) => Promise<void>> = {
+  new: cmdNew,
+  show: cmdShow,
+  edit: cmdEdit,
+  list: cmdList,
+  tasks: cmdTasks,
+  progress: cmdProgress,
+  archive: cmdArchive,
+  unarchive: cmdUnarchive,
+  log: cmdLog,
+  publish: cmdPublish,
+  unpublish: cmdUnpublish,
+};
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const command = args[0];
+  
+  if (!command || command === "help" || command === "--help") {
+    console.log(`qp - Project management CLI for Q agent
+
+Usage: qp <command> [options]
+
+Commands:
+  new <title>     Create a new project
+  show <id>       Show project details
+  edit <id>       Edit project in $EDITOR
+  list            List projects
+  tasks <id>      List project tasks
+  progress <id>   Calculate project progress
+  archive [id]    Archive completed projects
+  unarchive <id>  Restore archived project
+  log [id]        Show update log
+  publish <id>    Publish to public/
+  unpublish <id>  Remove from public/
+
+Options:
+  --json          Output as JSON
+  --help          Show help
+
+Examples:
+  qp new "API v2 Migration" -p P0 --repo github/myorg/myrepo -t infra,trading
+  qp list --priority P0
+  qp tasks tsl-myproject
+  qp progress tsl-myproject
+  qp archive --dry-run
+`);
+    return;
+  }
+  
+  const handler = commands[command];
+  if (!handler) {
+    error(`Unknown command: ${command}`, "UNKNOWN_COMMAND", { command });
+  }
+  
+  await handler(args.slice(1));
+}
+
+main().catch(err => {
+  console.error(JSON.stringify({ error: err.message, code: "INTERNAL_ERROR" }));
+  process.exit(1);
+});

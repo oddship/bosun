@@ -1,0 +1,30 @@
+{
+  "name": "pi-agents",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Agent identity, model tier resolution, and spawn_agent tool for Pi",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-agents"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  }
+}

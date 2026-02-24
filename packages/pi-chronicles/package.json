@@ -1,0 +1,14 @@
+{
+  "name": "pi-chronicles",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Builder's log chronicle generation from coding sessions",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "pi": {
+    "workflows": [
+      "./workflows/chronicle-analyzer",
+      "./workflows/chronicle-scribe"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+site_name = "Bosun"
+
+[highlight]
+light = "github"
+dark  = "github-dark"
+
+[[links]]
+title = "GitHub"
+url = "https://github.com/oddship/bosun"
+
+[extra]
+footer = 'Built with <a href="https://github.com/oddship/moat">moat</a> + <a href="https://github.com/knadh/oat">oat</a>'

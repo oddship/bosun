@@ -1,0 +1,24 @@
+{
+  "name": "pi-tmux",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Terminal power tools for Pi \u2014 split_pane, send_keys, capture_pane, list_windows",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-tmux"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  }
+}

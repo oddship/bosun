@@ -1,0 +1,14 @@
+{
+  "name": "pi-session-tools",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Session summarization and handoff tools",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "pi": {
+    "workflows": [
+      "./workflows/catchup-sessions",
+      "./workflows/fill-handoff"
+    ]
+  }
+}
