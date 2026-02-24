@@ -132,38 +132,105 @@ Read `upstream/scripts/init.ts` and write an adapted version:
 
 ### Step 5: justfile
 
-Read `upstream/justfile` and write an adapted version:
+Read `upstream/justfile` and write an adapted version. The justfile uses
+`upstream/scripts/tmux-helpers.sh` for tmux management functions.
 
-**Adaptations:**
-- Replace `scripts/sandbox.sh` with `upstream/scripts/sandbox.sh`
-- Replace `scripts/tmux-helpers.sh` with `upstream/scripts/tmux-helpers.sh`
-- Replace `scripts/tmux-next-bosun.sh` with `upstream/scripts/tmux-next-bosun.sh`
-  (or write a project-specific version)
-- Replace all `bosun` session naming with `{{PROJECT_NAME}}`
-  (e.g., `bosun-daemon` → `{{PROJECT_NAME}}-daemon`)
-- Replace `PI_AGENT=bosun` and `PI_AGENT_NAME=bosun` with `{{ORCHESTRATOR_NAME}}`
-- Replace `.bosun-home` references — keep the same dir name (it's gitignored)
-- Replace `.bosun-daemon` references — keep the same dir name
-- Add an `update` recipe (same as upstream's `just update`)
-- Add a `sync-upstream` recipe:
-  ```just
-  # Sync upstream bosun
-  sync-upstream:
-      cd upstream && git fetch origin && git checkout main && git pull
-      cd .. && git add upstream
-      bun install
-      just init
-      @echo "Upstream synced. Review changes, then commit."
-  ```
-- Add a `sync-skills` recipe:
-  ```just
-  # Sync skills from upstream
-  sync-skills:
-      @echo "Skills in upstream/.pi/skills/ not in .pi/skills/:"
-      @comm -23 <(ls upstream/.pi/skills/ | sort) <(ls .pi/skills/ | sort) 2>/dev/null || true
-      @echo ""
-      @echo "Copy with: cp -r upstream/.pi/skills/<name> .pi/skills/"
-  ```
+**Critical details:**
+- **Tmux socket path**: Use `.sock` at project root, NOT `.bosun-home/tmux.sock`.
+  Tmux sockets have a ~107 char path limit. Deep directory paths will fail.
+- **Helpers preamble**: Use the `_helpers` variable pattern to source tmux helpers
+  with correct `BOSUN_ROOT` and `TMUX_CMD` env vars.
+- **Daemon recipe**: Include `_ensure-daemon` to start the daemon alongside the main session.
+
+**Template** (replace `{{PROJECT_NAME}}` and `{{ORCHESTRATOR_NAME}}`):
+
+```just
+{{PROJECT_NAME}}_root := justfile_directory()
+tmux_sock := {{PROJECT_NAME}}_root / ".sock"
+tmux_cmd := "tmux -S " + tmux_sock
+
+_helpers := 'export BOSUN_ROOT="' + {{PROJECT_NAME}}_root + '" TMUX_CMD="' + tmux_cmd + '"; source "' + {{PROJECT_NAME}}_root + '/upstream/scripts/tmux-helpers.sh"'
+
+default:
+    @just --list
+
+start:
+    #!/usr/bin/env bash
+    just _ensure bwrap tmux bun pi
+    {{{{_helpers}}}}
+    ensure_dirs
+    if {{{{tmux_cmd}}}} has-session -t {{PROJECT_NAME}} 2>/dev/null; then
+      exec {{{{tmux_cmd}}}} attach -t {{PROJECT_NAME}}
+    fi
+    {{{{tmux_cmd}}}} -f "{{{{{{PROJECT_NAME}}}}_root}}/config/tmux.conf" new-session -d -s {{PROJECT_NAME}} -n {{ORCHESTRATOR_NAME}}
+    set_tmux_env
+    {{{{tmux_cmd}}}} send-keys -t {{PROJECT_NAME}}:{{ORCHESTRATOR_NAME}} "cd {{{{{{PROJECT_NAME}}}}_root}} && PI_AGENT={{ORCHESTRATOR_NAME}} PI_AGENT_NAME={{ORCHESTRATOR_NAME}} upstream/scripts/sandbox.sh pi" Enter
+    just _ensure-daemon
+    {{{{tmux_cmd}}}} attach -t {{PROJECT_NAME}}
+
+start-unsandboxed:
+    #!/usr/bin/env bash
+    just _ensure tmux bun pi
+    {{{{_helpers}}}}
+    ensure_dirs
+    if {{{{tmux_cmd}}}} has-session -t {{PROJECT_NAME}} 2>/dev/null; then
+      exec {{{{tmux_cmd}}}} attach -t {{PROJECT_NAME}}
+    fi
+    {{{{tmux_cmd}}}} -f "{{{{{{PROJECT_NAME}}}}_root}}/config/tmux.conf" new-session -d -s {{PROJECT_NAME}} -n {{ORCHESTRATOR_NAME}}
+    set_tmux_env
+    {{{{tmux_cmd}}}} send-keys -t {{PROJECT_NAME}}:{{ORCHESTRATOR_NAME}} "cd {{{{{{PROJECT_NAME}}}}_root}} && BOSUN_ROOT={{{{{{PROJECT_NAME}}}}_root}} PI_AGENT={{ORCHESTRATOR_NAME}} PI_AGENT_NAME={{ORCHESTRATOR_NAME}} pi" Enter
+    {{{{tmux_cmd}}}} attach -t {{PROJECT_NAME}}
+
+init:
+    @test -f config.toml || { echo "config.toml not found. Run: just setup"; exit 1; }
+    bun scripts/init.ts
+
+setup:
+    #!/usr/bin/env bash
+    if [[ ! -f config.toml ]]; then
+        cp config.sample.toml config.toml
+        echo "Created config.toml — edit with your API keys"
+    fi
+    bun install
+    just init
+    mkdir -p .bosun-home/.pi/agent workspace
+    echo "Ready! Run: just start"
+
+stop:
+    {{{{tmux_cmd}}}} kill-server 2>/dev/null || true
+    @echo "Stopped."
+
+sync-upstream:
+    cd upstream && git fetch origin && git checkout main && git pull
+    cd .. && git add upstream
+    bun install
+    just init
+    @echo "Upstream synced. Review changes, then commit."
+
+_ensure-daemon:
+    #!/usr/bin/env bash
+    if [[ ! -f ".pi/daemon.json" ]]; then exit 0; fi
+    ENABLED=$(grep -o '"enabled".*true' ".pi/daemon.json" || echo "")
+    if [[ -z "$ENABLED" ]]; then exit 0; fi
+    if {{{{tmux_cmd}}}} has-session -t {{PROJECT_NAME}}-daemon 2>/dev/null; then
+      echo "Daemon already running"
+    else
+      echo "Starting daemon..."
+      {{{{tmux_cmd}}}} -f "config/tmux.conf" new-session -d -s {{PROJECT_NAME}}-daemon -n daemon
+      {{{{tmux_cmd}}}} send-keys -t {{PROJECT_NAME}}-daemon:daemon "cd $PWD && BOSUN_ROOT=$PWD upstream/scripts/sandbox.sh bun upstream/packages/pi-daemon/src/index.ts" Enter
+      sleep 2
+      echo "Daemon started"
+    fi
+
+_ensure +tools:
+    #!/usr/bin/env bash
+    for cmd in {{{{tools}}}}; do
+      command -v "$cmd" &>/dev/null || { echo "Missing: $cmd"; exit 1; }
+    done
+```
+
+**Note:** The template above uses `{{{{ }}}}` to escape just's interpolation.
+When generating the actual justfile, use normal `{{ }}` just syntax.
 
 ### Step 6: Orchestrator Agent
 
@@ -180,17 +247,52 @@ Read `upstream/.pi/agents/bosun.md` and write `.pi/agents/{{ORCHESTRATOR_NAME}}.
 
 ### Step 7: .gitignore
 
-Read `upstream/.gitignore` and copy it. Add any project-specific ignores.
+Read `upstream/.gitignore` and copy it. Add these additional entries:
+
+```gitignore
+# Tmux socket
+.sock
+
+# Direnv cache
+.direnv/
+```
+
+Plus any project-specific ignores (e.g., data files that should never be committed).
+
+### Step 7b: flake.nix (recommended)
+
+Create a `flake.nix` so `nix develop` provides all tools including `bwrap`:
+
+```nix
+{
+  description = "{{PROJECT_NAME}}";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let pkgs = nixpkgs.legacyPackages.${system}; in {
+        devShells.default = pkgs.mkShell {
+          name = "{{PROJECT_NAME}}-dev";
+          buildInputs = [
+            pkgs.bun pkgs.nodejs_22 pkgs.bubblewrap pkgs.tmux
+            pkgs.git pkgs.ripgrep pkgs.fd pkgs.jq pkgs.just
+          ];
+          shellHook = ''
+            export PATH="$PWD/node_modules/.bin:$PATH"
+          '';
+        };
+      }
+    );
+}
+```
 
 ### Step 8: .envrc
 
-Write a simple direnv config:
+Write a direnv config:
 ```bash
-# If using nix:
 use flake
-
-# If not using nix:
-# export PATH="$PWD/node_modules/.bin:$PATH"
 ```
 
 ### Step 9: Copy Skills

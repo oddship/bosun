@@ -73,6 +73,19 @@ Files that need more than a copy (read upstream version and adapt):
 - `justfile` — change session names, point scripts to `upstream/scripts/`
 - `.pi/agents/<name>.md` — your main agent persona
 - `package.json` — workspaces: `["packages/*", "upstream/packages/*"]`
+- `flake.nix` — nix devShell with bwrap, tmux, bun, etc.
+
+### Pitfalls
+
+**Tmux socket path too long.** Tmux sockets have a ~107 character path limit. Use `.sock` at the project root in your justfile, not `.bosun-home/tmux.sock`:
+
+```just
+tmux_sock := justfile_directory() / ".sock"
+```
+
+**Daemon won't start.** `just start` must call an `_ensure-daemon` recipe that starts the daemon in a separate tmux session. Also, `.pi/daemon.json` must exist — run `just init` first.
+
+**`.direnv/` committed.** Add `.direnv/` to `.gitignore` before the first commit.
 
 ### Install and start
 
@@ -80,7 +93,7 @@ Files that need more than a copy (read upstream version and adapt):
 bun install
 cp config.sample.toml config.toml
 # Edit config.toml with your API keys
-just init
+just init       # generates .pi/*.json — required before start
 just start
 ```
 
