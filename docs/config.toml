@@ -1,4 +1,5 @@
 site_name = "Bosun"
+base_path = "/bosun"
 
 [highlight]
 light = "github"
