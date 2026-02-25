@@ -11,7 +11,6 @@
 # Returns empty string if none running.
 bosun_sessions() {
   $TMUX_CMD list-sessions -F '#{session_name}' 2>/dev/null \
-    | grep '^bosun' \
     | grep -v '^bosun-daemon$' \
     || true
 }
