@@ -30,16 +30,44 @@ Note: `BOSUN_ROOT` is bound read-write at the top level, with specific files lik
 
 ### Custom Paths
 
-In `config.toml`:
+#### Adding Read-Only Host Paths
+
+To access files or directories outside the sandbox (e.g., external repos, shared data), add them to the `ro_bind` array in `config.toml`:
 
 ```toml
 [paths]
-# Additional read-only mounts
-ro_bind = ["/opt/my-tool"]
-
-# Block specific paths (tmpfs overlay)
-deny = ["/some/sensitive/path"]
+ro_bind = [
+  "/home/user/other-project",
+  "/opt/shared-data",
+  "/mnt/external"
+]
 ```
+
+Then apply the changes:
+
+```bash
+just init          # Regenerate .pi/bwrap.json with new mount config
+just stop          # Stop the sandbox session
+just start         # Restart sandbox with updated mounts
+```
+
+**Useful for:**
+- Referencing other repositories without cloning into `workspace/`
+- Accessing shared data directories on the host
+- Cross-project analysis while keeping workspaces isolated
+
+**Note:** `bwrap` mounts are fixed at process start, so you must restart the session for new paths to take effect.
+
+#### Blocking Sensitive Paths
+
+To prevent access to sensitive host directories, use the `deny` array:
+
+```toml
+[paths]
+deny = ["/home/user/.ssh/private-keys"]
+```
+
+This overlays the path with an empty tmpfs (read-write but ephemeral).
 
 ## Environment Variables
 

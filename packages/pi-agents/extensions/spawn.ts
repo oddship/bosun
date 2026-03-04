@@ -142,21 +142,27 @@ export function registerSpawnAgent(
           : agent.extensions.split(",").map((s) => s.trim())
         : [];
 
-      // Always include pi-sandbox for security (if not already listed)
-      if (!extList.includes("pi-sandbox")) {
-        extList.push("pi-sandbox");
+      // Always include pi-agents (handles identity injection + TUI agent name)
+      // and pi-sandbox (security) even if not in the agent's extension list.
+      for (const required of ["pi-agents", "pi-sandbox"]) {
+        if (!extList.includes(required)) {
+          extList.push(required);
+        }
       }
 
+      const skippedExts: string[] = [];
       for (const ext of extList.filter(Boolean)) {
         // Check if it's a local package (exists under packages/ or node_modules/)
         const localPath = path.join(ctx.cwd, "packages", ext);
         const nmPath = path.join(ctx.cwd, "node_modules", ext);
-        if (fs.existsSync(localPath)) {
+        if (fs.existsSync(path.join(localPath, "package.json"))) {
           extensionFlags.push("-e", localPath);
-        } else if (fs.existsSync(nmPath)) {
+        } else if (fs.existsSync(path.join(nmPath, "package.json"))) {
           extensionFlags.push("-e", nmPath);
         } else {
-          extensionFlags.push("-e", `npm:${ext}`);
+          // Extension not found locally — skip gracefully instead of
+          // trying npm: which would fail if the user removed the package.
+          skippedExts.push(ext);
         }
       }
 
@@ -226,12 +232,15 @@ export function registerSpawnAgent(
             });
           } else {
             const modelInfo = resolvedModel ? ` (model: ${resolvedModel})` : "";
+            const skippedInfo = skippedExts.length
+              ? `\nSkipped extensions (not installed): ${skippedExts.join(", ")}`
+              : "";
             resolve({
               content: [
                 {
                   type: "text",
                   text: [
-                    `Spawned '${params.agent}' agent in tmux window '${windowName}'${modelInfo}.`,
+                    `Spawned '${params.agent}' agent in tmux window '${windowName}'${modelInfo}.${skippedInfo}`,
                     "",
                     "The agent is running with its persona and extensions loaded.",
                     "Use pi-mesh to communicate, or tmux to observe.",

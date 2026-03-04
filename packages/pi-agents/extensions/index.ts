@@ -13,6 +13,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { loadConfig, type AgentsConfig } from "./config.js";
 import { findAgentFile, loadAgent } from "./agents.js";
 import { registerSpawnAgent } from "./spawn.js";
+import { processTemplate } from "./template.js";
 
 export default function (pi: ExtensionAPI) {
   const agentName = process.env.PI_AGENT || "none";
@@ -42,13 +43,15 @@ export default function (pi: ExtensionAPI) {
     const agent = loadAgent(agentFile);
     if (!agent.body) return {};
 
+    const processedBody = processTemplate(agent.body, { cwd: ctx.cwd });
+
     return {
-      systemPrompt: agent.body + "\n\n" + event.systemPrompt,
+      systemPrompt: processedBody + "\n\n" + event.systemPrompt,
     };
   });
 
   // Write agent identity to session JSONL + set PI_AGENT_NAME fallback.
-  pi.on("session_start", async () => {
+  pi.on("session_start", async (_event, ctx) => {
     if (agentName === "none") return;
 
     // Belt-and-suspenders: sandbox.sh sets PI_AGENT_NAME, but if running
@@ -60,6 +63,10 @@ export default function (pi: ExtensionAPI) {
     // Persist identity for daemon session filtering.
     // Creates: {"type":"custom","customType":"agent_identity","data":{"agent":"bosun"}}
     pi.appendEntry("agent_identity", { agent: agentName });
+
+    // Update TUI with agent name in terminal title and status bar.
+    ctx.ui.setTitle(`pi — ${agentName}`);
+    ctx.ui.setStatus("agent", `🤖 ${agentName}`);
   });
 
   // --- spawn_agent tool ---

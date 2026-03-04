@@ -7,8 +7,8 @@
 # Model tiers — referenced by tier name in agent frontmatter (e.g., model: lite)
 
 [models]
-lite = "claude-haiku-4-5-20251001"       # Fast, cheap — context gathering, summaries
-medium = "claude-sonnet-4-5-20250929"    # Balanced — most coding tasks
+lite = "claude-haiku-4-6"               # Fast, cheap — context gathering, summaries
+medium = "claude-sonnet-4-6"            # Balanced — most coding tasks
 high = "claude-opus-4-6"                 # Best — complex planning, orchestration
 oracle = "gpt-5.3-codex"                 # Deep reasoning — architecture, hard debugging
 

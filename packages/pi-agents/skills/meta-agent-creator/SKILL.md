@@ -38,8 +38,8 @@ Model tiers are defined in `.pi/agents.json`:
 ```json
 {
   "models": {
-    "lite": "claude-haiku-4-5-20251001",
-    "medium": "claude-sonnet-4-5-20250929",
+    "lite": "claude-haiku-4-6",
+    "medium": "claude-sonnet-4-6",
     "high": "claude-opus-4-6",
     "oracle": "gpt-5.3-codex"
   }
