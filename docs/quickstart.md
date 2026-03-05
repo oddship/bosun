@@ -37,8 +37,8 @@ anthropic = "sk-ant-..."
 
 [models]
 lite = "claude-haiku-4-5-20251001"
-medium = "claude-sonnet-4-5-20250929"
-high = "claude-sonnet-4-5-20250929"
+medium = "claude-sonnet-4-6"
+high = "claude-opus-4-6"
 oracle = "o3"
 ```
 

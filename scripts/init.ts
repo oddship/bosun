@@ -84,7 +84,7 @@ const backend = (config.backend as Record<string, unknown>) || {};
 writeJson("agents.json", {
   models: {
     lite: models.lite || "claude-haiku-4-5-20251001",
-    medium: models.medium || "claude-sonnet-4-5-20250929",
+    medium: models.medium || "claude-sonnet-4-6",
     high: models.high || "claude-opus-4-6",
     oracle: models.oracle || "gpt-5.3-codex",
   },

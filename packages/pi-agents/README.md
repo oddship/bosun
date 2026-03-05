@@ -60,7 +60,7 @@ Create `.pi/agents.json`:
 {
   "models": {
     "lite": "claude-haiku-4-5-20251001",
-    "medium": "claude-sonnet-4-5-20250929",
+    "medium": "claude-sonnet-4-6",
     "high": "claude-opus-4-6"
   },
   "defaultAgent": "bosun",

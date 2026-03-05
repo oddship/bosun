@@ -26,8 +26,8 @@ Agents declare a tier, not a specific model. You map tiers to models in `config.
 ```toml
 [models]
 lite = "claude-haiku-4-5-20251001"      # Fast, cheap
-medium = "claude-sonnet-4-5-20250929"    # Balanced
-high = "claude-sonnet-4-5-20250929"      # Capable
+medium = "claude-sonnet-4-6"    # Balanced
+high = "claude-opus-4-6"      # Capable
 oracle = "o3"                            # Maximum reasoning
 ```
 
