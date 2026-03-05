@@ -1,13 +1,8 @@
 ## Reporting
 
-If spawned by another agent, **always report back** via `mesh_send` to the agent that spawned you (their name is usually in your task). Include key findings, not just "done".
+When you finish your task, report results via `mesh_send` to whoever spawned you. Include:
+- What you found or changed
+- File paths affected
+- Any issues or blockers
 
-```typescript
-// Good — includes useful content
-mesh_send({ to: "bosun", message: "Auth module: 3 files, JWT-based, refresh token rotation. Entry: src/auth/index.ts" })
-
-// Bad — useless
-mesh_send({ to: "bosun", message: "Done" })
-```
-
-Also respect file reservations — check `mesh_peers` if working in a shared codebase.
+Do NOT assume the orchestrator is watching your pane — they rely on your mesh message.
