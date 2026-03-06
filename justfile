@@ -60,12 +60,24 @@ start:
     echo "  Shift+←/→    - Previous/next window"
     echo ""
 
-    # Start tmux server inside bwrap — all windows/panes inherit the sandbox.
-    # Client commands (set-environment, attach) connect to existing server, no wrapper needed.
-    scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" \
-      new-session -d -s bosun -n bosun \
-      "/bin/sh -c 'cd {{bosun_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
-    {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
+    # If tmux server already exists (e.g. daemon still running), just create
+    # a new session on it. Otherwise start server inside bwrap so all
+    # windows/panes inherit the sandbox.
+    if {{tmux_cmd}} has-session 2>/dev/null; then
+      VERSION=$({{tmux_cmd}} show-environment -g BOSUN_SANDBOX_VERSION 2>/dev/null | cut -d= -f2- || echo "1")
+      if [[ "$VERSION" != "2" ]]; then
+        echo "Security update: tmux server must run inside sandbox."
+        echo "Old session detected. Please restart: just stop && just start"
+        exit 1
+      fi
+      {{tmux_cmd}} new-session -d -s bosun -n bosun \
+        "/bin/sh -c 'cd {{bosun_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+    else
+      scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" \
+        new-session -d -s bosun -n bosun \
+        "/bin/sh -c 'cd {{bosun_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+      {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
+    fi
     set_tmux_env
     just _ensure-daemon
     {{tmux_cmd}} attach -t bosun
@@ -134,6 +146,12 @@ attach session="":
     fi
     SESSIONS=$(bosun_sessions)
     if [[ -z "$SESSIONS" ]]; then
+      # If daemon is running, start a new bosun session and attach
+      if {{tmux_cmd}} has-session -t bosun-daemon 2>/dev/null; then
+        echo "No bosun sessions running (daemon is active). Starting one..."
+        just start
+        exit $?
+      fi
       echo "No bosun sessions running. Start one with: just start"
       exit 1
     fi
