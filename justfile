@@ -41,6 +41,12 @@ start:
     check_inside_tmux
 
     if {{tmux_cmd}} has-session -t bosun 2>/dev/null; then
+      VERSION=$({{tmux_cmd}} show-environment -g BOSUN_SANDBOX_VERSION 2>/dev/null | cut -d= -f2- || echo "1")
+      if [[ "$VERSION" != "2" ]]; then
+        echo "Security update: tmux server must run inside sandbox."
+        echo "Old session detected. Please restart: just stop && just start"
+        exit 1
+      fi
       echo "Attaching to existing session 'bosun'..."
       exec {{tmux_cmd}} attach -t bosun
     fi
@@ -54,9 +60,13 @@ start:
     echo "  Shift+←/→    - Previous/next window"
     echo ""
 
-    {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" new-session -d -s bosun -n bosun
+    # Start tmux server inside bwrap — all windows/panes inherit the sandbox.
+    # Client commands (set-environment, attach) connect to existing server, no wrapper needed.
+    scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" \
+      new-session -d -s bosun -n bosun \
+      "/bin/sh -c 'cd {{bosun_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+    {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
     set_tmux_env
-    {{tmux_cmd}} send-keys -t bosun:bosun "cd {{bosun_root}} && scripts/sandbox.sh pi" Enter
     just _ensure-daemon
     {{tmux_cmd}} attach -t bosun
 
@@ -75,6 +85,7 @@ start-unsandboxed:
 
     echo "Creating new session 'bosun'..."
     {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" new-session -d -s bosun -n bosun
+    {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "1"
     set_tmux_env
     {{tmux_cmd}} send-keys -t bosun:bosun "cd {{bosun_root}} && BOSUN_ROOT={{bosun_root}} BOSUN_WORKSPACE={{bosun_root}}/workspace PI_CODING_AGENT_DIR={{bosun_root}}/.bosun-home/.pi/agent PI_AGENT=bosun PI_AGENT_NAME=bosun pi" Enter
     {{tmux_cmd}} attach -t bosun
@@ -94,9 +105,24 @@ run *args:
     fi
 
     echo "Creating new session '$SESSION'..."
-    {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" new-session -d -s "$SESSION" -n bosun
+    # If tmux server already exists (sandboxed), just create a new session on it.
+    # If not (first run via `just run`), start server inside bwrap.
+    if {{tmux_cmd}} has-session 2>/dev/null; then
+      VERSION=$({{tmux_cmd}} show-environment -g BOSUN_SANDBOX_VERSION 2>/dev/null | cut -d= -f2- || echo "1")
+      if [[ "$VERSION" != "2" ]]; then
+        echo "Security update: tmux server must run inside sandbox."
+        echo "Old session detected. Please restart: just stop && just start"
+        exit 1
+      fi
+      {{tmux_cmd}} new-session -d -s "$SESSION" -n bosun \
+        "/bin/sh -c 'cd {{bosun_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+    else
+      scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" \
+        new-session -d -s "$SESSION" -n bosun \
+        "/bin/sh -c 'cd {{bosun_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+      {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
+    fi
     set_tmux_env
-    {{tmux_cmd}} send-keys -t "$SESSION":bosun "cd {{bosun_root}} && PI_AGENT_NAME=$SESSION scripts/sandbox.sh pi {{args}}" Enter
     {{tmux_cmd}} attach -t "$SESSION"
 
 # Attach to running session (auto-detects available sessions)
@@ -230,9 +256,24 @@ _ensure-daemon:
       echo "Daemon already running"
     else
       echo "Starting daemon..."
-      {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" new-session -d -s bosun-daemon -n daemon
+      # If tmux server already exists (sandboxed), just add a session.
+      # Otherwise wrap in sandbox.sh to start server inside bwrap.
+      if {{tmux_cmd}} has-session 2>/dev/null; then
+        VERSION=$({{tmux_cmd}} show-environment -g BOSUN_SANDBOX_VERSION 2>/dev/null | cut -d= -f2- || echo "1")
+        if [[ "$VERSION" != "2" ]]; then
+          echo "Security update: tmux server must run inside sandbox."
+          echo "Old session detected. Please restart: just stop && just start"
+          exit 1
+        fi
+        {{tmux_cmd}} new-session -d -s bosun-daemon -n daemon \
+          "/bin/sh -c 'cd {{bosun_root}} && bun packages/pi-daemon/src/index.ts; sleep 300'"
+      else
+        scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" \
+          new-session -d -s bosun-daemon -n daemon \
+          "/bin/sh -c 'cd {{bosun_root}} && bun packages/pi-daemon/src/index.ts; sleep 300'"
+        {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
+      fi
       {{tmux_cmd}} set-environment -g BOSUN_ROOT "{{bosun_root}}"
-      {{tmux_cmd}} send-keys -t bosun-daemon:daemon "cd {{bosun_root}} && BOSUN_PI_PATH=$({{tmux_cmd}} show-environment -g BOSUN_PI_PATH 2>/dev/null | cut -d= -f2-) BOSUN_BUN_PATH=$({{tmux_cmd}} show-environment -g BOSUN_BUN_PATH 2>/dev/null | cut -d= -f2-) scripts/sandbox.sh bun packages/pi-daemon/src/index.ts" Enter
       sleep 2
       if {{tmux_cmd}} has-session -t bosun-daemon 2>/dev/null; then
         echo "Daemon started in tmux session 'bosun-daemon'"

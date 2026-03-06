@@ -13,6 +13,13 @@
 
 set -euo pipefail
 
+# --- Nested sandbox detection ---
+# If already inside bwrap, skip re-wrapping and just exec the command.
+# This handles spawn_agent's command_prefix calling sandbox.sh recursively.
+if [[ "${BOSUN_SANDBOX:-}" == "1" ]]; then
+  exec "$@"
+fi
+
 # --- Find BOSUN_ROOT ---
 find_bosun_root() {
   local dir="$PWD"
@@ -104,19 +111,9 @@ if [[ -d "$HOME/.ssh" ]]; then
   RO_BIND_ARGS="$RO_BIND_ARGS --ro-bind $HOME/.ssh $HOME/.ssh"
 fi
 
-# Bind tmux socket directory
-TMUX_BIND=""
-_UID=$(id -u)
-TMUX_SOCKET_DIR="/run/user/$_UID/tmux-$_UID"
-if [[ -d "$TMUX_SOCKET_DIR" ]]; then
-  TMUX_BIND="--bind $TMUX_SOCKET_DIR $TMUX_SOCKET_DIR"
-fi
-
-# Also bind the bosun tmux socket directory if it exists
-if [[ -e "$BOSUN_ROOT/.bosun-home/tmux.sock" ]]; then
-  # Socket is inside .bosun-home which is already bound
-  :
-fi
+# NOTE: Host tmux socket directory is intentionally NOT bound.
+# The tmux server runs inside bwrap, so agents can only talk to the
+# sandboxed server. This prevents sandbox escape via tmux split-window.
 
 # Extra ro_bind from bwrap.json
 if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
@@ -272,7 +269,6 @@ exec "$BWRAP" \
   $RO_BIND_ARGS \
   $CMD_BIND_ARGS \
   $EXTRA_BIND_ARGS \
-  $TMUX_BIND \
   --bind "$BOSUN_ROOT" "$BOSUN_ROOT" \
   --bind "$BOSUN_ROOT/.bosun-home" "$BOSUN_ROOT/.bosun-home" \
   --bind "$BOSUN_ROOT/.pi" "$BOSUN_ROOT/.pi" \
@@ -284,7 +280,7 @@ exec "$BWRAP" \
   --setenv PI_AGENT "${PI_AGENT:-bosun}" \
   --setenv PI_AGENT_NAME "${PI_AGENT_NAME:-bosun}" \
   --setenv SHELL "/bin/bash" \
-  --setenv TMUX "${TMUX:-}" \
+  --unsetenv TMUX \
   --setenv PATH "$SANDBOX_PATH" \
   --setenv BOSUN_SANDBOX "1" \
   --setenv BOSUN_PI_PATH "${BOSUN_PI_PATH:-pi}" \
