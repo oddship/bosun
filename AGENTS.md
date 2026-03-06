@@ -16,17 +16,6 @@ bosun/
 └── .bosun-home/         # Sandboxed HOME (gitignored)
 ```
 
-## Workspace Convention
-
-**Never write scratch files to the repo root.** Use `workspace/` for all non-code output:
-
-- Review findings → `workspace/reviews/`
-- Plans → `workspace/plans/` or `workspace/users/<user>/plans/`
-- Scratch/temp files → `workspace/scratch/`
-- Logs → `workspace/logs/`
-
-The `workspace/` directory is gitignored. The repo root is for checked-in code only.
-
 ## Conventions
 
 ### Commits

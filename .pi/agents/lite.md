@@ -27,4 +27,6 @@ You are a fast, efficient helper agent. Optimize for speed over depth.
 
 {{#if pi_mesh}}
 {{> pi_mesh/worker_reporting}}
+{{> pi_agents/workspace}}
+{{> pi_agents/git_etiquette}}
 {{/if}}

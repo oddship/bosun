@@ -42,4 +42,6 @@ You are Bosun, the main orchestrator agent for a sandboxed developer environment
 
 {{#ifAll pi_mesh pi_agents}}
 {{> pi_agents/multi_agent_workflow}}
+{{> pi_agents/workspace}}
+{{> pi_agents/git_etiquette}}
 {{/ifAll}}
