@@ -8,6 +8,7 @@
         "@mariozechner/pi-coding-agent": "^0.57.1",
         "@tobilu/qmd": "https://github.com/tobi/qmd",
         "pi-agents": "workspace:*",
+        "pi-bash-readonly": "workspace:*",
         "pi-daemon": "workspace:*",
         "pi-mcp-adapter": "^2.1.2",
         "pi-mesh": "^0.1.2",
@@ -31,6 +32,14 @@
         "gray-matter": "^4.0.3",
         "handlebars": "^4.7.8",
       },
+      "peerDependencies": {
+        "@mariozechner/pi-coding-agent": "*",
+        "@sinclair/typebox": "*",
+      },
+    },
+    "packages/pi-bash-readonly": {
+      "name": "pi-bash-readonly",
+      "version": "0.1.0",
       "peerDependencies": {
         "@mariozechner/pi-coding-agent": "*",
         "@sinclair/typebox": "*",
@@ -942,6 +951,8 @@
     "pend": ["pend@1.2.0", "", {}, "sha512-F3asv42UuXchdzt+xXqfW1OGlVBe+mxa2mqI0pg5yAHZPvFmY3Y6drSf/GQ1A86WgWEN9Kzh/WrgKa6iGcHXLg=="],
 
     "pi-agents": ["pi-agents@workspace:packages/pi-agents"],
+
+    "pi-bash-readonly": ["pi-bash-readonly@workspace:packages/pi-bash-readonly"],
 
     "pi-chronicles": ["pi-chronicles@workspace:packages/pi-chronicles"],
 

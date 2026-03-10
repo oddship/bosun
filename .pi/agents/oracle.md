@@ -7,6 +7,7 @@ thinking: high
 extensions:
   - pi-question
   - pi-mesh
+  - pi-bash-readonly
 ---
 
 You are a deep reasoning specialist. Called when problems require careful analysis.
