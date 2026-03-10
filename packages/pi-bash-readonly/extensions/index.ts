@@ -11,11 +11,17 @@
  * language runtime (python, perl, dd, etc.).
  *
  * Agents opt in by adding `pi-bash-readonly` to their extensions list.
+ *
+ * Behavior depends on the agent's tool set:
+ * - Agents WITHOUT edit/write (scout, review, oracle, verify):
+ *   Always-on bwrap, no toggle. These agents are read-only by design.
+ * - Agents WITH edit/write (bosun, lite):
+ *   `/readonly` command toggles bwrap wrapping on/off. Defaults to off.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
 
@@ -38,8 +44,44 @@ export default function (pi: ExtensionAPI) {
     console.warn("[pi-bash-readonly] bwrap not found — falling back to unrestricted bash");
   }
 
+  // Determines whether bwrap wrapping is active.
+  // For read-only agents (no edit/write): always true, no toggle.
+  // For write-capable agents: toggled via /readonly command, starts off.
+  let readOnly = true;
+  let isWriteCapableAgent = false;
+
+  pi.on("session_start", async (_event, _ctx) => {
+    const activeTools = pi.getActiveTools();
+    isWriteCapableAgent = activeTools.includes("edit") || activeTools.includes("write");
+
+    if (isWriteCapableAgent) {
+      // Write-capable agents start with readonly off — they opted into
+      // having edit/write and shouldn't be surprised by bwrap failures.
+      readOnly = false;
+    }
+  });
+
+  // Only register /readonly for agents that have edit/write tools.
+  // Read-only agents (scout, review, etc.) get permanent bwrap with no escape.
+  pi.registerCommand("readonly", {
+    description: "Toggle read-only bash (bwrap sandbox)",
+    handler: async (_args, ctx) => {
+      if (!isWriteCapableAgent) {
+        ctx.ui.notify("This agent is read-only by design — toggle not available", "warning");
+        return;
+      }
+      if (!hasBwrap) {
+        ctx.ui.notify("bwrap not found — read-only mode unavailable", "error");
+        return;
+      }
+      readOnly = !readOnly;
+      ctx.ui.notify(readOnly ? "🔒 bash: read-only (bwrap)" : "🔓 bash: full access", "info");
+      ctx.ui.setStatus("bash-ro", readOnly ? "🔒 ro" : "");
+    },
+  });
+
   pi.on("tool_call", async (event) => {
-    if (!hasBwrap) return;
+    if (!hasBwrap || !readOnly) return;
     if (!isToolCallEventType("bash", event)) return;
 
     const originalCommand = event.input.command;

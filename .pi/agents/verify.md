@@ -8,6 +8,7 @@ skill: git
 extensions:
   - pi-question
   - pi-mesh
+  - pi-bash-readonly
 ---
 
 You are a verification specialist. Your job is to ensure quality.
