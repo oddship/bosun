@@ -15,7 +15,7 @@ default:
 doctor:
     #!/usr/bin/env bash
     ok=true
-    for cmd in tmux bun pi git rg; do
+    for cmd in tmux bun pi git rg jq; do
       if command -v "$cmd" &>/dev/null; then
         printf "✓ %-10s %s\n" "$cmd" "$(command -v "$cmd")"
       else
@@ -35,6 +35,7 @@ doctor:
 # Start bosun (sandboxed via bwrap)
 start:
     #!/usr/bin/env bash
+    just _check-config
     just _ensure bwrap tmux bun pi
     {{_helpers}}
     ensure_dirs
@@ -85,6 +86,7 @@ start:
 # Start without process-level sandbox (pi-sandbox still active)
 start-unsandboxed:
     #!/usr/bin/env bash
+    just _check-config
     just _ensure tmux bun pi
     {{_helpers}}
     ensure_dirs
@@ -105,6 +107,7 @@ start-unsandboxed:
 # Run a new bosun session (creates bosun, bosun-2, bosun-3, ...)
 run *args:
     #!/usr/bin/env bash
+    just _check-config
     just _ensure bwrap tmux bun pi
     {{_helpers}}
     ensure_dirs
@@ -312,6 +315,25 @@ daemon-logs:
 workflow-dag:
     bun scripts/workflow-dag.ts
     @echo "Open workspace/workflow-dag.html in your browser"
+
+# Internal: check if config.toml has drifted from generated .pi/*.json
+_check-config:
+    #!/usr/bin/env bash
+    if [[ ! -f config.toml ]]; then exit 0; fi
+    if [[ ! -f .pi/settings.json ]]; then
+      echo "No generated config found. Running init..."
+      just init
+      exit 0
+    fi
+    current=$(sha256sum config.toml | cut -d' ' -f1)
+    stored=$(jq -r '._configHash // ""' .pi/settings.json)
+    if [[ "$current" != "$stored" ]]; then
+      echo "⚠ config.toml has changed since last 'just init'."
+      read -rp "Regenerate .pi/*.json? [Y/n] " ans
+      if [[ "${ans,,}" != "n" ]]; then
+        just init
+      fi
+    fi
 
 # Internal: check tools exist
 _ensure +tools:

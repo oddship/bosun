@@ -11,6 +11,7 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { parse as parseToml } from "@iarna/toml";
 
@@ -24,6 +25,7 @@ if (!existsSync(CONFIG_PATH)) {
 }
 
 const configContent = readFileSync(CONFIG_PATH, "utf-8");
+const configHash = createHash("sha256").update(configContent).digest("hex");
 const config = parseToml(configContent) as Record<string, unknown>;
 
 console.log("Loaded config.toml");
@@ -70,6 +72,7 @@ const npmPackages: string[] = Object.entries(rootPkg.dependencies || {})
 // Paths in settings.json are resolved relative to .pi/ (where the file lives),
 // so we need "../packages/" to reach the packages directory.
 writeJson("settings.json", {
+  _configHash: configHash,
   packages: [
     ...localPackages.map((p) => `../packages/${p}`),
     ...npmPackages.map((p) => `npm:${p}`),
