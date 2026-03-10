@@ -13,6 +13,7 @@ extensions:
   - pi-question
   - pi-session-context
   - pi-sandbox
+  - pi-bash-readonly
 defaultProgress: true
 ---
 

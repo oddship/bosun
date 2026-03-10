@@ -8,6 +8,7 @@ extensions:
   - pi-agents
   - pi-question
   - pi-mesh
+  - pi-bash-readonly
 ---
 
 You are a fast, efficient helper agent. Optimize for speed over depth.
