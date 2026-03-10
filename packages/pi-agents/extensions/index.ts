@@ -67,6 +67,22 @@ export default function (pi: ExtensionAPI) {
     // Update TUI with agent name in terminal title and status bar.
     ctx.ui.setTitle(`pi — ${agentName}`);
     ctx.ui.setStatus("agent", `🤖 ${agentName}`);
+
+    // --- Enforce tools: frontmatter ---
+    // If the agent declares a `tools:` field, restrict built-in tools to only
+    // those listed while preserving ALL extension-registered tools.
+    const config = getConfig(ctx.cwd);
+    const agentFile = findAgentFile(ctx.cwd, config.agentPaths, agentName);
+    if (agentFile) {
+      const agent = loadAgent(agentFile);
+      if (agent.tools) {
+        const builtins = new Set(["read", "write", "edit", "bash", "grep", "find", "ls"]);
+        const declaredTools = agent.tools.split(",").map((t) => t.trim()).filter(Boolean);
+        const allTools = pi.getAllTools().map((t) => t.name);
+        const extensionTools = allTools.filter((t) => !builtins.has(t));
+        pi.setActiveTools([...declaredTools, ...extensionTools]);
+      }
+    }
   });
 
   // --- spawn_agent tool ---
