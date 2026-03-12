@@ -100,10 +100,17 @@ log_level = "info"
 # =============================================================================
 # See: https://github.com/badlogic/pi-mono docs/keybindings.md
 # Format: action = ["key1", "key2"] or action = "key"
-# Common fix: remap cursorLineStart to free Ctrl+A for tmux prefix
+# Fixes for conflicts with bosun's tmux keybindings:
+#   Ctrl+A (tmux prefix) steals cursorLineStart → remap to Home
+#   Alt+Arrow (tmux pane nav) steals word movement, tree nav, dequeue → remap
 
 [keybindings]
 cursorLineStart = ["home"]
+dequeue = ["alt+u"]
+cursorWordLeft = ["ctrl+left", "alt+b"]
+cursorWordRight = ["ctrl+right", "alt+f"]
+treeFoldOrUp = ["ctrl+left"]
+treeUnfoldOrDown = ["ctrl+right"]
 
 # =============================================================================
 # Q System
