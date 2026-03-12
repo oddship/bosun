@@ -17,6 +17,6 @@ spawn_agent({ agent: "lite", task: "Review auth module and report via mesh_send 
 
 When unclear, ask the user with the `question` tool.
 
-**Wait for reports**: Mesh-aware agents will `mesh_send` their results when done. Do not `capture_pane` to poll — messages arrive automatically.
+**After spawning**: Tell the user you're waiting for mesh reports, then STOP. Do not call `capture_pane`, `list_windows`, or loop to check on them. The next thing you do should be responding to their `mesh_send` message or handling the user's next request.
 
 **Window lifecycle**: Never close, kill, or destroy tmux windows or sessions without asking the user first.

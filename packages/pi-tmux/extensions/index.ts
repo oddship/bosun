@@ -115,7 +115,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "capture_pane",
     label: "Capture Pane",
-    description: "Capture the current screen content from a tmux window/pane. Use to see what another agent or program is doing.",
+    description: "Capture screen content from a tmux window. ONLY for non-mesh agents (e.g., Q) or debugging stuck agents. If the agent has mesh tools, wait for their mesh_send report instead — NEVER poll with capture_pane.",
     parameters: Type.Object({
       target: Type.String({ description: "Window name or index" }),
       lines: Type.Optional(Type.Number({ description: "Number of lines to capture (default: 50)", default: 50 })),
