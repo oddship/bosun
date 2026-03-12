@@ -124,6 +124,16 @@ if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
   done < <(jq -r '.ro_bind[]? // empty' "$BWRAP_CONFIG" 2>/dev/null)
 fi
 
+# Extra rw_bind from bwrap.json
+RW_BIND_ARGS=""
+if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
+  while IFS= read -r p; do
+    if [[ -n "$p" ]] && [[ -e "$p" ]]; then
+      RW_BIND_ARGS="$RW_BIND_ARGS --bind $p $p"
+    fi
+  done < <(jq -r '.rw_bind[]? // empty' "$BWRAP_CONFIG" 2>/dev/null)
+fi
+
 # --- Resolve workspace path ---
 WORKSPACE="workspace"
 if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
@@ -267,6 +277,7 @@ exec "$BWRAP" \
   --tmpfs /usr \
   $USR_SYMLINK_ARGS \
   $RO_BIND_ARGS \
+  $RW_BIND_ARGS \
   $CMD_BIND_ARGS \
   $EXTRA_BIND_ARGS \
   --bind "$BOSUN_ROOT" "$BOSUN_ROOT" \

@@ -43,6 +43,17 @@ ro_bind = [
 ]
 ```
 
+#### Adding Read-Write Host Paths
+
+For paths that agents need to modify (e.g., nix-system directories, shared build caches), use the `rw_bind` array:
+
+```toml
+[paths]
+rw_bind = [
+  "/home/user/nix-system",
+]
+```
+
 Then apply the changes:
 
 ```bash

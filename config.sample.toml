@@ -62,6 +62,8 @@ allowed = [
 [paths]
 # Additional read-only bind mounts beyond defaults
 ro_bind = []
+# Additional read-write bind mounts beyond defaults
+rw_bind = []
 
 # =============================================================================
 # Tool-level Sandbox (pi-sandbox)
