@@ -13,7 +13,8 @@
     "postinstall": "cd node_modules/@tobilu/qmd && [ -d dist ] || bun run build"
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.57.1",
+    "@mariozechner/pi-coding-agent": "^0.58.1",
+    "@oddship/quartermaster": "https://github.com/oddship/quartermaster",
     "@tobilu/qmd": "https://github.com/tobi/qmd",
     "pi-agents": "workspace:*",
     "pi-bash-readonly": "workspace:*",
