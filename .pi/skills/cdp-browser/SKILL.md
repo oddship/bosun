@@ -3,269 +3,223 @@ name: cdp-browser
 description: |
   Browser automation via Chrome DevTools Protocol. Connects to Chromium
   running with --remote-debugging-port=9222. Use for: navigate, click, fill,
-  screenshot, inspect DOM, capture console logs, debug errors, monitor network.
+  screenshot, inspect DOM, capture console logs, debug errors, monitor network,
+  viewport emulation, visual review, overflow detection.
   Triggers: "browser", "go to", "click", "fill form", "take screenshot", 
-  "web page", "scrape", "console errors", "debug", "network requests".
+  "web page", "scrape", "console errors", "debug", "network requests",
+  "visual review", "responsive", "viewport", "overflow".
 license: MIT
-compatibility: Requires Node.js 18+, Chrome/Chromium with remote debugging enabled
+compatibility: Requires Bun 1.0+, Chrome/Chromium with remote debugging enabled
 allowed-tools: Bash Read Write
 metadata:
   category: automation
-  requires: chromium
+  requires: chromium bun
 ---
 
 # CDP Browser Skill
 
-Control Chrome/Chromium browser via Chrome DevTools Protocol.
+Control Chrome/Chromium via Chrome DevTools Protocol.
 
-## What I Do
+**Implementation:** TypeScript on Bun. Zero dependencies — uses Bun's native WebSocket + fetch.
 
-- Navigate to URLs and wait for page load
-- Click elements, fill forms, type text
-- Take screenshots, get accessibility tree
-- Execute JavaScript in page context
-- Wait for elements to appear
-- **Capture console logs** (console.log, console.error, etc.)
-- **Track errors and exceptions** (uncaught errors with stack traces)
-- **Monitor network requests** (API calls, status codes, timing)
+## Two Modes
 
-## When to Use Me
+### 1. CLI — one-shot commands
 
-Use this skill when:
-- Automating browser interactions
-- Scraping dynamic web content (JavaScript-rendered)
-- Testing web applications
-- Filling forms programmatically
-- Taking screenshots of web pages
+```bash
+CDP=".pi/skills/cdp-browser/scripts/cdp.ts"
 
-## Do NOT Use For
+bun $CDP tabs
+bun $CDP navigate "https://example.com"
+bun $CDP screenshot workspace/scratch/page.png
+bun $CDP device iphone-14
+bun $CDP overflow
+```
 
-- Simple HTTP requests (use `curl` or `webfetch` instead)
-- Static HTML scraping (use `curl` + parsing)
-- Entering real passwords or sensitive credentials
+Each invocation opens a WebSocket, runs one command, closes.
+
+### 2. Library — scripted workflows
+
+```typescript
+import { run } from "../../.pi/skills/cdp-browser/scripts/cdp-client";
+
+await run(async (b) => {
+  await b.navigate("http://localhost:8080");
+  await b.resize(375, 812);
+  await b.screenshot("mobile.png");
+  const overflows = await b.checkOverflow();
+  console.log("Overflows:", overflows.length);
+});
+```
+
+Single persistent connection. Use for multi-step workflows, visual reviews, or anything that touches multiple pages/viewports.
 
 ## Prerequisites
 
-**The browser must be started on the HOST machine before entering the Zero sandbox.**
+**Chrome must be started on the HOST before entering the sandbox:**
 
 ```bash
-# ON HOST (outside sandbox): Start Chrome with debugging
 chromium --remote-debugging-port=9222
-
-# Or with a specific profile:
-chromium --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
 ```
 
-Then enter Zero sandbox and use the skill.
-
-## Quick Check
-
+Quick check:
 ```bash
-# Verify Chrome is accessible
-curl -s http://localhost:9222/json | head -20
+curl -s http://localhost:9222/json | head -5
 ```
 
-## CLI Usage
+## CLI Commands
 
-All commands use the `cdp` script in this skill's scripts directory:
-
-```bash
-CDP=".pi/skills/cdp-browser/scripts/cdp"
-
-# List tabs
-$CDP tabs
-
-# Navigate
-$CDP navigate "https://example.com"
-
-# Get page info
-$CDP info
-
-# Take screenshot (saves to workspace/temp/ by default)
-$CDP screenshot workspace/temp/page.png
-
-# Get accessibility tree (best way to find elements)
-$CDP snapshot
-
-# Click element
-$CDP click "button.submit"
-
-# Fill input field
-$CDP fill "input[name=email]" "test@example.com"
-
-# Type text (character by character, for autocomplete fields)
-$CDP type "input[name=search]" "hello world"
-
-# Wait for element to appear
-$CDP waitfor ".results" 5000
-
-# Evaluate JavaScript
-$CDP eval "document.title"
-
-# Get JSON output
-$CDP --json info
-
-# === DEBUGGING ===
-
-# Capture console messages for 3 seconds (default)
-$CDP console
-
-# Capture console for longer (10 seconds)
-$CDP console 10000
-
-# Capture only errors and exceptions
-$CDP errors
-
-# Monitor network requests for 5 seconds
-$CDP network 5000
-
-# JSON output for programmatic use
-$CDP --json errors
-$CDP --json console 2000
-```
-
-## Debugging Workflow
-
-For debugging web applications:
-
-```bash
-CDP=".pi/skills/cdp-browser/scripts/cdp"
-
-# 1. Navigate to the page
-$CDP navigate "http://localhost:3000"
-
-# 2. Capture any immediate errors
-$CDP errors
-
-# 3. Perform an action
-$CDP click "button.submit"
-
-# 4. Check console output after action
-$CDP console 3000
-
-# 5. Check network requests if needed
-$CDP network 5000
-```
-
-### Example: Debug a Vue/React App
-
-```bash
-CDP=".pi/skills/cdp-browser/scripts/cdp"
-
-# Check for Vue/React warnings and errors
-$CDP console 2000
-
-# Get just errors with stack traces
-$CDP errors
-
-# Monitor API calls
-$CDP network 5000 | grep -E "api|xhr"
-```
-
-## Workflow Pattern
-
-1. **Navigate** to the target page
-2. **Snapshot** to discover element selectors
-3. **Interact** using click/fill/type
-4. **Verify** with screenshot or snapshot
-5. **Extract** data with eval or text commands
-
-### Example: Fill a Form
-
-```bash
-CDP=".pi/skills/cdp-browser/scripts/cdp"
-
-# Go to form page
-$CDP navigate "https://httpbin.org/forms/post"
-
-# Discover elements
-$CDP snapshot > workspace/temp/form-structure.txt
-
-# Fill fields
-$CDP fill "input[name=custname]" "John Doe"
-$CDP fill "input[name=custtel]" "555-1234"
-$CDP fill "input[name=custemail]" "john@example.com"
-
-# Click submit
-$CDP click "button[type=submit]"
-
-# Verify result
-$CDP screenshot workspace/temp/result.png
-```
-
-## Command Reference
+### Navigation & Info
 
 | Command | Description |
 |---------|-------------|
-| `tabs` | List open browser tabs |
-| `info` | Get current page title/URL |
-| `navigate <url>` | Go to URL |
-| `screenshot [path]` | Save screenshot |
-| `snapshot` | Get accessibility tree |
-| `click <selector>` | Click element |
-| `fill <selector> <value>` | Set input value |
-| `type <selector> <text>` | Type text character by character |
+| `tabs` | List open tabs |
+| `info` | Current page title + URL |
+| `navigate <url>` | Go to URL (waits for load) |
+
+### Screenshots
+
+| Command | Description |
+|---------|-------------|
+| `screenshot [path]` | Viewport screenshot |
+| `fullscreenshot [path]` | Full-page screenshot (scrolls) |
+
+### Viewport & Emulation
+
+| Command | Description |
+|---------|-------------|
+| `resize <w> <h>` | Set viewport (mobile auto ≤768) |
+| `resetviewport` | Reset to browser default |
+| `device [name]` | Emulate device preset (no args = list) |
+
+Devices: `iphone-se`, `iphone-14`, `iphone-14-pro-max`, `pixel-7`, `ipad`, `ipad-pro`, `laptop`, `desktop`, `desktop-hd`
+
+### Interaction
+
+| Command | Description |
+|---------|-------------|
+| `click <selector>` | Click (scrolls into view) |
+| `fill <selector> <value>` | Set input value (instant) |
+| `type <selector> <text>` | Type character by character |
+
+### Content
+
+| Command | Description |
+|---------|-------------|
 | `eval <expr>` | Run JavaScript |
-| `wait <ms>` | Wait milliseconds |
-| `waitfor <selector>` | Wait for element |
-| `html [selector]` | Get HTML content |
-| `text <selector>` | Get text content |
-| **Debugging** | |
-| `console [ms]` | Capture console messages (default: 3000ms) |
-| `errors` | Capture only errors/exceptions (2000ms) |
-| `network [ms]` | Monitor network requests (default: 5000ms) |
+| `html [selector]` | Get HTML |
+| `text <selector>` | Get innerText |
+| `snapshot` | Accessibility tree |
 
-## Options
+### Waiting
 
-- `--json` - Output as JSON (for programmatic use)
-- `--tab=<id|title>` - Select specific tab
+| Command | Description |
+|---------|-------------|
+| `wait <ms>` | Sleep |
+| `waitfor <selector> [ms]` | Wait for element (default 10s) |
 
-## Environment Variables
+### Debugging
 
-- `CDP_HOST` - Chrome host (default: localhost)
-- `CDP_PORT` - Debug port (default: 9222)
-- `CDP_TIMEOUT` - Command timeout in ms (default: 30000)
+| Command | Description |
+|---------|-------------|
+| `console [ms]` | Console messages (default 3s) |
+| `errors` | Errors only (2s) |
+| `network [ms]` | Network requests (default 5s) |
 
-## Finding Elements
+### Audit
 
-**Use `snapshot` first** to discover what elements exist:
+| Command | Description |
+|---------|-------------|
+| `overflow` | Detect horizontal overflow |
+| `inlinestyles` | Find `style=` attributes |
+
+### Options
+
+- `--json` — JSON output
+- `--tab=<id|title>` — Target specific tab
+
+## Workflow: Quick Check
 
 ```bash
-$CDP snapshot | grep -i "button\|input\|link"
+CDP=".pi/skills/cdp-browser/scripts/cdp.ts"
+
+bun $CDP navigate "http://localhost:8080"
+bun $CDP snapshot | grep -i "button\|link"
+bun $CDP click "button[type=submit]"
+bun $CDP errors
+bun $CDP screenshot workspace/scratch/result.png
 ```
 
-The accessibility tree shows:
-- Element roles (button, textbox, link, etc.)
-- Element names/labels
-- Current values
-- States (checked, disabled, focused)
+## Workflow: Visual Review (scripted)
 
-Then use CSS selectors to interact:
-- `button[type=submit]` - Submit button
-- `input[name=email]` - Input by name
-- `a[href*=login]` - Link containing "login"
-- `.classname` - By class
-- `#id` - By ID
+```typescript
+import { run } from "../../.pi/skills/cdp-browser/scripts/cdp-client";
 
-## Browser Agent
+await run(async (b) => {
+  // Multi-viewport screenshots
+  await b.screenshotViewports("http://localhost:8080", "workspace/scratch/review", {
+    mobile: { width: 375, height: 812 },
+    tablet: { width: 768, height: 1024 },
+    desktop: { width: 1440, height: 900 },
+  });
 
-For complex browser automation tasks, use the `@browser` agent which has restricted bash permissions for security:
+  // Check each viewport for overflow
+  for (const [name, vp] of [["mobile", 375], ["tablet", 768], ["desktop", 1440]]) {
+    await b.resize(vp as number, 900);
+    const issues = await b.checkOverflow();
+    console.log(`${name}: ${issues.length ? issues.length + " overflow(s)" : "clean"}`);
+  }
 
+  // Console errors
+  const errs = await b.errors();
+  console.log(`Errors: ${errs.length}`);
+});
 ```
-@browser Navigate to example.com and fill the login form
-```
 
-The agent uses this CDP CLI directly and follows the workflow patterns documented here.
+## Library API Summary
 
-## Best Practices
+### Connection
+- `connect(opts?)` → `Browser`
+- `run(fn, opts?)` → auto-connect + close
+- `browser.close()`
 
-- Use `snapshot` first to discover elements before interacting
-- Use `waitfor` before clicking dynamic elements
-- Use native `click`/`fill` instead of `eval` for reliability
-- Use `errors` command to debug console errors quickly
-- Chain commands with `&&` for multi-step flows
+### Navigation
+- `.navigate(url)`, `.reload()`, `.url()`, `.title()`
 
-## Detailed References
+### Screenshots
+- `.screenshot(path, opts?)` — viewport or `{ fullPage: true }`
+- `.screenshotViewports(url, dir, viewports, opts?)` — batch
 
-- [CDP-COMMANDS.md](references/CDP-COMMANDS.md) - Full command documentation
-- [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) - Common issues and fixes
+### Viewport
+- `.resize(w, h, dpr?)`, `.emulate(device)`, `.resetViewport()`, `.viewport()`
+
+### Interaction
+- `.click(sel)`, `.fill(sel, val)`, `.type(sel, text)`, `.press(key)`
+
+### Content
+- `.eval(js)`, `.html(sel?)`, `.text(sel)`, `.exists(sel)`, `.count(sel)`
+- `.css(sel, prop)`, `.rect(sel)`
+
+### Waiting
+- `.waitFor(sel, timeout?)`, `.sleep(ms)`
+
+### Accessibility
+- `.accessibilityTree()` → structured `AXNode`
+- `.accessibilitySnapshot()` → flat text
+
+### Debugging
+- `.console(ms?)`, `.errors(ms?)`, `.network(ms?)`
+
+### Audit
+- `.checkOverflow()` → `{ selector, overflow }[]`
+- `.findInlineStyles()` → `{ selector, style }[]`
+
+### Raw CDP
+- `.send(method, params)` — any CDP protocol method
+- `.on(handler)` → unsubscribe function
+
+## References
+
+- [CDP-COMMANDS.md](references/CDP-COMMANDS.md) — Full CLI command docs
+- [SCRIPTING.md](references/SCRIPTING.md) — Library usage, recipes, visual review scripts
+- [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) — Common issues
