@@ -136,6 +136,42 @@ function getWindows(session: string): TmuxWindow[] {
   });
 }
 
+// ── Spawn Tree ─────────────────────────────────────────────────────────
+
+interface SpawnRecord {
+  parent: string;
+  child: string;
+  agent: string;
+  ts: string;
+}
+
+/**
+ * Read spawn tree from .pi/spawn-tree.jsonl.
+ * Returns a map of child → parent for live agents only.
+ */
+function getSpawnTree(): Map<string, string> {
+  const bosunRoot = process.env.BOSUN_ROOT || process.cwd();
+  const treePath = join(bosunRoot, ".pi", "spawn-tree.jsonl");
+  const parentMap = new Map<string, string>();
+
+  try {
+    const content = readFileSync(treePath, "utf-8");
+    for (const line of content.trim().split("\n")) {
+      if (!line) continue;
+      try {
+        const record = JSON.parse(line) as SpawnRecord;
+        parentMap.set(record.child, record.parent);
+      } catch {
+        // skip malformed lines
+      }
+    }
+  } catch {
+    // file doesn't exist yet
+  }
+
+  return parentMap;
+}
+
 // ── Mesh ───────────────────────────────────────────────────────────────
 
 function getMeshPeers(): MeshPeer[] {
@@ -196,6 +232,7 @@ function buildList(): { entries: ListEntry[]; initialSelected: number } {
   const currentSession = tmux("display-message", "-p", "#S");
   const sessions = getSessions();
   const peers = getMeshPeers();
+  const spawnTree = getSpawnTree();
   const entries: ListEntry[] = [];
   let initialSelected = 0;
 
@@ -270,11 +307,15 @@ function buildList(): { entries: ListEntry[]; initialSelected: number } {
           ? timeAgo(peer.activity.lastActivityAt)
           : "";
 
+        // Parent annotation (from spawn tree)
+        const parentName = spawnTree.get(win.name);
+        const parentTag = parentName ? ` ${C.darkGray}← ${parentName}${C.reset}` : "";
+
         // Status sub-line
         const statusColor = statusText === "idle" ? C.darkGray : C.yellow;
         entries.push({
           target: `${session.name}:${win.index}`,
-          display: truncate(`    ${statusColor}${C.italic}${statusText}${C.reset} ${C.darkGray}${modelShort} ${lastActive}${C.reset}`, maxContentWidth),
+          display: truncate(`    ${statusColor}${C.italic}${statusText}${C.reset} ${C.darkGray}${modelShort} ${lastActive}${C.reset}${parentTag}`, maxContentWidth),
           type: "separator",
         });
 

@@ -191,6 +191,10 @@ export function registerSpawnAgent(
         tmuxBaseArgs.push("-S", socket);
       }
 
+      // Pass the spawning agent's identity so the child knows who to report to.
+      // PI_AGENT_NAME is the unique instance name (e.g. "bosun-2").
+      const parentName = process.env.PI_AGENT_NAME || process.env.PI_AGENT || "agent";
+
       const tmuxArgs = [
         ...tmuxBaseArgs,
         "new-window",
@@ -201,6 +205,8 @@ export function registerSpawnAgent(
         `PI_AGENT=${params.agent}`,
         "-e",
         `PI_AGENT_NAME=${windowName}`,
+        "-e",
+        `PI_PARENT_AGENT=${parentName}`,
         command,
       ];
 
@@ -231,6 +237,22 @@ export function registerSpawnAgent(
               isError: true,
             });
           } else {
+            // Record the spawn in .pi/spawn-tree.jsonl so tools like the
+            // session sidebar can display parent→child relationships.
+            try {
+              const treeFile = path.join(ctx.cwd, ".pi", "spawn-tree.jsonl");
+              const entry = JSON.stringify({
+                parent: parentName,
+                child: windowName,
+                agent: params.agent,
+                model: resolvedModel || null,
+                ts: new Date().toISOString(),
+              });
+              fs.appendFileSync(treeFile, entry + "\n");
+            } catch {
+              // Best-effort — don't fail the spawn if logging fails
+            }
+
             const modelInfo = resolvedModel ? ` (model: ${resolvedModel})` : "";
             const skippedInfo = skippedExts.length
               ? `\nSkipped extensions (not installed): ${skippedExts.join(", ")}`

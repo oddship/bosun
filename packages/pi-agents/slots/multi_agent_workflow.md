@@ -3,8 +3,8 @@
 Spawn agents in tmux windows — they auto-join the mesh and report back:
 
 ```typescript
-spawn_agent({ agent: "verify", task: "Run tests and report via mesh_send to bosun" })
-spawn_agent({ agent: "lite", task: "Review auth module and report via mesh_send to bosun" })
+spawn_agent({ agent: "verify", task: "Run tests and report via mesh_send to {{agent_name}}" })
+spawn_agent({ agent: "lite", task: "Review auth module and report via mesh_send to {{agent_name}}" })
 ```
 
 ### Session vs Window

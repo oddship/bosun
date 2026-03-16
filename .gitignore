@@ -21,6 +21,7 @@ node_modules/
 .pi/bwrap.json
 .pi/daemon.json
 .pi/mesh/
+.pi/spawn-tree.jsonl
 .pi/npm/
 .pi/pi-mesh.json
 .pi/pi-q.json

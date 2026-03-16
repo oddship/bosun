@@ -145,8 +145,19 @@ export function processTemplate(body: string, ctx: TemplateContext): string {
       return allTruthy ? options.fn(this) : options.inverse(this);
     });
 
-    // Build context with package booleans
-    const context = buildContext(ctx.cwd);
+    // Build context with package booleans + agent identity.
+    // Widen type: buildContext returns booleans, but we add string values below.
+    const context: Record<string, boolean | string> = buildContext(ctx.cwd);
+
+    // Expose agent name so slots can reference {{agent_name}} instead of
+    // hardcoding a specific orchestrator name.  PI_AGENT_NAME is the unique
+    // instance name (e.g. "bosun-2"), PI_AGENT is the template name (e.g. "bosun").
+    context.agent_name = process.env.PI_AGENT_NAME || process.env.PI_AGENT || "agent";
+
+    // Expose parent agent name so child agents can reference {{parent_agent}}
+    // to know who spawned them.  Set by spawn_agent via PI_PARENT_AGENT env var.
+    // Empty string when running as a top-level agent (not spawned).
+    context.parent_agent = process.env.PI_PARENT_AGENT || "";
 
     // Pre-register all partials referenced in the body
     discoverAndRegisterPartials(body, ctx.cwd, hbs);
