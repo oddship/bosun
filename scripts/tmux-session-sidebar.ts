@@ -280,7 +280,10 @@ function buildList(): { entries: ListEntry[]; initialSelected: number } {
 
         // Show reservations if any
         if (peer.reservations && peer.reservations.length > 0) {
-          const files = peer.reservations.slice(0, 2).map(f => f.replace(/\/$/, "").split("/").pop()).join(", ");
+          const files = peer.reservations.slice(0, 2).map(f => {
+            const path = typeof f === "string" ? f : (f as any).pattern || String(f);
+            return path.replace(/\/$/, "").split("/").pop();
+          }).join(", ");
           const more = peer.reservations.length > 2 ? ` +${peer.reservations.length - 2}` : "";
           entries.push({
             target: `${session.name}:${win.index}`,
