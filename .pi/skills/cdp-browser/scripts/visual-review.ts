@@ -158,25 +158,31 @@ await run(async (b) => {
 
     if (!jsonReport) process.stdout.write(`  ${page.padEnd(40)}`);
 
-    // Console errors (once per page, at natural viewport)
-    await b.navigate(BASE_URL + page);
-    allIssues.push(...(await checkConsoleErrors(b, page)));
-
     for (const [vpName, vp] of Object.entries(VIEWPORTS)) {
-      await b.resize(vp.width, vp.height);
-      await b.sleep(150);
+      // Set viewport BEFORE navigating so CSS media queries apply from the start.
+      // This avoids false positives from CSS transitions when resizing after load.
+      await b.send("Emulation.setDeviceMetricsOverride", {
+        width: vp.width,
+        height: vp.height,
+        deviceScaleFactor: 1,
+        mobile: vp.width < 768,
+      });
+      await b.navigate(BASE_URL + page);
+      await b.sleep(200);
 
       await b.screenshot(`${OUT_DIR}/${slug}-${vpName}.png`);
 
-      allIssues.push(...(await checkOverflow(b, page, vpName)));
-      allIssues.push(...(await checkInlineStyles(b, page, vpName)));
-
+      // Console errors (check at each viewport — JS may differ)
       if (vpName === "desktop") {
+        allIssues.push(...(await checkConsoleErrors(b, page)));
         allIssues.push(...(await checkA11y(b, page, vpName)));
       }
+
+      allIssues.push(...(await checkOverflow(b, page, vpName)));
+      allIssues.push(...(await checkInlineStyles(b, page, vpName)));
     }
 
-    await b.resetViewport();
+    await b.send("Emulation.clearDeviceMetricsOverride", {});
     if (!jsonReport) console.log("✓");
   }
 
