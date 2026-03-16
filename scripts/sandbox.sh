@@ -100,6 +100,7 @@ fi
 
 # --- Build bind mounts ---
 RO_BIND_ARGS=""
+RW_BIND_ARGS=""
 for p in /nix /etc/resolv.conf /etc/ssl /etc/pki /etc/static /etc/hosts /etc/localtime /etc/passwd /etc/group /lib /lib64 /run/current-system; do
   if [[ -e "$p" ]]; then
     RO_BIND_ARGS="$RO_BIND_ARGS --ro-bind $p $p"
@@ -111,9 +112,12 @@ if [[ -d "$HOME/.ssh" ]]; then
   RO_BIND_ARGS="$RO_BIND_ARGS --ro-bind $HOME/.ssh $HOME/.ssh"
 fi
 
-# NOTE: Host tmux socket directory is intentionally NOT bound.
-# The tmux server runs inside bwrap, so agents can only talk to the
-# sandboxed server. This prevents sandbox escape via tmux split-window.
+# Bind a dedicated tmux socket directory that is shared between the host and
+# the sandbox. This keeps bosun's own tmux server reachable while avoiding a
+# broad bind of the host tmux socket directory.
+TMUX_SOCKET_DIR="${BOSUN_TMUX_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bosun-tmux}"
+mkdir -p "$TMUX_SOCKET_DIR"
+RW_BIND_ARGS="$RW_BIND_ARGS --bind $TMUX_SOCKET_DIR $TMUX_SOCKET_DIR"
 
 # Extra ro_bind from bwrap.json
 if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
@@ -125,7 +129,6 @@ if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
 fi
 
 # Extra rw_bind from bwrap.json
-RW_BIND_ARGS=""
 if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
   while IFS= read -r p; do
     if [[ -n "$p" ]] && [[ -e "$p" ]]; then
@@ -286,6 +289,7 @@ exec "$BWRAP" \
   --chdir "$BOSUN_ROOT" \
   --setenv HOME "$BOSUN_ROOT/.bosun-home" \
   --setenv BOSUN_ROOT "$BOSUN_ROOT" \
+  --setenv BOSUN_TMUX_DIR "$TMUX_SOCKET_DIR" \
   --setenv BOSUN_WORKSPACE "$BOSUN_ROOT/$WORKSPACE" \
   --setenv PI_CODING_AGENT_DIR "$BOSUN_ROOT/.bosun-home/.pi/agent" \
   --setenv PI_AGENT "${PI_AGENT:-bosun}" \

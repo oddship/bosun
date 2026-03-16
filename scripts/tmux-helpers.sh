@@ -4,7 +4,8 @@
 #
 # Usage:
 #   BOSUN_ROOT=/path/to/bosun
-#   TMUX_CMD="tmux -S $BOSUN_ROOT/.bosun-home/tmux.sock"
+#   TMUX_SOCK=$(bash "$BOSUN_ROOT/scripts/tmux-socket.sh" "$BOSUN_ROOT")
+#   TMUX_CMD="tmux -S $TMUX_SOCK"
 #   source scripts/tmux-helpers.sh
 
 # List bosun sessions (excludes bosun-daemon), one per line.

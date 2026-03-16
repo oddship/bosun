@@ -1,11 +1,11 @@
 # Bosun — personal multi-agent Pi coding environment
 
 bosun_root := justfile_directory()
-tmux_sock := bosun_root / ".bosun-home" / "tmux.sock"
+tmux_sock := '$(bash "' + bosun_root + '/scripts/tmux-socket.sh" "' + bosun_root + '")'
 tmux_cmd := "tmux -S " + tmux_sock
 
 # Preamble sourced by all bash recipes that need tmux helpers
-_helpers := 'export BOSUN_ROOT="' + bosun_root + '" TMUX_CMD="' + tmux_cmd + '"; source "' + bosun_root + '/scripts/tmux-helpers.sh"'
+_helpers := 'export BOSUN_ROOT="' + bosun_root + '"; TMUX_SOCK="$(bash "' + bosun_root + '/scripts/tmux-socket.sh" "' + bosun_root + '")"; export TMUX_SOCK; export TMUX_CMD="tmux -S $TMUX_SOCK"; source "' + bosun_root + '/scripts/tmux-helpers.sh"'
 
 # Default: show help
 default:
@@ -74,7 +74,7 @@ start:
       {{tmux_cmd}} new-session -d -s bosun -n bosun \
         "/bin/sh -c 'cd {{bosun_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
     else
-      scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" \
+      scripts/sandbox.sh tmux -S "$TMUX_SOCK" -f "{{bosun_root}}/config/tmux.conf" \
         new-session -d -s bosun -n bosun \
         "/bin/sh -c 'cd {{bosun_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
       {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
@@ -129,11 +129,11 @@ run *args:
         echo "Old session detected. Please restart: just stop && just start"
         exit 1
       fi
-      {{tmux_cmd}} new-session -d -s "$SESSION" -n bosun \
+      {{tmux_cmd}} new-session -d -s "$SESSION" -n "$SESSION" \
         "/bin/sh -c 'cd {{bosun_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
     else
-      scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" \
-        new-session -d -s "$SESSION" -n bosun \
+      scripts/sandbox.sh tmux -S "$TMUX_SOCK" -f "{{bosun_root}}/config/tmux.conf" \
+        new-session -d -s "$SESSION" -n "$SESSION" \
         "/bin/sh -c 'cd {{bosun_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
       {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
     fi
@@ -249,6 +249,14 @@ daemon-run rule:
     @mkdir -p "{{bosun_root}}/.bosun-daemon/control"
     echo '{"action":"trigger","handler":"{{rule}}"}' > "{{bosun_root}}/.bosun-daemon/control/manual-$(date +%s).json"
     @echo "Triggered: {{rule}}"
+
+# Run E2E validations
+
+e2e-runtime-identity:
+    bun scripts/e2e/runtime-identity-sync.ts
+
+e2e-runtime-identity-live-pi:
+    bun scripts/e2e/runtime-identity-live-pi.ts
 
 # Show session status
 status:

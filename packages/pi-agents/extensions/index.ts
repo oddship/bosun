@@ -60,13 +60,15 @@ export default function (pi: ExtensionAPI) {
       process.env.PI_AGENT_NAME = agentName;
     }
 
+    const runtimeName = process.env.PI_AGENT_NAME || agentName;
+
     // Persist identity for daemon session filtering.
     // Creates: {"type":"custom","customType":"agent_identity","data":{"agent":"bosun"}}
     pi.appendEntry("agent_identity", { agent: agentName });
 
-    // Update TUI with agent name in terminal title and status bar.
-    ctx.ui.setTitle(`pi — ${agentName}`);
-    ctx.ui.setStatus("agent", `🤖 ${agentName}`);
+    // Update TUI with the runtime instance name rather than the persona name.
+    ctx.ui.setTitle(`pi — ${runtimeName}`);
+    ctx.ui.setStatus("agent", `🤖 ${runtimeName}`);
 
     // --- Enforce tools: frontmatter ---
     // If the agent declares a `tools:` field, restrict built-in tools to only

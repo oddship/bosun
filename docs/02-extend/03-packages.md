@@ -24,7 +24,7 @@ spawn_agent({ agent: "verify", task: "...", session: true })
 
 ### pi-mesh
 
-Multi-agent coordination — peer awareness, file reservations, and messaging. Agents auto-join on spawn.
+Multi-agent coordination — peer awareness, file reservations, messaging, and optional runtime identity sync between mesh, tmux, and the Pi UI. Agents auto-join on spawn.
 
 **Key tools:** `mesh_peers`, `mesh_reserve`, `mesh_release`, `mesh_send`, `mesh_manage`
 

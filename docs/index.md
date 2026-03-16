@@ -92,5 +92,6 @@ Every component is an independent Pi package:
   - [Daily Use](guide/daily-use/) — Day-to-day patterns and commands
 - **Extending**
   - [Architecture](extend/architecture/) — Package design, sandbox model, data flow
+  - [Runtime Identity](extend/runtime-identity/) — Persona vs runtime naming, tmux/mesh sync, testing
   - [Downstream](extend/downstream/) — Build your own environment on bosun
   - [Packages](extend/packages/) — Package reference and API details
