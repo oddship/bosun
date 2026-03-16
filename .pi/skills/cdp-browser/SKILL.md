@@ -18,45 +18,73 @@ metadata:
 
 # CDP Browser Skill
 
-Control Chrome/Chromium via Chrome DevTools Protocol.
+Browser automation and visual review via Chrome DevTools Protocol.
 
-**Implementation:** TypeScript on Bun. Zero dependencies — uses Bun's native WebSocket + fetch.
+**Implementation:** TypeScript on Bun. Zero dependencies (native WebSocket + fetch).
 
-## Two Modes
+## Visual Review
 
-### 1. CLI — one-shot commands
+The headline capability. Run against any local site from any repo — bosun handles everything:
+
+```bash
+bun .pi/skills/cdp-browser/scripts/visual-review.ts \
+  --base http://localhost:8080 \
+  --crawl \
+  --out workspace/scratch/review
+```
+
+This will:
+1. Auto-discover every page by crawling internal links
+2. Screenshot each page at mobile (375px), tablet (768px), and desktop (1440px)
+3. Check for horizontal overflow, inline styles, accessibility issues, console errors
+4. Print a report with all issues found
+
+Or specify pages explicitly:
+
+```bash
+bun .pi/skills/cdp-browser/scripts/visual-review.ts \
+  --base http://localhost:3000 \
+  --pages / /about /docs/getting-started \
+  --out workspace/scratch/review
+```
+
+Use `--json` for machine-readable output.
+
+**No project setup needed.** The site just needs to be served locally and Chromium running with debugging enabled.
+
+## CLI — one-shot commands
 
 ```bash
 CDP=".pi/skills/cdp-browser/scripts/cdp.ts"
 
-bun $CDP tabs
 bun $CDP navigate "https://example.com"
 bun $CDP screenshot workspace/scratch/page.png
 bun $CDP device iphone-14
 bun $CDP overflow
+bun $CDP inlinestyles
 ```
 
-Each invocation opens a WebSocket, runs one command, closes.
+## Library — custom scripts
 
-### 2. Library — scripted workflows
+For workflows the visual-review script doesn't cover, write a Bun script that imports the library:
 
 ```typescript
-import { run } from "../../.pi/skills/cdp-browser/scripts/cdp-client";
+import { run } from ".pi/skills/cdp-browser/scripts/cdp-client";
 
 await run(async (b) => {
   await b.navigate("http://localhost:8080");
   await b.resize(375, 812);
-  await b.screenshot("mobile.png");
+  await b.screenshot("workspace/scratch/mobile.png");
   const overflows = await b.checkOverflow();
   console.log("Overflows:", overflows.length);
 });
 ```
 
-Single persistent connection. Use for multi-step workflows, visual reviews, or anything that touches multiple pages/viewports.
+Save to `workspace/scratch/my-check.ts` and run with `bun workspace/scratch/my-check.ts`.
 
 ## Prerequisites
 
-**Chrome must be started on the HOST before entering the sandbox:**
+**Chromium must be running with remote debugging on the HOST:**
 
 ```bash
 chromium --remote-debugging-port=9222
@@ -218,8 +246,17 @@ await run(async (b) => {
 - `.send(method, params)` — any CDP protocol method
 - `.on(handler)` → unsubscribe function
 
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/visual-review.ts` | Full visual review (screenshots + audits) |
+| `scripts/cdp.ts` | CLI for one-shot commands |
+| `scripts/cdp-client.ts` | Library for custom scripts |
+| `scripts/cdp` | Legacy bash wrapper → `bun cdp.ts` |
+
 ## References
 
 - [CDP-COMMANDS.md](references/CDP-COMMANDS.md) — Full CLI command docs
-- [SCRIPTING.md](references/SCRIPTING.md) — Library usage, recipes, visual review scripts
+- [SCRIPTING.md](references/SCRIPTING.md) — Library API, custom script recipes
 - [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) — Common issues

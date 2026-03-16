@@ -764,33 +764,42 @@ export class Browser {
 
   /**
    * Check for horizontal overflow at the current viewport.
-   * Returns elements that extend beyond the viewport width.
+   * Returns outermost elements that extend beyond the viewport width.
+   * Children of an already-overflowing element are excluded to reduce noise.
    */
   async checkOverflow(): Promise<
     { selector: string; overflow: number }[]
   > {
     return this.eval(`(function() {
       var vw = document.documentElement.clientWidth;
-      var overflows = [];
+      var overflowing = [];
       document.querySelectorAll('*').forEach(function(el) {
         var r = el.getBoundingClientRect();
-        if (r.right > vw + 1) {
-          var path = [];
-          var node = el;
-          while (node && node !== document.body) {
-            var tag = node.tagName.toLowerCase();
-            if (node.id) { path.unshift(tag + '#' + node.id); break; }
-            else if (node.className && typeof node.className === 'string') {
-              path.unshift(tag + '.' + node.className.trim().split(/\\s+/).join('.'));
-            } else {
-              path.unshift(tag);
-            }
-            node = node.parentElement;
-          }
-          overflows.push({ selector: path.join(' > '), overflow: Math.round(r.right - vw) });
-        }
+        if (r.right > vw + 1) overflowing.push(el);
       });
-      return overflows;
+      // Filter to outermost: skip elements whose parent is also in the list
+      var set = new Set(overflowing);
+      var roots = overflowing.filter(function(el) {
+        var p = el.parentElement;
+        while (p) { if (set.has(p)) return false; p = p.parentElement; }
+        return true;
+      });
+      return roots.map(function(el) {
+        var r = el.getBoundingClientRect();
+        var path = [];
+        var node = el;
+        while (node && node !== document.body) {
+          var tag = node.tagName.toLowerCase();
+          if (node.id) { path.unshift(tag + '#' + node.id); break; }
+          else if (node.className && typeof node.className === 'string') {
+            path.unshift(tag + '.' + node.className.trim().split(/\\s+/).join('.'));
+          } else {
+            path.unshift(tag);
+          }
+          node = node.parentElement;
+        }
+        return { selector: path.join(' > '), overflow: Math.round(r.right - vw) };
+      });
     })()`);
   }
 

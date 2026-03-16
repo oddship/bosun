@@ -1,16 +1,23 @@
 # CDP Scripting Reference
 
-The `cdp-client` library lets you write browser automation scripts in TypeScript that run under Bun. Use it for multi-step workflows, visual reviews, or any task that needs a persistent browser connection.
+The `cdp-client` library lets agents write browser automation scripts in TypeScript that run under Bun. Use it for custom workflows beyond what the built-in `visual-review.ts` script covers.
+
+## When to Use
+
+**Use `visual-review.ts` first** — it handles the common case (multi-page, multi-viewport screenshots + audits) with zero code. Only write a custom script when you need something specific like:
+- Interacting with forms or dialogs
+- Testing a specific user flow (search, navigation, login)
+- Checking behavior after JS interactions
+- Custom assertions not covered by the built-in audits
 
 ## Import
 
 ```typescript
-// From a script in workspace/scratch/
+// From workspace/scratch/ (the standard place for agent scripts)
 import { connect, run, devices } from "../../.pi/skills/cdp-browser/scripts/cdp-client";
-
-// Or use the absolute path via BOSUN_ROOT
-import { connect, run, devices } from `${process.env.BOSUN_ROOT}/.pi/skills/cdp-browser/scripts/cdp-client`;
 ```
+
+Save scripts to `workspace/scratch/` and run with `bun workspace/scratch/my-script.ts`.
 
 ## Quick Start
 
