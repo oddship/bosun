@@ -19,7 +19,7 @@
     "pi-bash-readonly": "workspace:*",
     "pi-daemon": "workspace:*",
     "pi-mcp-adapter": "^2.1.2",
-    "pi-mesh": "^0.1.2",
+    "pi-mesh": "^0.2.0",
     "pi-meta-skills": "workspace:*",
     "pi-q": "workspace:*",
     "pi-question": "workspace:*",

@@ -95,8 +95,17 @@ Controls how `spawn_agent` launches processes:
 
 | Variable | Description |
 |----------|-------------|
-| `PI_AGENT` | Agent name to load (default: `"none"` — no persona) |
-| `PI_AGENT_NAME` | Mesh peer name / tmux window name (set from `PI_AGENT` if missing) |
+| `PI_AGENT` | Agent persona/type to load (default: `"none"` — no persona) |
+| `PI_AGENT_NAME` | Runtime identity shown in the Pi UI and used as mesh peer / tmux window name when available (set from `PI_AGENT` if missing) |
+
+## Runtime identity
+
+`pi-agents` treats `PI_AGENT` as the persona/type and `PI_AGENT_NAME` as the per-session runtime identity.
+
+That means:
+- persona loading still comes from `PI_AGENT`
+- the visible Pi UI title/status prefers `PI_AGENT_NAME ?? PI_AGENT`
+- spawned agents set `PI_AGENT_NAME` to the target window/peer name so tmux and mesh can correlate the session correctly
 
 ## How spawn_agent works
 

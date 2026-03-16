@@ -89,6 +89,23 @@ log_level = "info"
 # and workspace/workflows/. No manual rules or watchers needed.
 
 # =============================================================================
+# Mesh Coordination (pi-mesh)
+# =============================================================================
+
+[mesh]
+auto_register = true
+context_mode = "full"
+feed_retention = 50
+auto_status = true
+
+[mesh.identity_sync]
+enabled = true
+startup_align = true
+mesh_to_tmux = true
+tmux_to_mesh = true
+poll_interval_ms = 2000
+
+# =============================================================================
 # Web Access (pi-web-access)
 # =============================================================================
 

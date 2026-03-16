@@ -153,12 +153,21 @@ writeJson("bwrap.json", {
 
 // --- pi-mesh.json ---
 const mesh = (config.mesh as Record<string, unknown>) || {};
+const meshIdentitySync = (mesh.identity_sync as Record<string, unknown>) || {};
 
 writeJson("pi-mesh.json", {
   autoRegister: mesh.auto_register ?? true,
   contextMode: mesh.context_mode || "full",
   feedRetention: mesh.feed_retention ?? 50,
   autoStatus: mesh.auto_status ?? true,
+  hooksModule: "./packages/pi-agents/extensions/mesh-identity-sync.ts",
+  identitySync: {
+    enabled: meshIdentitySync.enabled ?? true,
+    startupAlign: meshIdentitySync.startup_align ?? true,
+    meshToTmux: meshIdentitySync.mesh_to_tmux ?? true,
+    tmuxToMesh: meshIdentitySync.tmux_to_mesh ?? true,
+    pollIntervalMs: meshIdentitySync.poll_interval_ms ?? 2000,
+  },
 });
 
 // --- pi-q.json ---
