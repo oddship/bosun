@@ -765,18 +765,32 @@ export class Browser {
   /**
    * Check for horizontal overflow at the current viewport.
    * Returns outermost elements that extend beyond the viewport width.
-   * Children of an already-overflowing element are excluded to reduce noise.
+   * Skips elements inside scrollable containers (overflow-x: auto/scroll)
+   * and children of already-overflowing elements.
    */
   async checkOverflow(): Promise<
     { selector: string; overflow: number }[]
   > {
     return this.eval(`(function() {
       var vw = document.documentElement.clientWidth;
+
+      // Check if an element is inside a scrollable container
+      function inScrollable(el) {
+        var p = el.parentElement;
+        while (p && p !== document.body && p !== document.documentElement) {
+          var ox = getComputedStyle(p).overflowX;
+          if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') return true;
+          p = p.parentElement;
+        }
+        return false;
+      }
+
       var overflowing = [];
       document.querySelectorAll('*').forEach(function(el) {
         var r = el.getBoundingClientRect();
-        if (r.right > vw + 1) overflowing.push(el);
+        if (r.right > vw + 1 && !inScrollable(el)) overflowing.push(el);
       });
+
       // Filter to outermost: skip elements whose parent is also in the list
       var set = new Set(overflowing);
       var roots = overflowing.filter(function(el) {
@@ -784,6 +798,7 @@ export class Browser {
         while (p) { if (set.has(p)) return false; p = p.parentElement; }
         return true;
       });
+
       return roots.map(function(el) {
         var r = el.getBoundingClientRect();
         var path = [];
