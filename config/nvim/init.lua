@@ -1,45 +1,65 @@
--- Bosun sandbox nvim config
--- Minimal defaults for quick edits in splits/panes
+-- Bootstrap lazy.nvim
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+if not vim.loop.fs_stat(lazypath) then
+  vim.fn.system({
+    "git",
+    "clone",
+    "--filter=blob:none",
+    "https://github.com/folke/lazy.nvim.git",
+    "--branch=stable",
+    lazypath,
+  })
+end
+vim.opt.rtp:prepend(lazypath)
 
--- Line numbers
+-- Basic settings
+vim.g.mapleader = " "
 vim.opt.number = true
 vim.opt.relativenumber = true
-
--- Indentation
-vim.opt.tabstop = 4
-vim.opt.shiftwidth = 4
 vim.opt.expandtab = true
-vim.opt.smartindent = true
-
--- Search
-vim.opt.ignorecase = true
-vim.opt.smartcase = true
-vim.opt.hlsearch = true
-vim.opt.incsearch = true
-
--- UI
+vim.opt.shiftwidth = 2
+vim.opt.tabstop = 2
 vim.opt.termguicolors = true
-vim.opt.signcolumn = "yes"
-vim.opt.scrolloff = 8
-vim.opt.cursorline = true
-vim.opt.wrap = false
+vim.opt.conceallevel = 2 -- needed for render-markdown
 
--- Files
-vim.opt.swapfile = false
-vim.opt.backup = false
-vim.opt.undofile = true
-
--- Misc
-vim.opt.mouse = "a"
-vim.opt.clipboard = "unnamedplus"
-vim.opt.updatetime = 250
-vim.opt.splitright = true
-vim.opt.splitbelow = true
-
--- Whitespace visibility
-vim.opt.list = true
-vim.opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
-
--- Minimal statusline
-vim.opt.laststatus = 2
-vim.opt.statusline = " %f %m%r%= %l:%c  %p%% "
+-- Load plugins
+require("lazy").setup({
+  -- Markdown Preview (render in-neovim)
+  {
+    "MeanderingProgrammer/render-markdown.nvim",
+    opts = {
+      file_types = { "markdown", "md" },
+      heading = {
+        sign = true,
+        icons = { "󰲡 ", "󰲣 ", "󰲥 ", "󰲧 ", "󰲩 ", "󰲫 " },
+        position = "overlay",
+      },
+      code = {
+        sign = true,
+        style = "full",
+        position = "left",
+        language_pad = 2,
+        disable_background = { "diffview", "fugitive", "neo-tree" },
+      },
+      dash = {
+        enabled = true,
+        icon = "—",
+      },
+      bullet = {
+        icons = { "●", "○", "◆", "◇" },
+      },
+      checkbox = {
+        checked = { icon = "✅", scope_highlight = "@markup.strikethrough" },
+        unchecked = { icon = "⬜" },
+      },
+      quote = {
+        icon = "▎",
+        repeat_linebreak = true,
+      },
+      pipe_table = {
+        preset = "round",
+      },
+    },
+    ft = { "markdown", "md" },
+  },
+})
