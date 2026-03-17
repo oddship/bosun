@@ -15,7 +15,7 @@ default:
 doctor:
     #!/usr/bin/env bash
     ok=true
-    for cmd in tmux bun pi git rg jq; do
+    for cmd in bash tmux bun pi git rg jq; do
       if command -v "$cmd" &>/dev/null; then
         printf "✓ %-10s %s\n" "$cmd" "$(command -v "$cmd")"
       else

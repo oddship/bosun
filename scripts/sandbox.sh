@@ -78,6 +78,12 @@ if [[ -f "$BOSUN_ROOT/config/tmux.conf" ]] && [[ ! -L "$BOSUN_ROOT/.bosun-home/.
   ln -sf "$BOSUN_ROOT/config/tmux.conf" "$BOSUN_ROOT/.bosun-home/.tmux.conf"
 fi
 
+# Symlink bash config (tmux forces bash via default-shell, so this is
+# what new splits/panes will source)
+if [[ -f "$BOSUN_ROOT/config/bashrc" ]] && [[ ! -L "$BOSUN_ROOT/.bosun-home/.bashrc" ]]; then
+  ln -sf "$BOSUN_ROOT/config/bashrc" "$BOSUN_ROOT/.bosun-home/.bashrc"
+fi
+
 # --- Read bwrap.json config ---
 BWRAP_CONFIG="$BOSUN_ROOT/.pi/bwrap.json"
 
@@ -168,11 +174,18 @@ USER_GID=$(id -g)
 
 # --- Build optional symlink args ---
 # These create /bin/sh and /usr/bin/env for scripts with shebangs
+# Resolve bash path (varies: NixOS vs standard Linux)
 SYMLINK_ARGS=""
 if [[ -x /run/current-system/sw/bin/bash ]]; then
-  SYMLINK_ARGS="$SYMLINK_ARGS --symlink /run/current-system/sw/bin/bash /bin/sh"
+  SANDBOX_BASH="/run/current-system/sw/bin/bash"
+  SYMLINK_ARGS="$SYMLINK_ARGS --symlink $SANDBOX_BASH /bin/sh"
+  SYMLINK_ARGS="$SYMLINK_ARGS --symlink $SANDBOX_BASH /bin/bash"
 elif [[ -x /usr/bin/bash ]]; then
-  SYMLINK_ARGS="$SYMLINK_ARGS --symlink /usr/bin/bash /bin/sh"
+  SANDBOX_BASH="/usr/bin/bash"
+  SYMLINK_ARGS="$SYMLINK_ARGS --symlink $SANDBOX_BASH /bin/sh"
+  # /bin/bash already exists on non-NixOS
+else
+  SANDBOX_BASH="/bin/bash"
 fi
 
 USR_SYMLINK_ARGS=""
@@ -294,7 +307,7 @@ exec "$BWRAP" \
   --setenv PI_CODING_AGENT_DIR "$BOSUN_ROOT/.bosun-home/.pi/agent" \
   --setenv PI_AGENT "${PI_AGENT:-bosun}" \
   --setenv PI_AGENT_NAME "${PI_AGENT_NAME:-bosun}" \
-  --setenv SHELL "/bin/bash" \
+  --setenv SHELL "$SANDBOX_BASH" \
   --unsetenv TMUX \
   --setenv PATH "$SANDBOX_PATH" \
   --setenv BOSUN_SANDBOX "1" \

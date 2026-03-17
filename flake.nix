@@ -13,6 +13,7 @@
 
         devTools = [
           # Runtime
+          pkgs.bash
           pkgs.bun
           pkgs.nodejs_22
 

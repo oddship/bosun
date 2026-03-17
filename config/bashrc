@@ -1,0 +1,34 @@
+# Bosun sandbox bash config
+# Symlinked to .bosun-home/.bashrc by sandbox.sh
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+# --- Prompt ---
+# Show current directory, git branch if available
+__bosun_git_branch() {
+  local branch
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)
+  [[ -n "$branch" ]] && echo " ($branch)"
+}
+PS1='\[\e[0;36m\]\w\[\e[0;35m\]$(__bosun_git_branch)\[\e[0m\] \$ '
+
+# --- History ---
+HISTSIZE=10000
+HISTFILESIZE=20000
+HISTCONTROL=ignoreboth:erasedups
+shopt -s histappend
+
+# --- Shell Options ---
+shopt -s checkwinsize   # Update LINES/COLUMNS after each command
+shopt -s globstar       # ** matches recursively
+shopt -s cdspell        # Auto-correct minor cd typos
+
+# --- Aliases ---
+alias ls='ls --color=auto'
+alias ll='ls -alF'
+alias la='ls -A'
+alias grep='grep --color=auto'
+
+# --- Environment ---
+export EDITOR="${EDITOR:-nvim}"
