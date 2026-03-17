@@ -84,6 +84,12 @@ if [[ -f "$BOSUN_ROOT/config/bashrc" ]] && [[ ! -L "$BOSUN_ROOT/.bosun-home/.bas
   ln -sf "$BOSUN_ROOT/config/bashrc" "$BOSUN_ROOT/.bosun-home/.bashrc"
 fi
 
+# Symlink nvim config
+if [[ -d "$BOSUN_ROOT/config/nvim" ]] && [[ ! -L "$BOSUN_ROOT/.bosun-home/.config/nvim" ]]; then
+  mkdir -p "$BOSUN_ROOT/.bosun-home/.config"
+  ln -sf "$BOSUN_ROOT/config/nvim" "$BOSUN_ROOT/.bosun-home/.config/nvim"
+fi
+
 # --- Read bwrap.json config ---
 BWRAP_CONFIG="$BOSUN_ROOT/.pi/bwrap.json"
 
