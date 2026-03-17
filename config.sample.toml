@@ -106,6 +106,47 @@ tmux_to_mesh = true
 poll_interval_ms = 2000
 
 # =============================================================================
+# Memory (pi-memory)
+# =============================================================================
+
+[memory]
+enabled = true
+db_path = ".bosun-home/.cache/qmd/index.sqlite"
+auto_update_on_open = true
+default_mode = "keyword"                 # keyword | hybrid
+default_limit = 5
+# global_context = "Bosun sessions, docs, plans, and skills"
+
+[memory.search_defaults]
+min_score = 0.0
+rerank = true
+
+[memory.formatting]
+snippet_max_lines = 12
+multi_get_max_bytes = 20480
+default_get_max_lines = 80
+
+[memory.collections.sessions]
+path = "workspace/users"
+pattern = "**/*.md"
+include_by_default = true
+
+[memory.collections.docs]
+path = "docs"
+pattern = "**/*.md"
+include_by_default = true
+
+[memory.collections.skills]
+path = ".pi/skills"
+pattern = "**/*.md"
+include_by_default = false
+
+[memory.collections.agents]
+path = ".pi/agents"
+pattern = "**/*.md"
+include_by_default = false
+
+# =============================================================================
 # Web Access (pi-web-access)
 # =============================================================================
 

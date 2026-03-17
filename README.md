@@ -68,6 +68,7 @@ Independent Pi packages, each usable standalone via `pi install npm:<name>`:
 | [pi-tmux](packages/pi-tmux/) | Terminal tools — split panes, send keys, capture |
 | [pi-daemon](packages/pi-daemon/) | Background workflows — scheduling, queue, retry |
 | [pi-sandbox](packages/pi-sandbox/) | Tool-level access control |
+| [pi-memory](packages/pi-memory/) | Curated markdown memory retrieval backed by qmd v2 |
 | [pi-chronicles](packages/pi-chronicles/) | Builder's log generation |
 | [pi-session-tools](packages/pi-session-tools/) | Session summarization and handoffs |
 | [pi-q](packages/pi-q/) | Task, project, and roadmap management |

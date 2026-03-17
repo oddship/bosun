@@ -226,6 +226,27 @@ init:
     @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
     bun scripts/init.ts
 
+# Memory helpers
+memory-status:
+    @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
+    bun scripts/init.ts >/dev/null
+    bun scripts/memory.ts status
+
+memory-search query:
+    @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
+    bun scripts/init.ts >/dev/null
+    bun scripts/memory.ts search {{query}}
+
+memory-get id max-lines="":
+    @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
+    bun scripts/init.ts >/dev/null
+    if [ -n "{{max-lines}}" ]; then bun scripts/memory.ts get {{id}} {{max-lines}}; else bun scripts/memory.ts get {{id}}; fi
+
+memory-multi-get pattern max-bytes="":
+    @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
+    bun scripts/init.ts >/dev/null
+    if [ -n "{{max-bytes}}" ]; then bun scripts/memory.ts multi-get {{pattern}} {{max-bytes}}; else bun scripts/memory.ts multi-get {{pattern}}; fi
+
 # First-time setup
 onboard:
     #!/usr/bin/env bash
@@ -257,6 +278,12 @@ e2e-runtime-identity:
 
 e2e-runtime-identity-live-pi:
     bun scripts/e2e/runtime-identity-live-pi.ts
+
+e2e-memory-init:
+    bun scripts/e2e/memory-init.ts
+
+e2e-memory-cli:
+    bun scripts/e2e/memory-cli-flow.ts
 
 # Show session status
 status:

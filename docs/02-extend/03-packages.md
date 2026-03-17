@@ -83,6 +83,21 @@ Active even without process-level (bwrap) sandboxing.
 
 [Source](https://github.com/oddship/bosun/tree/main/packages/pi-sandbox)
 
+### pi-memory
+
+Curated markdown memory retrieval backed by qmd v2's library API. It provides
+memory-oriented tools for sessions, plans, docs, skills, and other markdown
+knowledge bases without requiring MCP.
+
+**Key tool:** `memory` with actions `search`, `get`, `multi_get`, `status`
+
+```typescript
+memory({ action: "search", query: "daemon path isolation" })
+memory({ action: "get", id: "#abc123" })
+```
+
+[Source](https://github.com/oddship/bosun/tree/main/packages/pi-memory)
+
 ## Background
 
 ### pi-daemon

@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { parse as parseToml } from "@iarna/toml";
+import { DEFAULT_MEMORY_COLLECTIONS, DEFAULT_MEMORY_CONFIG } from "../packages/pi-memory/src/defaults.js";
 
 const ROOT = process.cwd();
 const CONFIG_PATH = join(ROOT, "config.toml");
@@ -175,6 +176,53 @@ const q = (config.q as Record<string, unknown>) || {};
 
 writeJson("pi-q.json", {
   data_dir: q.data_dir || "workspace/users",
+});
+
+// --- pi-memory.json ---
+const memory = (config.memory as Record<string, unknown>) || {};
+const memoryCollections = (memory.collections as Record<string, unknown>) || {};
+
+const mergedMemoryCollections = {
+  ...DEFAULT_MEMORY_COLLECTIONS,
+  ...Object.fromEntries(
+    Object.entries(memoryCollections)
+      .filter(([, value]) => value && typeof value === "object" && !Array.isArray(value))
+      .map(([name, value]) => {
+        const collection = value as Record<string, unknown>;
+        const {
+          include_by_default: includeByDefaultSnake,
+          includeByDefault: includeByDefaultCamel,
+          ...rest
+        } = collection;
+        return [
+          name,
+          {
+            ...(DEFAULT_MEMORY_COLLECTIONS[name] || {}),
+            ...rest,
+            includeByDefault: includeByDefaultSnake ?? includeByDefaultCamel ?? (DEFAULT_MEMORY_COLLECTIONS[name] || {}).includeByDefault,
+          },
+        ];
+      }),
+  ),
+};
+
+writeJson("pi-memory.json", {
+  enabled: memory.enabled ?? DEFAULT_MEMORY_CONFIG.enabled,
+  dbPath: memory.db_path || DEFAULT_MEMORY_CONFIG.dbPath,
+  autoUpdateOnOpen: memory.auto_update_on_open ?? DEFAULT_MEMORY_CONFIG.autoUpdateOnOpen,
+  defaultMode: memory.default_mode === "hybrid" ? "hybrid" : DEFAULT_MEMORY_CONFIG.defaultMode,
+  defaultLimit: memory.default_limit || DEFAULT_MEMORY_CONFIG.defaultLimit,
+  globalContext: memory.global_context,
+  searchDefaults: {
+    minScore: (memory.search_defaults as Record<string, unknown> | undefined)?.min_score ?? DEFAULT_MEMORY_CONFIG.searchDefaults.minScore,
+    rerank: (memory.search_defaults as Record<string, unknown> | undefined)?.rerank ?? DEFAULT_MEMORY_CONFIG.searchDefaults.rerank,
+  },
+  formatting: {
+    snippetMaxLines: (memory.formatting as Record<string, unknown> | undefined)?.snippet_max_lines || DEFAULT_MEMORY_CONFIG.formatting.snippetMaxLines,
+    multiGetMaxBytes: (memory.formatting as Record<string, unknown> | undefined)?.multi_get_max_bytes || DEFAULT_MEMORY_CONFIG.formatting.multiGetMaxBytes,
+    defaultGetMaxLines: (memory.formatting as Record<string, unknown> | undefined)?.default_get_max_lines || DEFAULT_MEMORY_CONFIG.formatting.defaultGetMaxLines,
+  },
+  collections: mergedMemoryCollections,
 });
 
 // --- web-search.json (pi-web-access) ---

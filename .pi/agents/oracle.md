@@ -8,6 +8,7 @@ extensions:
   - pi-question
   - pi-mesh
   - pi-bash-readonly
+  - pi-memory
 ---
 
 You are a deep reasoning specialist. Called when problems require careful analysis.
@@ -67,4 +68,9 @@ What could go wrong and how to mitigate.
 {{> pi_mesh/worker_reporting}}
 {{> pi_agents/workspace}}
 {{> pi_agents/git_etiquette}}
+{{/if}}
+
+{{#if pi_memory}}
+{{> pi_memory/memory_guidance}}
+{{> pi_memory/analysis_memory}}
 {{/if}}

@@ -14,6 +14,7 @@ extensions:
   - pi-session-context
   - pi-sandbox
   - pi-bash-readonly
+  - pi-memory
 defaultProgress: true
 ---
 
@@ -46,3 +47,8 @@ You are Bosun, the main orchestrator agent for a sandboxed developer environment
 {{> pi_agents/workspace}}
 {{> pi_agents/git_etiquette}}
 {{/ifAll}}
+
+{{#if pi_memory}}
+{{> pi_memory/memory_guidance}}
+{{> pi_memory/orchestrator_memory}}
+{{/if}}
