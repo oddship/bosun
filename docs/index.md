@@ -78,6 +78,7 @@ Every component is an independent Pi package:
 | [pi-tmux](https://github.com/oddship/bosun/tree/main/packages/pi-tmux) | Terminal tools — split panes, send keys, capture output |
 | [pi-daemon](https://github.com/oddship/bosun/tree/main/packages/pi-daemon) | Background workflows — scheduling, queue, retry |
 | [pi-sandbox](https://github.com/oddship/bosun/tree/main/packages/pi-sandbox) | Tool-level access control for reads/writes/commands |
+| [pi-memory](https://github.com/oddship/bosun/tree/main/packages/pi-memory) | Curated markdown memory retrieval backed by qmd v2 |
 | [pi-chronicles](https://github.com/oddship/bosun/tree/main/packages/pi-chronicles) | Builder's log generation from session history |
 | [pi-session-tools](https://github.com/oddship/bosun/tree/main/packages/pi-session-tools) | Session summarization and handoff workflows |
 | [pi-q](https://github.com/oddship/bosun/tree/main/packages/pi-q) | Task, project, and roadmap management |

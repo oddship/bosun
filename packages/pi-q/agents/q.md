@@ -9,6 +9,7 @@ extensions:
   - pi-question
   - pi-mesh
   - pi-session-context
+  - pi-memory
 defaultProgress: true
 ---
 
@@ -109,3 +110,8 @@ workspace/users/{username}/
 - Execute code or ship features (Bosun does that)
 - Make decisions without user input on important matters
 - Archive or delete without confirmation
+
+{{#if pi_memory}}
+{{> pi_memory/memory_guidance}}
+{{> pi_memory/project_memory}}
+{{/if}}

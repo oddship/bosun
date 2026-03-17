@@ -14,11 +14,12 @@
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.57.1",
-    "@tobilu/qmd": "https://github.com/tobi/qmd",
+    "@tobilu/qmd": "github:tobi/qmd#v2.0.1",
     "pi-agents": "workspace:*",
     "pi-bash-readonly": "workspace:*",
     "pi-daemon": "workspace:*",
     "pi-mcp-adapter": "^2.1.2",
+    "pi-memory": "workspace:*",
     "pi-mesh": "^0.2.0",
     "pi-meta-skills": "workspace:*",
     "pi-q": "workspace:*",

@@ -1,0 +1,30 @@
+{
+  "name": "pi-memory",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Bosun-native memory retrieval for Pi agents, backed by qmd v2",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-memory"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "dependencies": {
+    "@tobilu/qmd": "github:tobi/qmd#v2.0.1"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  }
+}
