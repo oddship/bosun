@@ -67,7 +67,7 @@ const npmPackages: string[] = Object.entries(rootPkg.dependencies || {})
     !version.startsWith("workspace:") &&
     !name.startsWith("@") // skip scoped deps like @mariozechner/pi-coding-agent, @tobilu/qmd
   )
-  .map(([name]) => name)
+  .map(([name, version]) => `${name}@${version}`)
   .sort();
 
 // Paths in settings.json are resolved relative to .pi/ (where the file lives),
