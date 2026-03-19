@@ -130,6 +130,10 @@ Run them after structural changes to agents, slots, or the template engine.
 
 ### Prerequisites
 
+{{< note type="warning" >}}
+Live Pi tests require API keys and incur LLM costs. Only run them after structural changes to agents, slots, or the template engine.
+{{< /note >}}
+
 ```bash
 # Must have auth configured
 ls .bosun-home/.pi/agent/auth.json
@@ -155,5 +159,4 @@ just init
 ## CI
 
 There is no CI pipeline yet. Tests are run locally before commits.
-The verify + review agent gate pattern (see [planning workflow](../../packages/pi-bosun/skills/context-management/references/planning.md))
-is the primary quality gate.
+The verify + review agent gate pattern is the primary quality gate.

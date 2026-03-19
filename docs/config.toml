@@ -5,9 +5,15 @@ base_path = "/bosun"
 light = "github"
 dark  = "github-dark"
 
+[[topnav]]
+title = "GitHub"
+url = "https://github.com/oddship/bosun"
+icon = "github"
+
 [[links]]
 title = "GitHub"
 url = "https://github.com/oddship/bosun"
+icon = "github"
 
 [extra]
 footer = 'Built with <a href="https://github.com/oddship/moat">moat</a> + <a href="https://github.com/knadh/oat">oat</a>'

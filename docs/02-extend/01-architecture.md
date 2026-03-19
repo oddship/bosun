@@ -93,7 +93,7 @@ Bosun separates:
 - **persona/type** → `PI_AGENT`
 - **runtime identity** → `PI_AGENT_NAME`
 
-The runtime identity is projected into the Pi UI, mesh peer name, and tmux window name when the relevant capabilities are available. See [Runtime Identity](./04-runtime-identity.md) for the detailed sync rules, tmux targeting requirements, and E2E validation strategy.
+The runtime identity is projected into the Pi UI, mesh peer name, and tmux window name when the relevant capabilities are available. See [[Runtime Identity]] for the detailed sync rules, tmux targeting requirements, and E2E validation strategy.
 
 ## Agent spawn flow
 

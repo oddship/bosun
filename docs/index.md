@@ -43,7 +43,7 @@ You: Explore this codebase and then add rate limiting to the API
 Bosun: I'll spawn scout for recon, then plan the implementation.
 ```
 
-Read the full [Quickstart](quickstart/) for details.
+Read the full [[Quickstart]] for details.
 
 ## How it works
 
@@ -86,15 +86,16 @@ Every component is an independent Pi package:
 
 ## Learn more
 
-- [Quickstart](quickstart/) — Getting started step by step
+- [[Quickstart]] — Getting started step by step
 - **Guide**
-  - [Walkthrough](guide/walkthrough/) — Guided tour of a session
-  - [Agents](guide/agents/) — Agent tiers, spawning, mesh coordination
-  - [Workflows](guide/workflows/) — Daemon, scheduled automation
-  - [Daily Use](guide/daily-use/) — Day-to-day patterns and commands
+  - [[Walkthrough]] — Guided tour of a session
+  - [[Agents]] — Agent tiers, spawning, mesh coordination
+  - [[Workflows]] — Daemon, scheduled automation
+  - [[Daily Use]] — Day-to-day patterns and commands
 - **Extending**
-  - [Architecture](extend/architecture/) — Package design, sandbox model, data flow
-  - [Runtime Identity](extend/runtime-identity/) — Persona vs runtime naming, tmux/mesh sync, testing
-  - [Downstream](extend/downstream/) — Build your own environment on bosun
-  - [Packages](extend/packages/) — Package reference and API details
-  - [Testing](extend/testing/) — Unit tests, e2e scripts, live Pi tests
+  - [[Architecture]] — Package design, sandbox model, data flow
+  - [[Runtime Identity]] — Persona vs runtime naming, tmux/mesh sync, testing
+  - [[Downstream]] — Build your own environment on bosun
+  - [[Packages]] — Package reference and API details
+  - [[Testing]] — Unit tests, e2e scripts, live Pi tests
+- [[Changelog]]

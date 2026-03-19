@@ -138,7 +138,7 @@ config.toml (source of truth)
 
 ## Next steps
 
-- [Walkthrough](guide/walkthrough/) — See a full session play out
-- [Agents](guide/agents/) — Understand agent tiers and spawning
-- [Daily Use](guide/daily-use/) — Patterns for everyday work
-- [Architecture](extend/architecture/) — How it all fits together
+- [[Walkthrough]] — See a full session play out
+- [[Agents]] — Understand agent tiers and spawning
+- [[Daily Use]] — Patterns for everyday work
+- [[Architecture]] — How it all fits together

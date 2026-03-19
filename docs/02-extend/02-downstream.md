@@ -199,5 +199,5 @@ diff config.toml upstream/config.sample.toml
 ## Reference
 
 - [Bootstrap Skill](https://github.com/oddship/bosun/tree/main/packages/pi-bosun/skills/meta-bosun-bootstrap) — Agent-assisted scaffolding
-- [Architecture](01-architecture.md) — Package design and data flow
-- [Packages](03-packages.md) — Package reference
+- [[Architecture]] — Package design and data flow
+- [[Packages]] — Package reference
