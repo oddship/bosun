@@ -15,6 +15,7 @@ extensions:
   - pi-sandbox
   - pi-bash-readonly
   - pi-memory
+  - pi-auto-resume
 defaultProgress: true
 ---
 

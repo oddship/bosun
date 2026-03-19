@@ -116,6 +116,18 @@ writeJson("daemon.json", {
   log_level: daemon.log_level || "info",
 });
 
+// --- pi-auto-resume.json ---
+const autoResume = (config.auto_resume as Record<string, unknown>) || {};
+
+writeJson("pi-auto-resume.json", {
+  enabled: autoResume.enabled ?? true,
+  cooldownSeconds: autoResume.cooldown_seconds ?? 60,
+  message:
+    typeof autoResume.message === "string" && (autoResume.message as string).trim()
+      ? autoResume.message
+      : "Continue where you left off. If the previous task is complete or you need clarification, just ask.",
+});
+
 // --- sandbox.json ---
 const sandbox = (config.sandbox as Record<string, unknown>) || {};
 const filesystem = (sandbox.filesystem as Record<string, unknown>) || {};

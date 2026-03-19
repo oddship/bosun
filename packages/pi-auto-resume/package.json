@@ -1,0 +1,23 @@
+{
+  "name": "pi-auto-resume",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Auto-resume after context compaction for Pi agents",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-auto-resume"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  }
+}

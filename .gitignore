@@ -23,7 +23,9 @@ node_modules/
 .pi/mesh/
 .pi/spawn-tree.jsonl
 .pi/npm/
+.pi/pi-auto-resume.json
 .pi/pi-mesh.json
+.pi/pi-memory.json
 .pi/pi-q.json
 .pi/sandbox.json
 pi-session-*.html

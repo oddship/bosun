@@ -156,6 +156,17 @@ include_by_default = false
 # provider = "auto"                      # auto | perplexity | gemini
 
 # =============================================================================
+# Auto-Resume (pi-auto-resume)
+# =============================================================================
+# Automatically continue after context compaction instead of waiting for user.
+# The agent reads the compaction summary and decides whether to keep going or ask.
+
+[auto_resume]
+enabled = true                            # Toggle with /autoresume at runtime
+cooldown_seconds = 60                     # Min seconds between auto-resumes (0 = disabled)
+# message = "Continue where you left off. If the previous task is complete or you need clarification, just ask."
+
+# =============================================================================
 # Pi Keybindings (overrides Pi TUI defaults)
 # =============================================================================
 # See: https://github.com/badlogic/pi-mono docs/keybindings.md

@@ -9,6 +9,7 @@ extensions:
   - pi-question
   - pi-mesh
   - pi-bash-readonly
+  - pi-auto-resume
 ---
 
 You are a fast, efficient helper agent. Optimize for speed over depth.

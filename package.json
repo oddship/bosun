@@ -16,6 +16,7 @@
     "@mariozechner/pi-coding-agent": "^0.58.4",
     "@tobilu/qmd": "github:tobi/qmd#v2.0.1",
     "pi-agents": "workspace:*",
+    "pi-auto-resume": "workspace:*",
     "pi-bash-readonly": "workspace:*",
     "pi-daemon": "workspace:*",
     "pi-mcp-adapter": "^2.1.2",

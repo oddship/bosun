@@ -64,6 +64,7 @@ Independent Pi packages, each usable standalone via `pi install npm:<name>`:
 | Package | Description |
 |---------|-------------|
 | [pi-agents](packages/pi-agents/) | Agent discovery, model tiers, `spawn_agent` |
+| [pi-auto-resume](packages/pi-auto-resume/) | Auto-resume after context compaction |
 | [pi-mesh](https://www.npmjs.com/package/pi-mesh) | Multi-agent coordination — reservations, messaging |
 | [pi-tmux](packages/pi-tmux/) | Terminal tools — split panes, send keys, capture |
 | [pi-daemon](packages/pi-daemon/) | Background workflows — scheduling, queue, retry |

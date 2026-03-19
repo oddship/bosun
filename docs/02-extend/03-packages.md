@@ -36,6 +36,24 @@ mesh_send({ to: "bosun", message: "Done. Tests pass." })
 
 [npm](https://www.npmjs.com/package/pi-mesh) · [Source](https://github.com/oddship/bosun/tree/main/packages/pi-mesh)
 
+### pi-auto-resume
+
+Automatically resume after context compaction. When Pi compacts a session, the agent normally goes idle. This extension sends a follow-up prompt so the agent continues from the summary's next steps.
+
+**Commands:** `/autoresume` (toggle on/off)
+
+**Footer:** `🔁 auto` when enabled
+
+Configure in `config.toml`:
+
+```toml
+[auto_resume]
+enabled = true
+cooldown_seconds = 60
+```
+
+[Source](https://github.com/oddship/bosun/tree/main/packages/pi-auto-resume)
+
 ### pi-session-context
 
 Session context and handoff tools. Provides session metadata and the handoff/pickup workflow.
