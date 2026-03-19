@@ -49,6 +49,7 @@ Tests use `bun:test`. Each package has its own `tests/` directory.
 
 - **Pin exact versions** — use `"1.2.3"` not `"^1.2.3"` in all `package.json` files
 - `workspace:*` is fine for local workspace packages
+- **After changing dependency versions**: run `bun install` then `just init` — pi reads package specifiers from `.pi/settings.json` (generated), not `package.json` directly
 
 ### Package Guidelines
 
