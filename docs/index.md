@@ -17,7 +17,7 @@ An opinionated multi-agent coding environment built on [Pi](https://github.com/b
 
 **Sandboxed by default.** Process-level isolation via bubblewrap. Tool-level access control for reads, writes, and commands. Agents can only touch what you allow.
 
-**Extensible foundation.** Every piece is an independent Pi package. Use them standalone, or build your own multi-agent environment on top of bosun as a git submodule.
+**Extensible foundation.** Every piece is an independent Pi package. Use them standalone, or build your own multi-agent environment on top of bosun via `bun link`.
 
 ## Who it's for
 
@@ -73,6 +73,7 @@ Every component is an independent Pi package:
 
 | Package | What it does |
 |---------|-------------|
+| [pi-bosun](https://github.com/oddship/bosun/tree/main/packages/pi-bosun) | Framework identity — default agents, slots, skills |
 | [pi-agents](https://github.com/oddship/bosun/tree/main/packages/pi-agents) | Agent discovery, model tiers, `spawn_agent` tool |
 | [pi-mesh](https://www.npmjs.com/package/pi-mesh) | Multi-agent coordination — reservations, messaging |
 | [pi-tmux](https://github.com/oddship/bosun/tree/main/packages/pi-tmux) | Terminal tools — split panes, send keys, capture output |
@@ -96,3 +97,4 @@ Every component is an independent Pi package:
   - [Runtime Identity](extend/runtime-identity/) — Persona vs runtime naming, tmux/mesh sync, testing
   - [Downstream](extend/downstream/) — Build your own environment on bosun
   - [Packages](extend/packages/) — Package reference and API details
+  - [Testing](extend/testing/) — Unit tests, e2e scripts, live Pi tests

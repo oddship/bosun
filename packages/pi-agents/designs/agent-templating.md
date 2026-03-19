@@ -192,16 +192,16 @@ You are Bosun, the main orchestrator agent.
 2. Verify changes — always review lite agent output before reporting done
 3. Plan before executing — mandatory for 3+ files or cross-cutting concerns
 
-{{#if pi_agents}}
-{{> pi_agents/delegation}}
+{{#if pi_bosun}}
+{{> pi_bosun/delegation}}
 {{/if}}
 
 {{#if pi_mesh}}
 {{> pi_mesh/orchestrator_coordination}}
 {{/if}}
 
-{{#ifAll pi_mesh pi_agents}}
-{{> pi_agents/multi_agent_workflow}}
+{{#ifAll pi_mesh pi_bosun}}
+{{> pi_bosun/multi_agent_workflow}}
 {{/ifAll}}
 ```
 

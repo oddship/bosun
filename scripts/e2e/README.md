@@ -65,6 +65,19 @@ Validates that:
 - `memory-init.ts` — init/config generation scenario
 - `memory-cli-flow.ts` — memory command flow scenario
 
+### Agent slot rendering (live Pi)
+
+```bash
+just e2e-agent-slots
+```
+
+Validates that a real Pi session with `PI_AGENT=bosun`:
+- loads the agent from `packages/pi-bosun/agents/bosun.md`
+- renders pi-bosun slots (delegation, workspace) into the system prompt
+- renders pi-memory slots (memory guidance) into the system prompt
+
+Requires `auth.json` and `config.toml`.
+
 ## Adding scenarios
 
 Prefer scenarios that test one distributed invariant at a time, for example:

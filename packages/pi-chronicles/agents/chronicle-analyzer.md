@@ -69,5 +69,8 @@ Write to a markdown file:
 
 {{#if pi_mesh}}
 {{> pi_mesh/worker_reporting}}
-{{> pi_agents/workspace}}
+{{/if}}
+
+{{#if pi_bosun}}
+{{> pi_bosun/workspace}}
 {{/if}}

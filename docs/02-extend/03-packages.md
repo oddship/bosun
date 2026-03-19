@@ -7,6 +7,16 @@ description: Package reference — independent Pi packages that compose into bos
 
 Every component in bosun is an independent Pi package, publishable to npm and usable standalone via `pi install npm:<name>`.
 
+## Framework
+
+### pi-bosun
+
+Bosun's framework identity — default agents (bosun, lite, oracle, review, scout, verify), prompt slots (delegation, workspace, git etiquette), and bosun-specific skills (context management, config, daemon, bootstrap).
+
+Override any agent by placing a file with the same name in `.pi/agents/`.
+
+[Source](https://github.com/oddship/bosun/tree/main/packages/pi-bosun)
+
 ## Orchestration
 
 ### pi-agents
