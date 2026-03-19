@@ -22,7 +22,3 @@ bun test tests/specific.test.ts    # specific test
 
 - TypeScript, ESM, `node:` prefix for builtins
 - Explicit types for public APIs
-
-## Stale References
-
-After renaming, check: `rg -i "zerodha|zero_root|\.zero-" .`
