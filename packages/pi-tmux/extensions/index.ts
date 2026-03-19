@@ -50,6 +50,9 @@ export default function (pi: ExtensionAPI) {
       if (!isInTmux()) return notInTmux();
 
       const args = ["split-window"];
+      // Target the calling agent's pane, not the currently active one
+      const callerPane = process.env.TMUX_PANE;
+      if (callerPane) args.push("-t", callerPane);
       if (params.vertical) args.push("-h");
       if (params.size) args.push("-p", String(params.size));
       args.push(params.command);
