@@ -16,29 +16,29 @@
     "postinstall": "cd node_modules/@tobilu/qmd && [ -d dist ] || bun run build"
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.58.4",
+    "@mariozechner/pi-coding-agent": "0.58.4",
     "@tobilu/qmd": "github:tobi/qmd#v2.0.1",
     "pi-agents": "workspace:*",
     "pi-auto-resume": "workspace:*",
     "pi-bash-readonly": "workspace:*",
     "pi-bosun": "workspace:*",
     "pi-daemon": "workspace:*",
-    "pi-mcp-adapter": "^2.1.2",
+    "pi-mcp-adapter": "2.1.2",
     "pi-memory": "workspace:*",
-    "pi-mesh": "^0.2.1",
+    "pi-mesh": "0.2.1",
     "pi-meta-skills": "workspace:*",
     "pi-q": "workspace:*",
     "pi-question": "workspace:*",
     "pi-sandbox": "workspace:*",
     "pi-session-context": "workspace:*",
     "pi-tmux": "workspace:*",
-    "pi-web-access": "^0.10.2"
+    "pi-web-access": "0.10.2"
   },
   "devDependencies": {
-    "@iarna/toml": "^3.0.0",
+    "@iarna/toml": "3.0.0",
     "@types/bun": "latest"
   },
   "overrides": {
-    "@mozilla/readability": "^0.6.0"
+    "@mozilla/readability": "0.6.0"
   }
 }
