@@ -1,11 +1,19 @@
 # Bosun — personal multi-agent Pi coding environment
+#
+# Two path variables:
+#   bosun_pkg    — where bosun's scripts live (repo root, or node_modules/bosun)
+#   project_root — where the user's project lives (config.toml, .pi/, workspace/)
+#
+# When running inside the bosun repo, both point to the same place.
+# When a downstream project imports this justfile, BOSUN_PKG is set via env.
 
-bosun_root := justfile_directory()
-tmux_sock := '$(bash "' + bosun_root + '/scripts/tmux-socket.sh" "' + bosun_root + '")'
+bosun_pkg := env("BOSUN_PKG", justfile_directory())
+project_root := justfile_directory()
+tmux_sock := '$(bash "' + bosun_pkg + '/scripts/tmux-socket.sh" "' + project_root + '")'
 tmux_cmd := "tmux -S " + tmux_sock
 
 # Preamble sourced by all bash recipes that need tmux helpers
-_helpers := 'export BOSUN_ROOT="' + bosun_root + '"; TMUX_SOCK="$(bash "' + bosun_root + '/scripts/tmux-socket.sh" "' + bosun_root + '")"; export TMUX_SOCK; export TMUX_CMD="tmux -S $TMUX_SOCK"; source "' + bosun_root + '/scripts/tmux-helpers.sh"'
+_helpers := 'export BOSUN_ROOT="' + project_root + '"; export BOSUN_PKG="' + bosun_pkg + '"; TMUX_SOCK="$(bash "' + bosun_pkg + '/scripts/tmux-socket.sh" "' + project_root + '")"; export TMUX_SOCK; export TMUX_CMD="tmux -S $TMUX_SOCK"; source "' + bosun_pkg + '/scripts/tmux-helpers.sh"'
 
 # Default: show help
 default:
@@ -72,11 +80,11 @@ start:
         exit 1
       fi
       {{tmux_cmd}} new-session -d -s bosun -n bosun \
-        "/bin/sh -c 'cd {{bosun_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+        "/bin/sh -c 'cd {{project_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
     else
-      scripts/sandbox.sh tmux -S "$TMUX_SOCK" -f "{{bosun_root}}/config/tmux.conf" \
+      {{bosun_pkg}}/scripts/sandbox.sh tmux -S "$TMUX_SOCK" -f "{{bosun_pkg}}/config/tmux.conf" \
         new-session -d -s bosun -n bosun \
-        "/bin/sh -c 'cd {{bosun_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+        "/bin/sh -c 'cd {{project_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
       {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
     fi
     set_tmux_env
@@ -98,10 +106,10 @@ start-unsandboxed:
     fi
 
     echo "Creating new session 'bosun'..."
-    {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" new-session -d -s bosun -n bosun
+    {{tmux_cmd}} -f "{{bosun_pkg}}/config/tmux.conf" new-session -d -s bosun -n bosun
     {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "1"
     set_tmux_env
-    {{tmux_cmd}} send-keys -t bosun:bosun "cd {{bosun_root}} && BOSUN_ROOT={{bosun_root}} BOSUN_WORKSPACE={{bosun_root}}/workspace PI_CODING_AGENT_DIR={{bosun_root}}/.bosun-home/.pi/agent PI_AGENT=bosun PI_AGENT_NAME=bosun pi" Enter
+    {{tmux_cmd}} send-keys -t bosun:bosun "cd {{project_root}} && BOSUN_ROOT={{project_root}} BOSUN_WORKSPACE={{project_root}}/workspace PI_CODING_AGENT_DIR={{project_root}}/.bosun-home/.pi/agent PI_AGENT=bosun PI_AGENT_NAME=bosun pi" Enter
     {{tmux_cmd}} attach -t bosun
 
 # Run a new bosun session (creates bosun, bosun-2, bosun-3, ...)
@@ -113,7 +121,7 @@ run *args:
     ensure_dirs
     # Find next available name (checks sessions, windows, AND mesh registry)
     if {{tmux_cmd}} has-session -t bosun 2>/dev/null; then
-      N=$(BOSUN_ROOT="{{bosun_root}}" "{{bosun_root}}/scripts/tmux-next-bosun.sh")
+      N=$(BOSUN_ROOT="{{project_root}}" "{{bosun_pkg}}/scripts/tmux-next-bosun.sh")
       SESSION="bosun-$N"
     else
       SESSION="bosun"
@@ -130,11 +138,11 @@ run *args:
         exit 1
       fi
       {{tmux_cmd}} new-session -d -s "$SESSION" -n "$SESSION" \
-        "/bin/sh -c 'cd {{bosun_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+        "/bin/sh -c 'cd {{project_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
     else
-      scripts/sandbox.sh tmux -S "$TMUX_SOCK" -f "{{bosun_root}}/config/tmux.conf" \
+      {{bosun_pkg}}/scripts/sandbox.sh tmux -S "$TMUX_SOCK" -f "{{bosun_pkg}}/config/tmux.conf" \
         new-session -d -s "$SESSION" -n "$SESSION" \
-        "/bin/sh -c 'cd {{bosun_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
+        "/bin/sh -c 'cd {{project_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
       {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
     fi
     set_tmux_env
@@ -224,66 +232,55 @@ update:
 # Generate .pi/*.json from config.toml
 init:
     @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
-    bun scripts/init.ts
+    bun {{bosun_pkg}}/scripts/init.ts
 
 # Memory helpers
 memory-status:
     @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
-    bun scripts/init.ts >/dev/null
-    bun scripts/memory.ts status
+    bun {{bosun_pkg}}/scripts/init.ts >/dev/null
+    bun {{bosun_pkg}}/scripts/memory.ts status
 
 memory-search query:
     @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
-    bun scripts/init.ts >/dev/null
-    bun scripts/memory.ts search {{query}}
+    bun {{bosun_pkg}}/scripts/init.ts >/dev/null
+    bun {{bosun_pkg}}/scripts/memory.ts search {{query}}
 
 memory-get id max-lines="":
     @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
-    bun scripts/init.ts >/dev/null
-    if [ -n "{{max-lines}}" ]; then bun scripts/memory.ts get {{id}} {{max-lines}}; else bun scripts/memory.ts get {{id}}; fi
+    bun {{bosun_pkg}}/scripts/init.ts >/dev/null
+    if [ -n "{{max-lines}}" ]; then bun {{bosun_pkg}}/scripts/memory.ts get {{id}} {{max-lines}}; else bun {{bosun_pkg}}/scripts/memory.ts get {{id}}; fi
 
 memory-multi-get pattern max-bytes="":
     @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }
-    bun scripts/init.ts >/dev/null
-    if [ -n "{{max-bytes}}" ]; then bun scripts/memory.ts multi-get {{pattern}} {{max-bytes}}; else bun scripts/memory.ts multi-get {{pattern}}; fi
+    bun {{bosun_pkg}}/scripts/init.ts >/dev/null
+    if [ -n "{{max-bytes}}" ]; then bun {{bosun_pkg}}/scripts/memory.ts multi-get {{pattern}} {{max-bytes}}; else bun {{bosun_pkg}}/scripts/memory.ts multi-get {{pattern}}; fi
 
 # First-time setup
 onboard:
-    #!/usr/bin/env bash
-    echo "=== Bosun Onboarding ==="
-    if [[ ! -f config.toml ]]; then
-        cp config.sample.toml config.toml
-        echo "Created config.toml from sample."
-        echo "  Edit it with your API keys: vim config.toml"
-    fi
-    just init
-    mkdir -p .bosun-home/.pi/agent workspace
-    bun install
-    echo ""
-    echo "Login to pi (saves auth in .bosun-home/.pi/agent/):"
-    echo "  PI_CODING_AGENT_DIR={{bosun_root}}/.bosun-home/.pi/agent pi /login"
-    echo ""
-    echo "Ready! Run: just start"
+    {{bosun_pkg}}/scripts/onboard.sh onboard
 
 # Trigger daemon rule manually
 daemon-run rule:
-    @mkdir -p "{{bosun_root}}/.bosun-daemon/control"
-    echo '{"action":"trigger","handler":"{{rule}}"}' > "{{bosun_root}}/.bosun-daemon/control/manual-$(date +%s).json"
+    @mkdir -p "{{project_root}}/.bosun-daemon/control"
+    echo '{"action":"trigger","handler":"{{rule}}"}' > "{{project_root}}/.bosun-daemon/control/manual-$(date +%s).json"
     @echo "Triggered: {{rule}}"
 
 # Run E2E validations
 
 e2e-runtime-identity:
-    bun scripts/e2e/runtime-identity-sync.ts
+    bun {{bosun_pkg}}/scripts/e2e/runtime-identity-sync.ts
 
 e2e-runtime-identity-live-pi:
-    bun scripts/e2e/runtime-identity-live-pi.ts
+    bun {{bosun_pkg}}/scripts/e2e/runtime-identity-live-pi.ts
 
 e2e-memory-init:
-    bun scripts/e2e/memory-init.ts
+    bun {{bosun_pkg}}/scripts/e2e/memory-init.ts
 
 e2e-memory-cli:
-    bun scripts/e2e/memory-cli-flow.ts
+    bun {{bosun_pkg}}/scripts/e2e/memory-cli-flow.ts
+
+e2e-agent-slots:
+    bun {{bosun_pkg}}/scripts/e2e/agent-slots-live-pi.ts
 
 # Show session status
 status:
@@ -304,8 +301,8 @@ status:
 _ensure-daemon:
     #!/usr/bin/env bash
     # Skip if daemon.json doesn't exist or isn't enabled
-    if [[ ! -f "{{bosun_root}}/.pi/daemon.json" ]]; then exit 0; fi
-    ENABLED=$(cat "{{bosun_root}}/.pi/daemon.json" | grep -o '"enabled"[[:space:]]*:[[:space:]]*true' || echo "")
+    if [[ ! -f "{{project_root}}/.pi/daemon.json" ]]; then exit 0; fi
+    ENABLED=$(cat "{{project_root}}/.pi/daemon.json" | grep -o '"enabled"[[:space:]]*:[[:space:]]*true' || echo "")
     if [[ -z "$ENABLED" ]]; then exit 0; fi
 
     if {{tmux_cmd}} has-session -t bosun-daemon 2>/dev/null; then
@@ -322,14 +319,14 @@ _ensure-daemon:
           exit 1
         fi
         {{tmux_cmd}} new-session -d -s bosun-daemon -n daemon \
-          "/bin/sh -c 'cd {{bosun_root}} && bun packages/pi-daemon/src/index.ts; sleep 300'"
+          "/bin/sh -c 'cd {{project_root}} && bun {{bosun_pkg}}/packages/pi-daemon/src/index.ts; sleep 300'"
       else
-        scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_root}}/config/tmux.conf" \
+        {{bosun_pkg}}/scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_pkg}}/config/tmux.conf" \
           new-session -d -s bosun-daemon -n daemon \
-          "/bin/sh -c 'cd {{bosun_root}} && bun packages/pi-daemon/src/index.ts; sleep 300'"
+          "/bin/sh -c 'cd {{project_root}} && bun {{bosun_pkg}}/packages/pi-daemon/src/index.ts; sleep 300'"
         {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
       fi
-      {{tmux_cmd}} set-environment -g BOSUN_ROOT "{{bosun_root}}"
+      {{tmux_cmd}} set-environment -g BOSUN_ROOT "{{project_root}}"
       sleep 2
       if {{tmux_cmd}} has-session -t bosun-daemon 2>/dev/null; then
         echo "Daemon started in tmux session 'bosun-daemon'"
@@ -344,11 +341,11 @@ daemon-stop:
 
 # View daemon logs
 daemon-logs:
-    @tail -50 "{{bosun_root}}/.bosun-daemon/daemon.log" 2>/dev/null || echo "No logs found"
+    @tail -50 "{{project_root}}/.bosun-daemon/daemon.log" 2>/dev/null || echo "No logs found"
 
 # Generate workflow DAG visualization
 workflow-dag:
-    bun scripts/workflow-dag.ts
+    bun {{bosun_pkg}}/scripts/workflow-dag.ts
     @echo "Open workspace/workflow-dag.html in your browser"
 
 # Internal: check if config.toml has drifted from generated .pi/*.json

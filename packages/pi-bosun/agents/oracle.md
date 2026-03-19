@@ -66,8 +66,11 @@ What could go wrong and how to mitigate.
 
 {{#if pi_mesh}}
 {{> pi_mesh/worker_reporting}}
-{{> pi_agents/workspace}}
-{{> pi_agents/git_etiquette}}
+{{/if}}
+
+{{#if pi_bosun}}
+{{> pi_bosun/workspace}}
+{{> pi_bosun/git_etiquette}}
 {{/if}}
 
 {{#if pi_memory}}

@@ -10,6 +10,7 @@
         "pi-agents": "workspace:*",
         "pi-auto-resume": "workspace:*",
         "pi-bash-readonly": "workspace:*",
+        "pi-bosun": "workspace:*",
         "pi-daemon": "workspace:*",
         "pi-mcp-adapter": "^2.1.2",
         "pi-memory": "workspace:*",
@@ -53,6 +54,10 @@
         "@mariozechner/pi-coding-agent": "*",
         "@sinclair/typebox": "*",
       },
+    },
+    "packages/pi-bosun": {
+      "name": "pi-bosun",
+      "version": "0.1.0",
     },
     "packages/pi-chronicles": {
       "name": "pi-chronicles",
@@ -918,6 +923,8 @@
     "pi-auto-resume": ["pi-auto-resume@workspace:packages/pi-auto-resume"],
 
     "pi-bash-readonly": ["pi-bash-readonly@workspace:packages/pi-bash-readonly"],
+
+    "pi-bosun": ["pi-bosun@workspace:packages/pi-bosun"],
 
     "pi-chronicles": ["pi-chronicles@workspace:packages/pi-chronicles"],
 

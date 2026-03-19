@@ -5,132 +5,199 @@ description: Build your own multi-agent environment on top of bosun
 
 # Downstream Projects
 
-Use bosun as a git submodule foundation for your own multi-agent environment. Inherit packages, agents, and infrastructure while adding your own domain-specific skills and tooling.
+Build your own multi-agent environment using bosun as a foundation. There are two approaches depending on your needs.
 
-## How it works
+## Option A: bun link (recommended)
+
+Use bosun as a linked dependency. Your project gets all agents, skills, and
+tooling. Override anything by placing files in `.pi/`.
+
+### Setup
+
+```bash
+# Register bosun for linking (once, from the bosun repo)
+cd /path/to/bosun
+bun link
+
+# Create your project
+mkdir my-project && cd my-project
+bun init
+bun link bosun
+
+# Scaffold config, justfile, and directory structure
+npx bosun onboard
+
+# Edit config.toml with your API keys and model preferences
+vim config.toml
+
+# Start
+just start
+```
+
+### What onboard creates
 
 ```
-your-project/
-├── upstream/              ← git submodule of oddship/bosun (read-only)
-├── .pi/agents/            ← your agents (override upstream by name)
-├── .pi/skills/            ← your domain skills + copied generic skills
-├── packages/              ← your custom Pi packages
-├── config.toml            ← your config
-├── justfile               ← your lifecycle (calls upstream/scripts/sandbox.sh)
-└── .bosun-root            ← marker file for sandbox discovery
+my-project/
+├── config.toml              ← your config (API keys, models, settings)
+├── justfile                 ← imports bosun's recipes, add your own below
+├── .pi/
+│   ├── agents/              ← empty — your overrides go here
+│   ├── skills/              ← empty — your custom skills go here
+│   ├── slots/               ← empty — your slot overrides go here
+│   ├── settings.json        ← generated (points to bosun's packages)
+│   └── agents.json          ← generated (agentPaths into node_modules/bosun/)
+├── workspace/
+│   └── users/               ← session logs, plans, tasks
+├── .bosun-home/             ← sandboxed HOME directory
+└── node_modules/
+    └── bosun/               ← linked bosun repo (read-only)
 ```
 
-**Agent discovery**: Your `.pi/agents/` is scanned first. If you create `.pi/agents/lite.md`, it overrides upstream's lite agent. Upstream agents (bosun, verify, scout, review, oracle) remain available via `agentPaths` config.
+### How discovery works
 
-**Package discovery**: Both `packages/*` and `upstream/packages/*` are bun workspaces. Your `scripts/init.ts` generates `.pi/settings.json` pointing to both.
+**Agents**: `.pi/agents/` is checked first. If you create `.pi/agents/bosun.md`,
+it overrides bosun's default. Otherwise, agents are found via `agentPaths` pointing
+into `node_modules/bosun/packages/pi-bosun/agents/`.
 
-**Skill propagation**: Copy generic skills (git, mesh, context-management) from upstream into your `.pi/skills/`. Add your own domain skills alongside them.
+**Skills**: Skills from bosun's packages are auto-discovered (pi-bosun, pi-q, etc.).
+Generic skills (git, github, etc.) are found via the `skills` path in settings.json.
+Add your own in `.pi/skills/`.
 
-## Quick start
+**Slots**: Template engine checks `.pi/slots/<pkg>/` first (your overrides), then
+falls through to the package's own slots directory.
 
-### Agent-assisted bootstrap
+**Extensions**: All bosun packages are listed in settings.json. Pi loads their
+extensions automatically.
 
-The fastest way — let an agent scaffold the project for you:
+### Customization
 
-1. Start plain `pi` (no bosun needed)
-2. Say:
-   ```
-   I want to create a project called "my-project" based on bosun.
-   Fetch the guide: https://raw.githubusercontent.com/oddship/bosun/main/.pi/skills/meta-bosun-bootstrap/SKILL.md
-   ```
-3. The agent fetches the skill, asks you a few questions (project name, orchestrator name, domain), then scaffolds everything.
+**Override an agent:**
+```bash
+# Copy the default and modify
+cp node_modules/bosun/packages/pi-bosun/agents/bosun.md .pi/agents/bosun.md
+# Edit: change model, add tools, modify persona
+```
 
-### Manual setup
+**Add a custom agent:**
+```bash
+# Create .pi/agents/deploy.md with frontmatter + body
+cat > .pi/agents/deploy.md << 'EOF'
+---
+name: deploy
+description: Deployment specialist
+model: medium
+extensions:
+  - pi-mesh
+  - pi-question
+---
+You are a deployment specialist...
+EOF
+```
+
+**Add domain skills:**
+```
+.pi/skills/my-api/
+├── SKILL.md              # Instructions (loaded on demand)
+├── references/
+│   └── ENDPOINTS.md      # Detailed docs
+└── scripts/
+    └── fetch-data.sh     # Helper scripts
+```
+
+**Add project-specific justfile recipes:**
+```just
+# Your justfile — bosun recipes are inherited via import
+export BOSUN_PKG := justfile_directory() / "node_modules/bosun"
+import "node_modules/bosun/justfile"
+
+# Your additions
+deploy:
+    ./scripts/deploy.sh
+
+seed-db:
+    bun scripts/seed.ts
+```
+
+### Upgrades
+
+```bash
+# Pull latest bosun (if you cloned it)
+cd /path/to/bosun && git pull
+
+# In your project — re-run init to pick up any new config
+cd my-project
+just init
+
+# Check for new config options or tool requirements
+npx bosun doctor
+```
+
+`just init` regenerates `.pi/*.json` using the latest `init.ts` from bosun.
+New packages, agents, skills, and config sections are picked up automatically.
+Your `config.toml` is never overwritten — missing sections use defaults.
+
+### Config drift
+
+When bosun adds new `config.toml` sections, `bosun doctor` reports them:
+
+```
+$ npx bosun doctor
+⚠ config.toml is missing sections from the latest sample:
+    [memory.search_defaults]
+    [web_access.video]
+
+  These sections use defaults. To customize, copy them from:
+  /path/to/node_modules/bosun/config.sample.toml
+```
+
+## Option B: Git submodule
+
+For production deployments or when you need version pinning, use bosun as a
+git submodule.
+
+### Setup
 
 ```bash
 mkdir my-project && cd my-project
 git init
 git submodule add https://github.com/oddship/bosun.git upstream
-touch .bosun-root
-mkdir -p .pi/agents .pi/skills packages scripts workspace .bosun-home config
-```
 
-Copy and adapt files from upstream:
+# Install bosun's deps
+cd upstream && bun install && cd ..
 
-```bash
-# Config template
-cp upstream/config.sample.toml config.sample.toml
-# Edit: change default_agent, add your env vars
-
-# Tmux config
-cp upstream/config/tmux.conf config/tmux.conf
-
-# Generic skills
-for skill in git github context-management mesh tmux-orchestration \
-             session-analysis background-processes skill-loading-patterns; do
-  cp -r upstream/.pi/skills/$skill .pi/skills/
-done
-```
-
-Files that need more than a copy (read upstream version and adapt):
-
-- `scripts/init.ts` — add `agentPaths` pointing to upstream agents
-- `justfile` — change session names, point scripts to `upstream/scripts/`
-- `.pi/agents/<name>.md` — your main agent persona
-- `package.json` — workspaces: `["packages/*", "upstream/packages/*"]`
-- `flake.nix` — nix devShell with bwrap, tmux, bun, etc.
-
-### Pitfalls
-
-**Tmux socket path too long.** Tmux sockets have a ~107 character path limit. Use `.sock` at the project root in your justfile, not `.bosun-home/tmux.sock`:
-
-```just
-tmux_sock := justfile_directory() / ".sock"
-```
-
-**Daemon won't start.** `just start` must call an `_ensure-daemon` recipe that starts the daemon in a separate tmux session. Also, `.pi/daemon.json` must exist — run `just init` first.
-
-**`.direnv/` committed.** Add `.direnv/` to `.gitignore` before the first commit.
-
-### Install and start
-
-```bash
+# Your project's package.json
+cat > package.json << 'EOF'
+{
+  "name": "my-project",
+  "workspaces": ["packages/*", "upstream/packages/*"]
+}
+EOF
 bun install
-cp config.sample.toml config.toml
-# Edit config.toml with your API keys
-just init       # generates .pi/*.json — required before start
-just start
 ```
 
-## Adding domain skills
+### Key differences from bun link
 
-Your domain skills are the main customization point:
+- Bosun lives at `upstream/` instead of `node_modules/bosun/`
+- Your `scripts/init.ts` needs custom `agentPaths` pointing to `upstream/packages/`
+- You write your own justfile (can't import from upstream easily)
+- Version pinned via submodule commit
 
-```
-.pi/skills/my-api/
-├── SKILL.md              # Main instruction file
-├── references/           # Detailed docs (loaded on demand)
-│   └── ENDPOINTS.md
-└── scripts/              # Helper scripts
-    └── fetch-data.sh
-```
-
-Skills are loaded on demand by agents. Use the `meta-skill-creator` skill for scaffolding guidance.
-
-## Syncing upstream
+### Syncing
 
 ```bash
-just sync-upstream      # Fetch latest, reinstall, regenerate config
-just sync-skills        # Show upstream skills you haven't copied
+cd upstream && git pull origin main && cd ..
+bun install
+just init
+git add upstream && git commit -m "chore: sync upstream bosun"
 ```
 
-Check for new config options:
+Check for new config:
 ```bash
-diff config.sample.toml upstream/config.sample.toml
-```
-
-Then commit:
-```bash
-git add -A && git commit -m "chore: sync upstream bosun"
+diff config.toml upstream/config.sample.toml
 ```
 
 ## Reference
 
-- [Bootstrap Skill](https://github.com/oddship/bosun/tree/main/.pi/skills/meta-bosun-bootstrap) — Full scaffolding guide
-- [Architecture](architecture/) — Package design and data flow
-- [Packages](packages/) — Package reference
+- [Bootstrap Skill](https://github.com/oddship/bosun/tree/main/packages/pi-bosun/skills/meta-bosun-bootstrap) — Agent-assisted scaffolding
+- [Architecture](01-architecture.md) — Package design and data flow
+- [Packages](03-packages.md) — Package reference

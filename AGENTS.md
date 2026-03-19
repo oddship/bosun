@@ -6,8 +6,9 @@ This document is for Pi agents (including you) operating inside the bosun enviro
 
 ```
 bosun/
-├── .pi/agents/          # Agent definitions (checked in)
-├── .pi/skills/          # Skill definitions (checked in)
+├── .pi/agents/          # Agent overrides (project-level)
+├── .pi/skills/          # Skill overrides (project-level)
+├── skills/              # Generic skills (git, github, cdp-browser, etc.)
 ├── packages/            # Pi packages (independent, publishable)
 ├── scripts/             # Scaffolding (sandbox.sh, init.ts, daemon handlers)
 ├── config/              # tmux.conf
@@ -78,13 +79,13 @@ Each package under `packages/` is independent:
 
 ### Adding a New Agent
 
-1. Create `.pi/agents/<name>.md` with frontmatter (name, model, extensions, skills)
+1. Create agent `.md` in a package (`packages/<pkg>/agents/`) or `.pi/agents/` for project overrides
 2. Model tiers: `lite`, `medium`, `high`, `oracle`
 3. Add to agent table in README.md and bosun.md
 
 ### Adding a New Skill
 
-1. Create `.pi/skills/<name>/SKILL.md` with frontmatter
+1. Create skill in a package (`packages/<pkg>/skills/`) or `skills/` for generic skills
 2. Add `references/` for detailed docs, `scripts/` for CLI tools
 3. Skills auto-discover via Pi's skill system
 

@@ -142,4 +142,59 @@ describe("processTemplate", () => {
 
     expect(result).not.toContain("Both available.");
   });
+
+  it("sets pi_bosun=true and resolves pi-bosun slots", () => {
+    const pkgDir = path.join(tmpDir, "packages", "pi-bosun");
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(path.join(pkgDir, "package.json"), '{"name":"pi-bosun"}');
+
+    const slotsDir = path.join(pkgDir, "slots");
+    fs.mkdirSync(slotsDir, { recursive: true });
+    fs.writeFileSync(path.join(slotsDir, "delegation.md"), "Delegate to specialists.");
+    fs.writeFileSync(path.join(slotsDir, "workspace.md"), "Write to workspace/.");
+
+    const body = [
+      "{{#if pi_bosun}}",
+      "{{> pi_bosun/delegation}}",
+      "{{/if}}",
+      "",
+      "{{#if pi_bosun}}",
+      "{{> pi_bosun/workspace}}",
+      "{{/if}}",
+    ].join("\n");
+
+    const result = processTemplate(body, { cwd: tmpDir });
+
+    expect(result).toContain("Delegate to specialists.");
+    expect(result).toContain("Write to workspace/.");
+  });
+
+  it("renders pi_bosun and pi_mesh slots independently", () => {
+    // Both packages exist
+    for (const pkg of ["pi-bosun", "pi-mesh"]) {
+      const dir = path.join(tmpDir, "packages", pkg);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "package.json"), `{"name":"${pkg}"}`);
+    }
+
+    // pi-bosun has slots, pi-mesh doesn't (it's npm, slots come from .pi/slots/)
+    const bosunSlots = path.join(tmpDir, "packages", "pi-bosun", "slots");
+    fs.mkdirSync(bosunSlots, { recursive: true });
+    fs.writeFileSync(path.join(bosunSlots, "workspace.md"), "Bosun workspace.");
+
+    const body = [
+      "{{#if pi_mesh}}",
+      "Mesh is available.",
+      "{{/if}}",
+      "",
+      "{{#if pi_bosun}}",
+      "{{> pi_bosun/workspace}}",
+      "{{/if}}",
+    ].join("\n");
+
+    const result = processTemplate(body, { cwd: tmpDir });
+
+    expect(result).toContain("Mesh is available.");
+    expect(result).toContain("Bosun workspace.");
+  });
 });

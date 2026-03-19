@@ -10,6 +10,8 @@ An opinionated environment for [Pi](https://github.com/badlogic/pi-mono). Multip
 
 ## Quickstart
 
+### Clone and use directly
+
 ```bash
 git clone https://github.com/oddship/bosun.git
 cd bosun
@@ -17,6 +19,23 @@ just onboard        # install deps, create config
 # edit config.toml with your API keys
 just start          # sandboxed tmux session
 ```
+
+### Use as a dependency
+
+```bash
+# In the bosun repo (once, registers it for linking)
+cd /path/to/bosun && bun link
+
+# In your project
+mkdir my-project && cd my-project
+bun init
+bun link bosun
+npx bosun onboard   # scaffolds config, justfile, directories
+# edit config.toml with your API keys
+just start
+```
+
+See [Downstream Projects](docs/02-extend/02-downstream.md) for the full guide.
 
 Then:
 
@@ -63,6 +82,7 @@ Independent Pi packages, each usable standalone via `pi install npm:<name>`:
 
 | Package | Description |
 |---------|-------------|
+| [pi-bosun](packages/pi-bosun/) | Framework identity — default agents, slots, skills |
 | [pi-agents](packages/pi-agents/) | Agent discovery, model tiers, `spawn_agent` |
 | [pi-auto-resume](packages/pi-auto-resume/) | Auto-resume after context compaction |
 | [pi-mesh](https://www.npmjs.com/package/pi-mesh) | Multi-agent coordination — reservations, messaging |

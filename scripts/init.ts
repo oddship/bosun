@@ -5,6 +5,10 @@
  * Each package reads its own .pi/<name>.json. This script generates
  * them all from a single config.toml source of truth.
  *
+ * Supports two modes:
+ *   Local — running inside the bosun repo (packages/ at root)
+ *   Dependency — bosun installed via bun add (packages at node_modules/bosun/packages/)
+ *
  * Usage:
  *   bun scripts/init.ts
  *   just init
@@ -14,10 +18,21 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { parse as parseToml } from "@iarna/toml";
-import { DEFAULT_MEMORY_COLLECTIONS, DEFAULT_MEMORY_CONFIG } from "../packages/pi-memory/src/defaults.js";
 
 const ROOT = process.cwd();
 const CONFIG_PATH = join(ROOT, "config.toml");
+
+// Detect mode: is bosun a dependency (node_modules/bosun/) or are we inside the bosun repo?
+const bosunDepDir = join(ROOT, "node_modules", "bosun");
+const isDependencyMode = existsSync(join(bosunDepDir, "packages")) && !existsSync(join(ROOT, "packages", "pi-bosun", "package.json"));
+
+// Resolve the bosun packages directory
+const bosunPackagesDir = isDependencyMode ? join(bosunDepDir, "packages") : null;
+
+// Import memory defaults — resolve relative to this script's location (works in both modes)
+const { DEFAULT_MEMORY_COLLECTIONS, DEFAULT_MEMORY_CONFIG } = await import(
+  join(dirname(import.meta.url.replace("file://", "")), "..", "packages", "pi-memory", "src", "defaults.js")
+);
 
 if (!existsSync(CONFIG_PATH)) {
   console.error("Error: config.toml not found");
@@ -41,43 +56,97 @@ function writeJson(name: string, data: unknown): void {
 }
 
 // --- settings.json ---
-// Auto-discover local packages that have a "pi" key in package.json
+// Auto-discover packages that have a "pi" key in package.json
 import { readdirSync } from "node:fs";
 
-const packagesDir = join(ROOT, "packages");
-const localPackages: string[] = readdirSync(packagesDir)
-  .filter((d) => {
-    const pkgPath = join(packagesDir, d, "package.json");
-    if (!existsSync(pkgPath)) return false;
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-      return !!pkg.pi;
-    } catch {
-      return false;
-    }
-  })
-  .sort();
+/** Scan a directory for pi-packages (dirs with package.json containing "pi" key). */
+function discoverPiPackages(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((d) => {
+      const pkgPath = join(dir, d, "package.json");
+      if (!existsSync(pkgPath)) return false;
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+        return !!pkg.pi;
+      } catch {
+        return false;
+      }
+    })
+    .sort();
+}
 
-// npm packages (not in packages/) — discovered from root package.json dependencies
-// that aren't workspace:* references
+// Local packages (in project's packages/ directory)
+const packagesDir = join(ROOT, "packages");
+const localPackages = discoverPiPackages(packagesDir);
+
+// Bosun dependency packages (when bosun is installed as a dep)
+const bosunPackages = bosunPackagesDir ? discoverPiPackages(bosunPackagesDir) : [];
+// Filter out any that overlap with local packages (local wins)
+const localNames = new Set(localPackages);
+const filteredBosunPackages = bosunPackages.filter((p) => !localNames.has(p));
+
+// npm packages — discovered from root package.json dependencies
+// In dependency mode, also include bosun's own npm deps that are pi-packages
 const rootPkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
 const npmPackages: string[] = Object.entries(rootPkg.dependencies || {})
   .filter(([name, version]) =>
     typeof version === "string" &&
     !version.startsWith("workspace:") &&
-    !name.startsWith("@") // skip scoped deps like @mariozechner/pi-coding-agent, @tobilu/qmd
+    !name.startsWith("@") && // skip scoped deps
+    name !== "bosun" // skip bosun itself (it's the framework, not a pi-package)
   )
   .map(([name, version]) => `${name}@${version}`)
   .sort();
 
+// In dependency mode, also discover npm pi-packages from bosun's dependencies
+// that got hoisted to the project's node_modules/
+if (isDependencyMode) {
+  const bosunPkg = JSON.parse(readFileSync(join(bosunDepDir, "package.json"), "utf-8"));
+  const bosunNpmDeps = Object.entries(bosunPkg.dependencies || {})
+    .filter(([name, version]) =>
+      typeof version === "string" &&
+      !version.startsWith("workspace:") &&
+      !name.startsWith("@") &&
+      !npmPackages.some((p) => p.startsWith(`${name}@`)) // not already in project deps
+    );
+  for (const [name, version] of bosunNpmDeps) {
+    // Check if it's actually a pi-package (has "pi" key)
+    const nmPath = join(ROOT, "node_modules", name, "package.json");
+    if (existsSync(nmPath)) {
+      try {
+        const pkg = JSON.parse(readFileSync(nmPath, "utf-8"));
+        if (pkg.pi) {
+          npmPackages.push(`${name}@${version}`);
+        }
+      } catch { /* skip */ }
+    }
+  }
+  npmPackages.sort();
+}
+
+// Skills paths — resolve relative to .pi/ (where settings.json lives)
+const skillsPaths: string[] = [];
+// Local project skills
+const localSkillsDir = join(ROOT, "skills");
+if (existsSync(localSkillsDir)) {
+  skillsPaths.push("../skills");
+}
+// Bosun dependency skills
+if (isDependencyMode && existsSync(join(bosunDepDir, "skills"))) {
+  skillsPaths.push("../node_modules/bosun/skills");
+}
+
 // Paths in settings.json are resolved relative to .pi/ (where the file lives),
-// so we need "../packages/" to reach the packages directory.
+// so we need "../packages/" or "../node_modules/bosun/packages/" to reach them.
 writeJson("settings.json", {
   _configHash: configHash,
   packages: [
     ...localPackages.map((p) => `../packages/${p}`),
+    ...filteredBosunPackages.map((p) => `../node_modules/bosun/packages/${p}`),
     ...npmPackages.map((p) => `npm:${p}`),
   ],
+  ...(skillsPaths.length > 0 ? { skills: skillsPaths } : {}),
 });
 
 // --- agents.json ---
@@ -95,7 +164,17 @@ writeJson("agents.json", {
   defaultAgent: agents.default_agent || "bosun",
   agentPaths: [
     ...(Array.isArray(agents.extra_paths) ? agents.extra_paths : []),
-    "./packages/pi-q/agents",
+    ...(isDependencyMode
+      ? [
+          "./node_modules/bosun/packages/pi-bosun/agents",
+          "./node_modules/bosun/packages/pi-q/agents",
+          "./node_modules/bosun/packages/pi-chronicles/agents",
+        ]
+      : [
+          "./packages/pi-bosun/agents",
+          "./packages/pi-q/agents",
+          "./packages/pi-chronicles/agents",
+        ]),
   ],
   backend: {
     type: backend.type || "tmux",

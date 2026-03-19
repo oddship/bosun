@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "bosun": "./scripts/onboard.sh"
+  },
   "description": "Bosun — personal multi-agent Pi coding environment",
   "license": "MIT",
   "workspaces": [
@@ -18,6 +21,7 @@
     "pi-agents": "workspace:*",
     "pi-auto-resume": "workspace:*",
     "pi-bash-readonly": "workspace:*",
+    "pi-bosun": "workspace:*",
     "pi-daemon": "workspace:*",
     "pi-mcp-adapter": "^2.1.2",
     "pi-memory": "workspace:*",

@@ -1,0 +1,38 @@
+{
+  "enabled": true,
+  "dbPath": ".bosun-home/.cache/qmd/index.sqlite",
+  "autoUpdateOnOpen": true,
+  "defaultMode": "keyword",
+  "defaultLimit": 5,
+  "searchDefaults": {
+    "minScore": 0,
+    "rerank": true
+  },
+  "formatting": {
+    "snippetMaxLines": 12,
+    "multiGetMaxBytes": 20480,
+    "defaultGetMaxLines": 80
+  },
+  "collections": {
+    "sessions": {
+      "path": "workspace/users",
+      "pattern": "**/*.md",
+      "includeByDefault": true
+    },
+    "docs": {
+      "path": "docs",
+      "pattern": "**/*.md",
+      "includeByDefault": true
+    },
+    "skills": {
+      "path": ".pi/skills",
+      "pattern": "**/*.md",
+      "includeByDefault": false
+    },
+    "agents": {
+      "path": ".pi/agents",
+      "pattern": "**/*.md",
+      "includeByDefault": false
+    }
+  }
+}

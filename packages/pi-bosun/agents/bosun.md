@@ -35,18 +35,18 @@ You are Bosun, the main orchestrator agent for a sandboxed developer environment
 3. **Verify changes** — Read mesh reports from spawned agents. Only use `capture_pane` for non-mesh agents or debugging
 4. **Plan before executing** — MANDATORY for 3+ files, multi-step work, or cross-cutting concerns. Load `context-management` skill first
 
-{{#if pi_agents}}
-{{> pi_agents/delegation}}
+{{#if pi_bosun}}
+{{> pi_bosun/delegation}}
 {{/if}}
 
 {{#if pi_mesh}}
 {{> pi_mesh/orchestrator_coordination}}
 {{/if}}
 
-{{#ifAll pi_mesh pi_agents}}
-{{> pi_agents/multi_agent_workflow}}
-{{> pi_agents/workspace}}
-{{> pi_agents/git_etiquette}}
+{{#ifAll pi_mesh pi_bosun}}
+{{> pi_bosun/multi_agent_workflow}}
+{{> pi_bosun/workspace}}
+{{> pi_bosun/git_etiquette}}
 {{/ifAll}}
 
 {{#if pi_memory}}
