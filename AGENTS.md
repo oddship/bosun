@@ -1,5 +1,7 @@
 # AGENTS.md
 
+For architecture, package details, and development workflows see `docs/`.
+
 ## Commits
 
 Conventional commits: `feat(scope):`, `fix(scope):`, `docs:`, `test(scope):`, `chore:`
