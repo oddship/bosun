@@ -14,7 +14,7 @@
         "pi-daemon": "workspace:*",
         "pi-mcp-adapter": "^2.1.2",
         "pi-memory": "workspace:*",
-        "pi-mesh": "^0.2.0",
+        "pi-mesh": "^0.2.1",
         "pi-meta-skills": "workspace:*",
         "pi-q": "workspace:*",
         "pi-question": "workspace:*",
@@ -934,7 +934,7 @@
 
     "pi-memory": ["pi-memory@workspace:packages/pi-memory"],
 
-    "pi-mesh": ["pi-mesh@0.2.0", "", { "peerDependencies": { "@mariozechner/pi-coding-agent": "^0.58.1", "@mariozechner/pi-tui": "*", "@sinclair/typebox": "*" } }, "sha512-fOVg8NrTK1l5ffRvROnJfsmHHyT0VxH6T3MC0af8c1AQ2gg8HCRAr2dytNLqpBfnv0yaxvLCyJOwJ8kzaV/0rw=="],
+    "pi-mesh": ["pi-mesh@0.2.1", "", { "peerDependencies": { "@mariozechner/pi-coding-agent": "^0.58.1", "@mariozechner/pi-tui": "*", "@sinclair/typebox": "*" } }, "sha512-s3Zc1xTHuSR7fM5HY4lmAuTWmjHKIkFnOy5Ewqm2CHA4fCXy07PJsDvTed3VOwuK7sbklwGXz5LmtSCkej/I0A=="],
 
     "pi-meta-skills": ["pi-meta-skills@workspace:packages/pi-meta-skills"],
 

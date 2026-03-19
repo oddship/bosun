@@ -25,7 +25,7 @@
     "pi-daemon": "workspace:*",
     "pi-mcp-adapter": "^2.1.2",
     "pi-memory": "workspace:*",
-    "pi-mesh": "^0.2.0",
+    "pi-mesh": "^0.2.1",
     "pi-meta-skills": "workspace:*",
     "pi-q": "workspace:*",
     "pi-question": "workspace:*",

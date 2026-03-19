@@ -250,13 +250,20 @@ export function createHooks(_meshConfig: MeshConfig): MeshLifecycleHooks {
       state.hookState.pollIntervalMs = syncConfig.pollIntervalMs;
     },
 
-    async onRenamed(state, ctx, _result) {
+    async onRenamed(state, ctx, _result, actions) {
       refreshRuntimeIdentity(state, ctx);
 
-      // TODO: Notify the LLM of the name change so it updates its
-      // self-reference. Requires pi-mesh to expose sendMessage via
-      // HookActions or pass the ExtensionAPI to hooks.
-      // See: https://github.com/oddship/bosun/issues/XXX
+      // Notify the LLM of the name change so it updates its self-reference.
+      if (actions?.sendMessage) {
+        actions.sendMessage(
+          {
+            customType: "identity-sync",
+            content: `Your mesh identity has been updated. You are now "${state.agentName}". Use this name when referring to yourself.`,
+            display: `🔄 Renamed to **${state.agentName}**`,
+          },
+          { deliverAs: "nextTurn" },
+        );
+      }
 
       if (!hasTmux()) return;
 
