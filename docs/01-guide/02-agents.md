@@ -45,7 +45,7 @@ spawn_agent({
 ```
 
 This:
-1. Resolves `lite` → `.pi/agents/lite.md`
+1. Resolves `lite` → finds `lite.md` (checks `.pi/agents/` overrides first, then `packages/pi-bosun/agents/`)
 2. Reads frontmatter: model tier, extensions, skills
 3. Resolves tier → actual model from config
 4. Spawns a new Pi instance in a tmux window
@@ -111,7 +111,7 @@ Messages arrive as follow-up events — no polling needed.
 
 ## Agent definitions
 
-Agent definitions live in `.pi/agents/*.md` with YAML frontmatter:
+Default agents live in `packages/pi-bosun/agents/*.md`. Override any agent by placing a file with the same name in `.pi/agents/`. Definitions use YAML frontmatter:
 
 ```yaml
 ---

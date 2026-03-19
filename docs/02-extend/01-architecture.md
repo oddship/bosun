@@ -11,8 +11,8 @@ Bosun is a monorepo of independent Pi packages that compose into a multi-agent c
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Agent Definitions (.pi/agents/*.md)                │
-│  Skills (.pi/skills/*/SKILL.md)                     │
+│  Framework Identity (packages/pi-bosun/)            │
+│  Agents, Slots, Skills — overridable via .pi/       │
 ├─────────────────────────────────────────────────────┤
 │  Orchestration                                      │
 │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
@@ -84,7 +84,7 @@ config.toml (source of truth)
             └── .pi/pi-q.json          → Q data paths
 ```
 
-Agent files (`.pi/agents/*.md`) are checked in directly — they use tier names (`model: high`), not specific model strings.
+Agent files use tier names (`model: high`), not specific model strings. Default agents live in `packages/pi-bosun/agents/`; override by placing a file with the same name in `.pi/agents/`.
 
 ## Runtime identity
 
@@ -102,7 +102,7 @@ User asks bosun to delegate
     │
     ├── bosun calls spawn_agent({ agent: "lite", task: "..." })
     │       │
-    │       ├── pi-agents resolves "lite" → .pi/agents/lite.md
+    │       ├── pi-agents resolves "lite" → checks .pi/agents/, then packages/*/agents/
     │       ├── Reads frontmatter: model tier, extensions
     │       ├── Resolves tier "lite" → "claude-haiku-4-5-20251001"
     │       ├── Builds command:
@@ -164,6 +164,6 @@ Session ends
 
 **Tier-based model config.** Agents declare tiers, not models. Change the model behind `lite` without touching any agent definition.
 
-**Convention over configuration.** Workflows are discovered from package directories. Agents from `.pi/agents/`. Skills from `.pi/skills/`. No central registry.
+**Convention over configuration.** Workflows are discovered from package directories. Agents from `packages/*/agents/` (overridable via `.pi/agents/`). Skills from packages and the root `skills/` directory (overridable via `.pi/skills/`). No central registry.
 
 **Scheduled polling over file watchers.** Workflows run on a heartbeat schedule with input validators as gatekeepers. More reliable than file watchers, which have race conditions and restart timing issues.
