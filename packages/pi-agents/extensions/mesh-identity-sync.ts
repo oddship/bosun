@@ -253,6 +253,11 @@ export function createHooks(_meshConfig: MeshConfig): MeshLifecycleHooks {
     async onRenamed(state, ctx, _result) {
       refreshRuntimeIdentity(state, ctx);
 
+      // TODO: Notify the LLM of the name change so it updates its
+      // self-reference. Requires pi-mesh to expose sendMessage via
+      // HookActions or pass the ExtensionAPI to hooks.
+      // See: https://github.com/oddship/bosun/issues/XXX
+
       if (!hasTmux()) return;
 
       const syncState = getSyncState(state);
