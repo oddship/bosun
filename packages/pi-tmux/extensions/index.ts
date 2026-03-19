@@ -55,7 +55,9 @@ export default function (pi: ExtensionAPI) {
       if (callerPane) args.push("-t", callerPane);
       if (params.vertical) args.push("-h");
       if (params.size) args.push("-p", String(params.size));
-      args.push(params.command);
+      // Wrap in interactive bash so aliases and .bashrc setup apply,
+      // matching the behavior of manually splitting with Ctrl-a + |
+      args.push("bash", "-ic", params.command);
 
       const result = await tmuxExec(args, ctx.cwd);
       if (result.code !== 0) {
