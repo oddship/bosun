@@ -1,12 +1,13 @@
 /**
  * pi-auto-resume — Automatically resume after context compaction.
  *
- * After threshold-based compaction the agent goes idle, waiting for user input.
- * This extension sends a follow-up prompt so the agent continues working from
- * the compaction summary's "Next Steps" instead of stopping.
+ * After compaction (threshold, manual /compact, or overflow) the agent
+ * normally goes idle. This extension sends a follow-up prompt so the agent
+ * continues working from the compaction summary's next steps.
  *
- * Overflow compaction is handled by Pi internally (agent.continue) — this
- * extension detects that case via isIdle() and stays out of the way.
+ * Hooks session_compact which fires for ALL compaction types. For overflow,
+ * Pi already retries internally via agent.continue() — the deferred isIdle()
+ * check at 200ms detects that and skips.
  *
  * Toggle at runtime with /autoresume. Footer shows 🔁 auto when enabled.
  */
