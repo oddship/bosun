@@ -314,7 +314,8 @@ exec "$BWRAP" \
   --setenv PI_AGENT "${PI_AGENT:-bosun}" \
   --setenv PI_AGENT_NAME "${PI_AGENT_NAME:-bosun}" \
   --setenv SHELL "$SANDBOX_BASH" \
-  --unsetenv TMUX \
+  ${TMUX:+--setenv TMUX "$TMUX"} \
+  ${TMUX_PANE:+--setenv TMUX_PANE "$TMUX_PANE"} \
   --setenv PATH "$SANDBOX_PATH" \
   --setenv BOSUN_SANDBOX "1" \
   --setenv BOSUN_PI_PATH "${BOSUN_PI_PATH:-pi}" \

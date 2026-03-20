@@ -20,20 +20,28 @@ function shellEscape(s: string): string {
 }
 
 /**
- * Extract the tmux socket path from config or $TMUX env var.
+ * Extract the tmux socket path from $TMUX env var or config.
  * $TMUX format: "/path/to/socket,pid,index"
+ *
+ * Priority: $TMUX env var first (the live, running socket), then config
+ * fallback. The config socket may point to a different tmux server
+ * (e.g. a stale .bosun-home/tmux.sock hosting "bosun-dev") while the
+ * agent is actually running in a different server entirely.
  */
 function getTmuxSocket(config: AgentsConfig, cwd: string): string | null {
-  if (config.backend.socket) {
-    // Resolve relative socket paths against cwd
-    const sock = config.backend.socket;
-    return sock.startsWith("/") ? sock : `${cwd}/${sock}`;
-  }
-
+  // Prefer the live socket from the environment — this is always correct
+  // for the current process's tmux context.
   const tmuxEnv = process.env.TMUX;
   if (tmuxEnv) {
     const parts = tmuxEnv.split(",");
     if (parts[0]) return parts[0];
+  }
+
+  // Fall back to config socket (useful when $TMUX is unavailable,
+  // e.g. processes started outside tmux that need to target a server).
+  if (config.backend.socket) {
+    const sock = config.backend.socket;
+    return sock.startsWith("/") ? sock : `${cwd}/${sock}`;
   }
 
   return null;
