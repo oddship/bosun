@@ -3,7 +3,6 @@
  */
 
 import type {
-  Tool,
   Model,
   AssistantMessageEvent,
 } from "@mariozechner/pi-ai";
@@ -161,6 +160,8 @@ export interface ExecutorConfig {
   model: Model<any>;
   /** System prompt for X (the executor identity). */
   systemPrompt: string;
+  /** API key for the model provider. If not set, falls back to env vars. */
+  apiKey?: string;
   /** Tool registry — phases reference these by key. */
   tools: ToolRegistry;
   /** Max cost in USD across the entire run. Default: 2.00. */

@@ -11,7 +11,7 @@
  * - Append results, loop
  */
 
-import { streamSimple, completeSimple } from "@mariozechner/pi-ai";
+import { streamSimple } from "@mariozechner/pi-ai";
 import type {
   Model,
   Message,
@@ -167,7 +167,7 @@ export async function runPhase(opts: PhaseRunnerOptions): Promise<PhaseResult> {
     const response = await llm.call(
       model,
       { systemPrompt: cachedPrefix, messages, tools: allToolDefs },
-      { sessionId, signal: config.signal },
+      { sessionId, signal: config.signal, apiKey: config.apiKey },
       onPhase
         ? (event) => emit(onPhase, { type: "stream_event", phaseIndex, phase, streamEvent: event })
         : undefined,
@@ -261,13 +261,13 @@ export async function runPhase(opts: PhaseRunnerOptions): Promise<PhaseResult> {
     // Hard budget check
     if (metrics.getCumulativeTokens() >= phaseBudget || round >= maxRounds) {
       emit(onPhase, { type: "force_done", phaseIndex, phase, round });
-      return await attemptForceDone(model, cachedPrefix, opts.state, sessionId, metrics, opts.state, config.signal, llm);
+      return await attemptForceDone(model, cachedPrefix, opts.state, sessionId, metrics, opts.state, config.signal, llm, config.apiKey);
     }
   }
 
   // Fell through max rounds
   emit(onPhase, { type: "force_done", phaseIndex, phase, round: maxRounds });
-  return await attemptForceDone(model, cachedPrefix, opts.state, sessionId, metrics, opts.state, config.signal, llm);
+  return await attemptForceDone(model, cachedPrefix, opts.state, sessionId, metrics, opts.state, config.signal, llm, config.apiKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -349,6 +349,7 @@ async function attemptForceDone(
   prevState: State,
   signal?: AbortSignal,
   llm?: LLMCaller,
+  apiKey?: string,
 ): Promise<PhaseResult> {
   try {
     const caller = llm ?? defaultLLMCaller;
@@ -363,7 +364,7 @@ async function attemptForceDone(
         }],
         tools: [doneTool],
       },
-      { sessionId, signal },
+      { sessionId, signal, apiKey },
     );
     metrics.addResponse(response);
 
