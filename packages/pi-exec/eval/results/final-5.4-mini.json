@@ -1,0 +1,1163 @@
+{
+  "timestamp": "2026-03-20T21:21:37.979Z",
+  "models": [
+    "gpt-5.4-mini"
+  ],
+  "runs": 1,
+  "tasks": 23,
+  "totalCost": 0.38634120000000005,
+  "results": [
+    {
+      "taskName": "read-and-summarize",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "state_field",
+            "path": "summary",
+            "description": "State should contain a summary field"
+          },
+          "passed": true,
+          "actual": "Codebase structure: a small TypeScript library with three source files. `src/math.ts` defines three named numeric helpers: `add`, `subtract`, and `multiply`. `src/utils.ts` defines two string helpers: `capitalize` and `slugify`. `src/index.ts` is the public barrel file that re-exports all five functions from the two implementation modules. The project has a clear separation between math utilities and string utilities, with `index.ts` serving as the main entry point."
+        },
+        {
+          "assertion": {
+            "type": "state_field",
+            "path": "files",
+            "description": "State should list the files found"
+          },
+          "passed": true,
+          "actual": [
+            "src/index.ts",
+            "src/math.ts",
+            "src/utils.ts"
+          ]
+        }
+      ],
+      "cost": 0.0060363000000000005,
+      "tokens": 5780,
+      "durationMs": 11646,
+      "status": "completed"
+    },
+    {
+      "taskName": "fix-bug",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/range.ts",
+            "expected": "<=",
+            "description": "Fix should use <= instead of <"
+          },
+          "passed": true,
+          "actual": "/**\n * Generate an array of numbers from start to end (inclusive).\n * range(1, 5) should return [1, 2, 3, 4, 5]\n */\nexport function range(start: number, end: number): number[] {\n  const result: number"
+        },
+        {
+          "assertion": {
+            "type": "state_field",
+            "path": "fix_applied",
+            "description": "State should confirm fix was applied"
+          },
+          "passed": true,
+          "actual": true
+        }
+      ],
+      "cost": 0.0075255,
+      "tokens": 6254,
+      "durationMs": 14567,
+      "status": "completed"
+    },
+    {
+      "taskName": "create-module",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/validators.ts",
+            "description": "validators.ts should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/validators.ts",
+            "expected": "isValidEmail",
+            "description": "Should export isValidEmail"
+          },
+          "passed": true,
+          "actual": "// Validation helpers\n\n/**\n * Validates whether a string is a syntactically valid email address.\n * This is a pragmatic regex-based check, not a full RFC implementation.\n */\nexport function isValidEma"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/validators.ts",
+            "expected": "isValidUrl",
+            "description": "Should export isValidUrl"
+          },
+          "passed": true,
+          "actual": "// Validation helpers\n\n/**\n * Validates whether a string is a syntactically valid email address.\n * This is a pragmatic regex-based check, not a full RFC implementation.\n */\nexport function isValidEma"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/validators.ts",
+            "expected": "export function",
+            "description": "Functions should be exported"
+          },
+          "passed": true,
+          "actual": "// Validation helpers\n\n/**\n * Validates whether a string is a syntactically valid email address.\n * This is a pragmatic regex-based check, not a full RFC implementation.\n */\nexport function isValidEma"
+        }
+      ],
+      "cost": 0.0072239999999999995,
+      "tokens": 5507,
+      "durationMs": 10421,
+      "status": "completed"
+    },
+    {
+      "taskName": "rename-export",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/math.ts",
+            "expected": "export function sumItems",
+            "description": "Definition should be renamed"
+          },
+          "passed": true,
+          "actual": "/**\n * Math utility functions.\n */\n\nexport function sumItems(items: number[]): number {\n  return items.reduce((sum, item) => sum + item, 0);\n}\n\nexport function calculateAverage(items: number[]): numbe"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/math.ts",
+            "expected": "sumItems(items)",
+            "description": "Internal usage should be renamed"
+          },
+          "passed": true,
+          "actual": "/**\n * Math utility functions.\n */\n\nexport function sumItems(items: number[]): number {\n  return items.reduce((sum, item) => sum + item, 0);\n}\n\nexport function calculateAverage(items: number[]): numbe"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/index.ts",
+            "expected": "sumItems",
+            "description": "Re-export should be renamed"
+          },
+          "passed": true,
+          "actual": "export { sumItems, calculateAverage } from \"./math.js\";\n"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/report.ts",
+            "expected": "sumItems",
+            "description": "Call site should be renamed"
+          },
+          "passed": true,
+          "actual": "import { sumItems, calculateAverage } from \"./math.js\";\n\nexport function generateReport(values: number[]): string {\n  const total = sumItems(values);\n  const avg = calculateAverage(values);\n  return `"
+        }
+      ],
+      "cost": 0.01109385,
+      "tokens": 13004,
+      "durationMs": 15869,
+      "status": "completed"
+    },
+    {
+      "taskName": "extract-function",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/parser.ts",
+            "description": "parser.ts should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/parser.ts",
+            "expected": "parseCSV",
+            "description": "Should export parseCSV function"
+          },
+          "passed": true,
+          "actual": "import type { DataRow } from \"./processor\";\n\nexport function parseCSV(csvLines: string[]): DataRow[] {\n  const rows: DataRow[] = [];\n  for (const line of csvLines) {\n    const parts = line.split(\",\")."
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/processor.ts",
+            "expected": "parseCSV",
+            "description": "processor.ts should call parseCSV"
+          },
+          "passed": true,
+          "actual": "/**\n * Data processor — handles CSV parsing and analysis.\n */\n\nimport { parseCSV } from \"./parser\";\n\nexport interface DataRow {\n  name: string;\n  value: number;\n  category: string;\n}\n\nexport function "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/processor.ts",
+            "expected": "import",
+            "description": "processor.ts should import from parser"
+          },
+          "passed": true,
+          "actual": "/**\n * Data processor — handles CSV parsing and analysis.\n */\n\nimport { parseCSV } from \"./parser\";\n\nexport interface DataRow {\n  name: string;\n  value: number;\n  category: string;\n}\n\nexport function "
+        }
+      ],
+      "cost": 0.015393150000000001,
+      "tokens": 15379,
+      "durationMs": 24461,
+      "status": "completed"
+    },
+    {
+      "taskName": "add-error-handling",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/api.ts",
+            "expected": "ApiError",
+            "description": "Should define or use ApiError class"
+          },
+          "passed": true,
+          "actual": "/**\n * Simple API client functions with typed error handling.\n */\n\nexport class ApiError extends Error {\n  public readonly status: number;\n\n  public constructor(status: number, message: string) {\n    "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/api.ts",
+            "expected": "response.ok",
+            "description": "Should check response.ok"
+          },
+          "passed": true,
+          "actual": "/**\n * Simple API client functions with typed error handling.\n */\n\nexport class ApiError extends Error {\n  public readonly status: number;\n\n  public constructor(status: number, message: string) {\n    "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/api.ts",
+            "expected": "try",
+            "description": "Should use try/catch"
+          },
+          "passed": true,
+          "actual": "/**\n * Simple API client functions with typed error handling.\n */\n\nexport class ApiError extends Error {\n  public readonly status: number;\n\n  public constructor(status: number, message: string) {\n    "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/api.ts",
+            "expected": "catch",
+            "description": "Should have catch blocks"
+          },
+          "passed": true,
+          "actual": "/**\n * Simple API client functions with typed error handling.\n */\n\nexport class ApiError extends Error {\n  public readonly status: number;\n\n  public constructor(status: number, message: string) {\n    "
+        }
+      ],
+      "cost": 0.01157895,
+      "tokens": 9736,
+      "durationMs": 14105,
+      "status": "completed"
+    },
+    {
+      "taskName": "config-from-data",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/config.ts",
+            "description": "config.ts should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/config.ts",
+            "expected": "interface",
+            "description": "Should define interfaces"
+          },
+          "passed": true,
+          "actual": "import { readFileSync } from 'node:fs';\n\nexport interface AppConfig {\n  name: string;\n  version: string;\n  port: number;\n  host: string;\n}\n\nexport interface DatabaseConfig {\n  url: string;\n  maxConnec"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/config.ts",
+            "expected": "DatabaseConfig",
+            "description": "Should have DatabaseConfig interface"
+          },
+          "passed": true,
+          "actual": "import { readFileSync } from 'node:fs';\n\nexport interface AppConfig {\n  name: string;\n  version: string;\n  port: number;\n  host: string;\n}\n\nexport interface DatabaseConfig {\n  url: string;\n  maxConnec"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/config.ts",
+            "expected": "loadConfig",
+            "description": "Should export loadConfig function"
+          },
+          "passed": true,
+          "actual": "import { readFileSync } from 'node:fs';\n\nexport interface AppConfig {\n  name: string;\n  version: string;\n  port: number;\n  host: string;\n}\n\nexport interface DatabaseConfig {\n  url: string;\n  maxConnec"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/config.ts",
+            "expected": "port",
+            "description": "Should include port field"
+          },
+          "passed": true,
+          "actual": "import { readFileSync } from 'node:fs';\n\nexport interface AppConfig {\n  name: string;\n  version: string;\n  port: number;\n  host: string;\n}\n\nexport interface DatabaseConfig {\n  url: string;\n  maxConnec"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/config.ts",
+            "expected": "number",
+            "description": "Should use number type"
+          },
+          "passed": true,
+          "actual": "import { readFileSync } from 'node:fs';\n\nexport interface AppConfig {\n  name: string;\n  version: string;\n  port: number;\n  host: string;\n}\n\nexport interface DatabaseConfig {\n  url: string;\n  maxConnec"
+        }
+      ],
+      "cost": 0.0125877,
+      "tokens": 10146,
+      "durationMs": 16723,
+      "status": "completed"
+    },
+    {
+      "taskName": "find-bugs",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/cart.ts",
+            "expected": "+=",
+            "description": "addItem should use += for quantity"
+          },
+          "passed": true,
+          "actual": "/**\n * Shopping cart implementation.\n */\n\nexport interface CartItem {\n  id: string;\n  name: string;\n  price: number;\n  quantity: number;\n}\n\nexport class ShoppingCart {\n  private items: CartItem[] = []"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/cart.ts",
+            "expected": "this.items = this.items.filter",
+            "description": "removeItem should assign the filtered result"
+          },
+          "passed": true,
+          "actual": "/**\n * Shopping cart implementation.\n */\n\nexport interface CartItem {\n  id: string;\n  name: string;\n  price: number;\n  quantity: number;\n}\n\nexport class ShoppingCart {\n  private items: CartItem[] = []"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/cart.ts",
+            "expected": "* item.quantity",
+            "description": "getTotal should multiply price by quantity"
+          },
+          "passed": true,
+          "actual": "/**\n * Shopping cart implementation.\n */\n\nexport interface CartItem {\n  id: string;\n  name: string;\n  price: number;\n  quantity: number;\n}\n\nexport class ShoppingCart {\n  private items: CartItem[] = []"
+        }
+      ],
+      "cost": 0.009482399999999998,
+      "tokens": 12427,
+      "durationMs": 20105,
+      "status": "completed"
+    },
+    {
+      "taskName": "dependency-audit",
+      "model": "gpt-5.4-mini",
+      "passed": false,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "state_field",
+            "path": "entryPoint",
+            "description": "Should identify the entry point"
+          },
+          "passed": false
+        }
+      ],
+      "cost": 0.008328750000000001,
+      "tokens": 7085,
+      "durationMs": 10376,
+      "status": "completed"
+    },
+    {
+      "taskName": "dead-code",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "state_field",
+            "path": "deadExports",
+            "description": "Should list dead exports"
+          },
+          "passed": true,
+          "actual": [
+            {
+              "path": "src/format.ts",
+              "name": "format"
+            },
+            {
+              "path": "src/format.ts",
+              "name": "formatCurrency"
+            },
+            {
+              "path": "src/helpers.ts",
+              "name": "padLeft"
+            },
+            {
+              "path": "src/helpers.ts",
+              "name": "padRight"
+            },
+            {
+              "path": "src/helpers.ts",
+              "name": "truncate"
+            },
+            {
+              "path": "src/index.ts",
+              "name": "format"
+            },
+            {
+              "path": "src/index.ts",
+              "name": "parse"
+            },
+            {
+              "path": "src/parse.ts",
+              "name": "parse"
+            },
+            {
+              "path": "src/parse.ts",
+              "name": "parseMany"
+            }
+          ]
+        }
+      ],
+      "cost": 0.00731325,
+      "tokens": 6056,
+      "durationMs": 9192,
+      "status": "completed"
+    },
+    {
+      "taskName": "read-fix-test",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/stack.ts",
+            "expected": "throw",
+            "description": "pop/peek should throw on empty stack"
+          },
+          "passed": true,
+          "actual": "/**\n * Simple stack implementation.\n */\n\nexport class Stack<T> {\n  private items: T[] = [];\n\n  push(item: T): void {\n    this.items.push(item);\n  }\n\n  pop(): T {\n    if (this.items.length === 0) {\n   "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/stack.ts",
+            "expected": "isEmpty()",
+            "description": "Should check isEmpty before accessing"
+          },
+          "passed": true,
+          "actual": "/**\n * Simple stack implementation.\n */\n\nexport class Stack<T> {\n  private items: T[] = [];\n\n  push(item: T): void {\n    this.items.push(item);\n  }\n\n  pop(): T {\n    if (this.items.length === 0) {\n   "
+        },
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/stack.test.ts",
+            "description": "Test file should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/stack.test.ts",
+            "expected": "throw",
+            "description": "Tests should verify throw behavior"
+          },
+          "passed": true,
+          "actual": "import { describe, it, expect } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { Stack } from './stack';\n\ndescribe('Stack', () => {\n  it('pushes and pops values in LIFO order', () ="
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/stack.test.ts",
+            "expected": "push",
+            "description": "Tests should cover push"
+          },
+          "passed": true,
+          "actual": "import { describe, it, expect } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { Stack } from './stack';\n\ndescribe('Stack', () => {\n  it('pushes and pops values in LIFO order', () ="
+        }
+      ],
+      "cost": 0.00949905,
+      "tokens": 8077,
+      "durationMs": 12259,
+      "status": "completed"
+    },
+    {
+      "taskName": "refactor-rename",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/AccountService.ts",
+            "description": "Renamed file should exist"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/AccountService.ts",
+            "expected": "class AccountService",
+            "description": "Class should be renamed"
+          },
+          "passed": true,
+          "actual": "import type { Database } from \"./database.js\";\n\nexport class AccountService {\n  constructor(private db: Database) {}\n\n  async getById(id: string) {\n    return this.db.findOne(\"users\", { id });\n  }\n\n  "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/index.ts",
+            "expected": "AccountService",
+            "description": "Import should reference AccountService"
+          },
+          "passed": true,
+          "actual": "import { AccountService } from \"./AccountService.js\";\nimport { createDatabase } from \"./database.js\";\n\nexport function createApp() {\n  const db = createDatabase();\n  const accountService = new Account"
+        }
+      ],
+      "cost": 0.01195815,
+      "tokens": 12484,
+      "durationMs": 14982,
+      "status": "completed"
+    },
+    {
+      "taskName": "data-transform",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "data/output.json",
+            "description": "output.json should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "data/output.json",
+            "expected": "New York",
+            "description": "Should contain New York group"
+          },
+          "passed": true,
+          "actual": "{\n  \"Chicago\": {\n    \"count\": 3,\n    \"averageAge\": 30.33,\n    \"averageScore\": 86.33,\n    \"highestScorer\": {\n      \"name\": \"Charlie\",\n      \"age\": 22,\n      \"city\": \"Chicago\",\n      \"score\": 92\n    }\n "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "data/output.json",
+            "expected": "San Francisco",
+            "description": "Should contain San Francisco group"
+          },
+          "passed": true,
+          "actual": "{\n  \"Chicago\": {\n    \"count\": 3,\n    \"averageAge\": 30.33,\n    \"averageScore\": 86.33,\n    \"highestScorer\": {\n      \"name\": \"Charlie\",\n      \"age\": 22,\n      \"city\": \"Chicago\",\n      \"score\": 92\n    }\n "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "data/output.json",
+            "expected": "Chicago",
+            "description": "Should contain Chicago group"
+          },
+          "passed": true,
+          "actual": "{\n  \"Chicago\": {\n    \"count\": 3,\n    \"averageAge\": 30.33,\n    \"averageScore\": 86.33,\n    \"highestScorer\": {\n      \"name\": \"Charlie\",\n      \"age\": 22,\n      \"city\": \"Chicago\",\n      \"score\": 92\n    }\n "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "data/output.json",
+            "expected": "average",
+            "description": "Should contain computed averages"
+          },
+          "passed": true,
+          "actual": "{\n  \"Chicago\": {\n    \"count\": 3,\n    \"averageAge\": 30.33,\n    \"averageScore\": 86.33,\n    \"highestScorer\": {\n      \"name\": \"Charlie\",\n      \"age\": 22,\n      \"city\": \"Chicago\",\n      \"score\": 92\n    }\n "
+        }
+      ],
+      "cost": 0.00749085,
+      "tokens": 6501,
+      "durationMs": 13760,
+      "status": "completed"
+    },
+    {
+      "taskName": "add-feature",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/eventEmitter.ts",
+            "expected": "once(",
+            "description": "Should add once method"
+          },
+          "passed": true,
+          "actual": "/**\n * Simple typed event emitter.\n */\n\ntype Listener = (...args: any[]) => void;\n\nexport class EventEmitter {\n  private listeners: Map<string, Listener[]> = new Map();\n\n  on(event: string, listener: "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/eventEmitter.ts",
+            "expected": "listenerCount(",
+            "description": "Should add listenerCount method"
+          },
+          "passed": true,
+          "actual": "/**\n * Simple typed event emitter.\n */\n\ntype Listener = (...args: any[]) => void;\n\nexport class EventEmitter {\n  private listeners: Map<string, Listener[]> = new Map();\n\n  on(event: string, listener: "
+        },
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/eventEmitter.test.ts",
+            "description": "Test file should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/eventEmitter.test.ts",
+            "expected": "once",
+            "description": "Tests should cover once"
+          },
+          "passed": true,
+          "actual": "import { strict as assert } from 'node:assert';\nimport { describe, it } from 'node:test';\nimport { EventEmitter } from './eventEmitter';\n\ndescribe('EventEmitter', () => {\n  it('supports on and emit ba"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/eventEmitter.test.ts",
+            "expected": "listenerCount",
+            "description": "Tests should cover listenerCount"
+          },
+          "passed": true,
+          "actual": "import { strict as assert } from 'node:assert';\nimport { describe, it } from 'node:test';\nimport { EventEmitter } from './eventEmitter';\n\ndescribe('EventEmitter', () => {\n  it('supports on and emit ba"
+        }
+      ],
+      "cost": 0.012869100000000001,
+      "tokens": 11057,
+      "durationMs": 16069,
+      "status": "completed"
+    },
+    {
+      "taskName": "phase0-planning",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/middleware.ts",
+            "description": "middleware.ts should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/middleware.ts",
+            "expected": "export",
+            "description": "Should export middleware functions"
+          },
+          "passed": true,
+          "actual": "export type Middleware = (req: any) => any | void | Promise<any | void>;\n\nexport const loggingMiddleware: Middleware = (req: any) => {\n  console.log(\"request\", req);\n};\n\nexport const authMiddleware: M"
+        }
+      ],
+      "cost": 0.021608850000000002,
+      "tokens": 24442,
+      "durationMs": 28268,
+      "status": "completed"
+    },
+    {
+      "taskName": "large-project",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_not_contains",
+            "path": "src/models/user.ts",
+            "expected": "${id}",
+            "description": "user.ts should not use string interpolation for id"
+          },
+          "passed": true,
+          "actual": "import type { Database } from \"../utils/database.js\";\n\nexport class UserManager {\n  constructor(private db: Database) {}\n  async findById(id: string) { return this.db.query(\"SELECT * FROM users WHERE "
+        },
+        {
+          "assertion": {
+            "type": "file_not_contains",
+            "path": "src/models/product.ts",
+            "expected": "${name}",
+            "description": "product.ts should not use string interpolation for name"
+          },
+          "passed": true,
+          "actual": "import type { Database } from \"../utils/database.js\";\n\nexport class ProductManager {\n  constructor(private db: Database) {}\n  async findById(id: string) { return this.db.query(\"SELECT * FROM products "
+        },
+        {
+          "assertion": {
+            "type": "file_not_contains",
+            "path": "src/models/order.ts",
+            "expected": "${userId}",
+            "description": "order.ts should not use string interpolation for userId"
+          },
+          "passed": true,
+          "actual": "import type { Database } from \"../utils/database.js\";\n\nexport class OrderManager {\n  constructor(private db: Database) {}\n  async create(userId: string, productId: string, quantity: number) {\n    retu"
+        }
+      ],
+      "cost": 0.017826300000000003,
+      "tokens": 17238,
+      "durationMs": 24833,
+      "status": "completed"
+    },
+    {
+      "taskName": "recovery",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/configOverride.ts",
+            "description": "Override module should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/configOverride.ts",
+            "expected": "getConfig",
+            "description": "Should export getConfig function"
+          },
+          "passed": true,
+          "actual": "import { readFileSync, existsSync } from \"node:fs\";\nimport { fileURLToPath } from \"node:url\";\nimport { dirname, resolve } from \"node:path\";\nimport { CONFIG } from \"./config.js\";\n\nexport type Config = "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/client.ts",
+            "expected": "getConfig",
+            "description": "client.ts should use getConfig"
+          },
+          "passed": true,
+          "actual": "import { getConfig } from \"./configOverride.js\";\n\nexport async function fetchData(path: string): Promise<unknown> {\n  const config = getConfig();\n  const url = `${config.apiUrl}/${path}`;\n  const resp"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/client.ts",
+            "expected": "configOverride",
+            "description": "client.ts should import from configOverride"
+          },
+          "passed": true,
+          "actual": "import { getConfig } from \"./configOverride.js\";\n\nexport async function fetchData(path: string): Promise<unknown> {\n  const config = getConfig();\n  const url = `${config.apiUrl}/${path}`;\n  const resp"
+        }
+      ],
+      "cost": 0.010125450000000001,
+      "tokens": 11152,
+      "durationMs": 16035,
+      "status": "completed"
+    },
+    {
+      "taskName": "gate-verification",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/sanitize.ts",
+            "expected": "&amp;",
+            "description": "sanitizeHtml should handle &"
+          },
+          "passed": true,
+          "actual": "/**\n * Input sanitizer — currently incomplete.\n */\n\nexport function sanitizeHtml(input: string): string {\n  return input\n    .replace(/&/g, \"&amp;\")\n    .replace(/</g, \"&lt;\")\n    .replace(/>/g, \"&gt;"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/sanitize.ts",
+            "expected": "&quot;",
+            "description": "sanitizeHtml should handle double quotes"
+          },
+          "passed": true,
+          "actual": "/**\n * Input sanitizer — currently incomplete.\n */\n\nexport function sanitizeHtml(input: string): string {\n  return input\n    .replace(/&/g, \"&amp;\")\n    .replace(/</g, \"&lt;\")\n    .replace(/>/g, \"&gt;"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/sanitize.ts",
+            "expected": "&#39;",
+            "description": "sanitizeHtml should handle single quotes"
+          },
+          "passed": true,
+          "actual": "/**\n * Input sanitizer — currently incomplete.\n */\n\nexport function sanitizeHtml(input: string): string {\n  return input\n    .replace(/&/g, \"&amp;\")\n    .replace(/</g, \"&lt;\")\n    .replace(/>/g, \"&gt;"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/sanitize.ts",
+            "expected": "\\\\",
+            "description": "sanitizeForSql should handle backslashes"
+          },
+          "passed": true,
+          "actual": "/**\n * Input sanitizer — currently incomplete.\n */\n\nexport function sanitizeHtml(input: string): string {\n  return input\n    .replace(/&/g, \"&amp;\")\n    .replace(/</g, \"&lt;\")\n    .replace(/>/g, \"&gt;"
+        }
+      ],
+      "cost": 0.0098505,
+      "tokens": 8234,
+      "durationMs": 16266,
+      "status": "completed"
+    },
+    {
+      "taskName": "long-refactor-hodor",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/types.ts",
+            "expected": "ReviewIssue",
+            "description": "types.ts should use ReviewIssue"
+          },
+          "passed": true,
+          "actual": "export type Platform = \"github\" | \"gitlab\";\n\nexport interface ParsedPrUrl {\n  owner: string;\n  repo: string;\n  prNumber: number;\n  host: string;\n}\n\nexport interface MrMetadata {\n  title?: string;\n  de"
+        },
+        {
+          "assertion": {
+            "type": "file_not_contains",
+            "path": "src/types.ts",
+            "expected": "ReviewFinding",
+            "description": "types.ts should not have ReviewFinding"
+          },
+          "passed": true,
+          "actual": "export type Platform = \"github\" | \"gitlab\";\n\nexport interface ParsedPrUrl {\n  owner: string;\n  repo: string;\n  prNumber: number;\n  host: string;\n}\n\nexport interface MrMetadata {\n  title?: string;\n  de"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/review.ts",
+            "expected": "REVIEW_ISSUE_SCHEMA",
+            "description": "review.ts should have renamed schema"
+          },
+          "passed": true,
+          "actual": "import { isAbsolute } from \"node:path\";\nimport { Type } from \"@sinclair/typebox\";\nimport type { ReviewOutput, ReviewPriority } from \"./types.js\";\n\nconst REVIEW_PRIORITY_TAGS = new Map<string, ReviewPr"
+        },
+        {
+          "assertion": {
+            "type": "file_not_contains",
+            "path": "src/review.ts",
+            "expected": "REVIEW_FINDING_SCHEMA",
+            "description": "review.ts should not have old schema name"
+          },
+          "passed": true,
+          "actual": "import { isAbsolute } from \"node:path\";\nimport { Type } from \"@sinclair/typebox\";\nimport type { ReviewOutput, ReviewPriority } from \"./types.js\";\n\nconst REVIEW_PRIORITY_TAGS = new Map<string, ReviewPr"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/types.ts",
+            "expected": "issues:",
+            "description": "ReviewOutput should use issues field"
+          },
+          "passed": true,
+          "actual": "export type Platform = \"github\" | \"gitlab\";\n\nexport interface ParsedPrUrl {\n  owner: string;\n  repo: string;\n  prNumber: number;\n  host: string;\n}\n\nexport interface MrMetadata {\n  title?: string;\n  de"
+        }
+      ],
+      "cost": 0.05906715,
+      "tokens": 126857,
+      "durationMs": 52337,
+      "status": "completed"
+    },
+    {
+      "taskName": "long-audit-hodor",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "AUDIT.md",
+            "description": "Audit report should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "AUDIT.md",
+            "expected": "agent.ts",
+            "description": "Report should mention the largest file"
+          },
+          "passed": true,
+          "actual": "# Audit Report\n\n## Overview\nThis TypeScript codebase implements an AI-powered PR/MR review agent with platform detection, workspace setup, prompt construction, structured review validation, markdown r"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "AUDIT.md",
+            "expected": "Finding",
+            "description": "Report should contain findings"
+          },
+          "passed": true,
+          "actual": "# Audit Report\n\n## Overview\nThis TypeScript codebase implements an AI-powered PR/MR review agent with platform detection, workspace setup, prompt construction, structured review validation, markdown r"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "AUDIT.md",
+            "expected": "Recommendation",
+            "description": "Report should contain recommendations"
+          },
+          "passed": true,
+          "actual": "# Audit Report\n\n## Overview\nThis TypeScript codebase implements an AI-powered PR/MR review agent with platform detection, workspace setup, prompt construction, structured review validation, markdown r"
+        }
+      ],
+      "cost": 0.055612499999999995,
+      "tokens": 91030,
+      "durationMs": 37707,
+      "status": "completed"
+    },
+    {
+      "taskName": "long-add-feature-hodor",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/types.ts",
+            "expected": "retryCount",
+            "description": "ReviewMetrics should have retryCount"
+          },
+          "passed": true,
+          "actual": "export type Platform = \"github\" | \"gitlab\";\n\nexport interface ParsedPrUrl {\n  owner: string;\n  repo: string;\n  prNumber: number;\n  host: string;\n}\n\nexport interface MrMetadata {\n  title?: string;\n  de"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/metrics.ts",
+            "expected": "retry",
+            "description": "Metrics display should include retry info"
+          },
+          "passed": true,
+          "actual": "import chalk from \"chalk\";\nimport type { ReviewMetrics } from \"./types.js\";\n\nfunction tok(value: number): string {\n  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;\n  if (value >="
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/render.ts",
+            "expected": "renderMetricsSummary",
+            "description": "render.ts should have new function"
+          },
+          "passed": true,
+          "actual": "/**\n * Render structured review output into clean markdown for PR/MR comments.\n */\n\nimport type { ReviewFinding, ReviewMetrics, ReviewOutput } from \"./types.js\";\n\n/**\n * Render a ReviewOutput into cle"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/review.ts",
+            "expected": "countFindingsByPriority",
+            "description": "review.ts should have counting function"
+          },
+          "passed": true,
+          "actual": "import { isAbsolute } from \"node:path\";\nimport { Type } from \"@sinclair/typebox\";\nimport type { ReviewOutput, ReviewPriority } from \"./types.js\";\n\nexport function countFindingsByPriority(\n  review: Re"
+        },
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "src/summary.ts",
+            "description": "summary.ts should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/summary.ts",
+            "expected": "generateReviewSummary",
+            "description": "summary.ts should export main function"
+          },
+          "passed": true,
+          "actual": "import type { ReviewMetrics, ReviewOutput } from \"./types.js\";\nimport { formatMetricsMarkdown } from \"./metrics.js\";\nimport { renderMetricsSummary } from \"./render.js\";\nimport { countFindingsByPriorit"
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "src/index.ts",
+            "expected": "summary",
+            "description": "index.ts should export summary module"
+          },
+          "passed": true,
+          "actual": "export { reviewPr, detectPlatform, parsePrUrl, postReviewComment } from \"./agent.js\";\nexport type { AgentProgressEvent } from \"./agent.js\";\nexport { buildPrReviewPrompt } from \"./prompt.js\";\nexport { "
+        }
+      ],
+      "cost": 0.04632795000000001,
+      "tokens": 68132,
+      "durationMs": 56082,
+      "status": "completed"
+    },
+    {
+      "taskName": "qm-dep-update",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "package.json",
+            "expected": "1.6.0",
+            "description": "axios should be updated to 1.6.0"
+          },
+          "passed": true,
+          "actual": "{\n  \"name\": \"example-app\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n    \"express\": \"4.18.2\",\n    \"lodash\": \"4.17.21\",\n    \"axios\": \"1.6.0\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.0.4\",\n    \""
+        },
+        {
+          "assertion": {
+            "type": "file_not_contains",
+            "path": "package.json",
+            "expected": "0.21.1",
+            "description": "Old axios version should be gone"
+          },
+          "passed": true,
+          "actual": "{\n  \"name\": \"example-app\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n    \"express\": \"4.18.2\",\n    \"lodash\": \"4.17.21\",\n    \"axios\": \"1.6.0\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.0.4\",\n    \""
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "package.json",
+            "expected": "4.17.21",
+            "description": "lodash should be updated"
+          },
+          "passed": true,
+          "actual": "{\n  \"name\": \"example-app\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n    \"express\": \"4.18.2\",\n    \"lodash\": \"4.17.21\",\n    \"axios\": \"1.6.0\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.0.4\",\n    \""
+        },
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "CHANGELOG.md",
+            "description": "Changelog should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "CHANGELOG.md",
+            "expected": "axios",
+            "description": "Changelog should mention axios update"
+          },
+          "passed": true,
+          "actual": "# Changelog\n\n## Security Updates\n\n- Updated `axios` from `0.21.1` to `1.6.0` to address a known security vulnerability (CVE) in the older version.\n- Updated `lodash` from `4.17.20` to `4.17.21` to inc"
+        }
+      ],
+      "cost": 0.01631115,
+      "tokens": 16558,
+      "durationMs": 41406,
+      "status": "completed"
+    },
+    {
+      "taskName": "hodor-review",
+      "model": "gpt-5.4-mini",
+      "passed": true,
+      "assertionResults": [
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "REVIEW.md",
+            "description": "Review report should be created"
+          },
+          "passed": true
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "REVIEW.md",
+            "expected": "SQL injection",
+            "description": "Should find SQL injection"
+          },
+          "passed": true,
+          "actual": "# Security Review\n\n## 1. [P0] Hardcoded JWT secret\n- **File:** `src/auth.ts` line 3\n- **Description:** The JWT signing secret is hardcoded in source code. If the repository is exposed or the value is "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "REVIEW.md",
+            "expected": "secret",
+            "description": "Should find hardcoded secret"
+          },
+          "passed": true,
+          "actual": "# Security Review\n\n## 1. [P0] Hardcoded JWT secret\n- **File:** `src/auth.ts` line 3\n- **Description:** The JWT signing secret is hardcoded in source code. If the repository is exposed or the value is "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "REVIEW.md",
+            "expected": "P0",
+            "description": "Should use priority tags"
+          },
+          "passed": true,
+          "actual": "# Security Review\n\n## 1. [P0] Hardcoded JWT secret\n- **File:** `src/auth.ts` line 3\n- **Description:** The JWT signing secret is hardcoded in source code. If the repository is exposed or the value is "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "REVIEW.md",
+            "expected": "auth.ts",
+            "description": "Should reference file locations"
+          },
+          "passed": true,
+          "actual": "# Security Review\n\n## 1. [P0] Hardcoded JWT secret\n- **File:** `src/auth.ts` line 3\n- **Description:** The JWT signing secret is hardcoded in source code. If the repository is exposed or the value is "
+        },
+        {
+          "assertion": {
+            "type": "file_contains",
+            "path": "REVIEW.md",
+            "expected": "deleteUser",
+            "description": "Should find missing admin check"
+          },
+          "passed": true,
+          "actual": "# Security Review\n\n## 1. [P0] Hardcoded JWT secret\n- **File:** `src/auth.ts` line 3\n- **Description:** The JWT signing secret is hardcoded in source code. If the repository is exposed or the value is "
+        }
+      ],
+      "cost": 0.01123035,
+      "tokens": 11191,
+      "durationMs": 15121,
+      "status": "completed"
+    }
+  ]
+}

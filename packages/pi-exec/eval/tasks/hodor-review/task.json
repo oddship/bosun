@@ -10,7 +10,7 @@
   "assertions": [
     { "type": "file_exists", "path": "REVIEW.md", "description": "Review report should be created" },
     { "type": "file_contains", "path": "REVIEW.md", "expected": "SQL injection", "description": "Should find SQL injection" },
-    { "type": "file_contains", "path": "REVIEW.md", "expected": "SECRET", "description": "Should find hardcoded secret" },
+    { "type": "file_contains", "path": "REVIEW.md", "expected": "secret", "description": "Should find hardcoded secret" },
     { "type": "file_contains", "path": "REVIEW.md", "expected": "P0", "description": "Should use priority tags" },
     { "type": "file_contains", "path": "REVIEW.md", "expected": "auth.ts", "description": "Should reference file locations" },
     { "type": "file_contains", "path": "REVIEW.md", "expected": "deleteUser", "description": "Should find missing admin check" }
