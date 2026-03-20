@@ -1,0 +1,25 @@
+{
+  "name": "pi-exec",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Plan-driven execution runtime for Pi — stateless phase-based agentic loop",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-exec"
+  },
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": ">=0.61.0",
+    "@mariozechner/pi-agent-core": ">=0.61.0",
+    "@sinclair/typebox": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": ">=0.61.0"
+  }
+}

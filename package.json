@@ -24,6 +24,7 @@
     "pi-bash-readonly": "workspace:*",
     "pi-bosun": "workspace:*",
     "pi-daemon": "workspace:*",
+    "pi-exec": "workspace:*",
     "pi-mcp-adapter": "2.1.2",
     "pi-memory": "workspace:*",
     "pi-mesh": "0.2.1",

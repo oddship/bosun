@@ -12,6 +12,7 @@
         "pi-bash-readonly": "workspace:*",
         "pi-bosun": "workspace:*",
         "pi-daemon": "workspace:*",
+        "pi-exec": "workspace:*",
         "pi-mcp-adapter": "2.1.2",
         "pi-memory": "workspace:*",
         "pi-mesh": "0.2.1",
@@ -74,6 +75,18 @@
       },
       "peerDependencies": {
         "@mariozechner/pi-coding-agent": "*",
+        "@sinclair/typebox": "*",
+      },
+    },
+    "packages/pi-exec": {
+      "name": "pi-exec",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@mariozechner/pi-coding-agent": ">=0.61.0",
+      },
+      "peerDependencies": {
+        "@mariozechner/pi-agent-core": ">=0.61.0",
+        "@mariozechner/pi-ai": ">=0.61.0",
         "@sinclair/typebox": "*",
       },
     },
@@ -927,6 +940,8 @@
     "pi-chronicles": ["pi-chronicles@workspace:packages/pi-chronicles"],
 
     "pi-daemon": ["pi-daemon@workspace:packages/pi-daemon"],
+
+    "pi-exec": ["pi-exec@workspace:packages/pi-exec"],
 
     "pi-mcp-adapter": ["pi-mcp-adapter@2.1.2", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.25.1", "@sinclair/typebox": "^0.32.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "bin": { "pi-mcp-adapter": "cli.js" } }, "sha512-W1N/ZNNxnCxsyegcqGrfq0SRv5KAHa48nltpoDpT7hTxTPNy2GIKxr8CU8SxvhXCUFS4GbKNsRQRirbxooVVJw=="],
 
