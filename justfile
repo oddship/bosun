@@ -229,6 +229,10 @@ update:
     echo "  2. git add package.json bun.lock && git commit -m 'build: update pi-coding-agent to v$UPDATED'"
     echo "  3. Restart: exit and run 'just start'"
 
+# Run tests (scoped to packages/ to avoid workspace clutter)
+test *args:
+    bun test packages/ {{args}}
+
 # Generate .pi/*.json from config.toml
 init:
     @test -f config.toml || { echo "config.toml not found. Run: just onboard"; exit 1; }

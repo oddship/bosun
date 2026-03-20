@@ -9,8 +9,8 @@ Conventional commits: `feat(scope):`, `fix(scope):`, `docs:`, `test(scope):`, `c
 ## Testing
 
 ```bash
-bun test                           # all tests
-bun test tests/specific.test.ts    # specific test
+just test                          # all tests
+just test packages/pi-daemon       # specific package
 ```
 
 ## Dependencies

@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "init": "bun run scripts/init.ts",
+    "test": "bun test packages/",
     "postinstall": "cd node_modules/@tobilu/qmd && [ -d dist ] || bun run build"
   },
   "dependencies": {
