@@ -25,7 +25,7 @@ export interface TaskDefinition {
 
 export interface Assertion {
   /** What to check: state field, file exists, file contains text, etc. */
-  type: "state_field" | "file_exists" | "file_contains" | "state_matches";
+  type: "state_field" | "file_exists" | "file_contains" | "file_not_contains" | "state_matches";
 
   /** Path to check (state field path or file path). */
   path: string;

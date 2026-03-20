@@ -1,0 +1,15 @@
+{
+  "name": "find-bugs",
+  "plan": [
+    { "description": "Read src/cart.ts carefully and identify ALL bugs. There are exactly 3 bugs. Record each bug with its description and fix in state.", "tools": ["read"] },
+    { "description": "Fix all 3 bugs in src/cart.ts.", "tools": ["read", "edit"] }
+  ],
+  "initialState": {
+    "task": "Find and fix all bugs in the ShoppingCart class in src/cart.ts."
+  },
+  "assertions": [
+    { "type": "file_contains", "path": "src/cart.ts", "expected": "+=", "description": "addItem should use += for quantity" },
+    { "type": "file_contains", "path": "src/cart.ts", "expected": "this.items = this.items.filter", "description": "removeItem should assign the filtered result" },
+    { "type": "file_contains", "path": "src/cart.ts", "expected": "* item.quantity", "description": "getTotal should multiply price by quantity" }
+  ]
+}

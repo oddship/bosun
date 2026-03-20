@@ -1,0 +1,16 @@
+{
+  "name": "rename-export",
+  "plan": [
+    { "description": "Read all source files and find every usage of calculateTotal. Record file paths and line numbers in state.", "tools": ["read", "grep", "find"] },
+    { "description": "Rename calculateTotal to sumItems everywhere: definition, re-export, and all call sites.", "tools": ["read", "edit"] }
+  ],
+  "initialState": {
+    "task": "Rename the function calculateTotal to sumItems across the entire project."
+  },
+  "assertions": [
+    { "type": "file_contains", "path": "src/math.ts", "expected": "export function sumItems", "description": "Definition should be renamed" },
+    { "type": "file_contains", "path": "src/math.ts", "expected": "sumItems(items)", "description": "Internal usage should be renamed" },
+    { "type": "file_contains", "path": "src/index.ts", "expected": "sumItems", "description": "Re-export should be renamed" },
+    { "type": "file_contains", "path": "src/report.ts", "expected": "sumItems", "description": "Call site should be renamed" }
+  ]
+}

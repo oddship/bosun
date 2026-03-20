@@ -1,0 +1,2438 @@
+{
+  "timestamp": "2026-03-20T20:32:23.208Z",
+  "model": "gpt-5.1-codex-mini",
+  "type": "chat-baseline",
+  "results": [
+    {
+      "taskName": "read-and-summarize",
+      "status": "completed",
+      "rounds": 6,
+      "inputTokens": 5046,
+      "outputTokens": 551,
+      "cacheReadTokens": 4096,
+      "totalTokens": 9693,
+      "cost": 0.0024658999999999996,
+      "durationMs": 8550,
+      "assertionsPassed": 0,
+      "assertionsTotal": 2,
+      "passed": false,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1402,
+          "cached": 0,
+          "output": 57,
+          "total": 1459,
+          "cost": 0.0004645
+        },
+        {
+          "round": 2,
+          "input": 1434,
+          "cached": 0,
+          "output": 22,
+          "total": 1456,
+          "cost": 0.00040249999999999997
+        },
+        {
+          "round": 3,
+          "input": 192,
+          "cached": 1280,
+          "output": 34,
+          "total": 1506,
+          "cost": 0.00014800000000000002
+        },
+        {
+          "round": 4,
+          "input": 1523,
+          "cached": 0,
+          "output": 30,
+          "total": 1553,
+          "cost": 0.00044074999999999995
+        },
+        {
+          "round": 5,
+          "input": 201,
+          "cached": 1408,
+          "output": 19,
+          "total": 1628,
+          "cost": 0.00012345
+        },
+        {
+          "round": 6,
+          "input": 294,
+          "cached": 1408,
+          "output": 389,
+          "total": 2091,
+          "cost": 0.0008866999999999999
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "read",
+        "read"
+      ]
+    },
+    {
+      "taskName": "fix-bug",
+      "status": "completed",
+      "rounds": 4,
+      "inputTokens": 5016,
+      "outputTokens": 274,
+      "cacheReadTokens": 1664,
+      "totalTokens": 6954,
+      "cost": 0.0018436000000000001,
+      "durationMs": 3912,
+      "assertionsPassed": 1,
+      "assertionsTotal": 2,
+      "passed": false,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1475,
+          "cached": 0,
+          "output": 30,
+          "total": 1505,
+          "cost": 0.00042875
+        },
+        {
+          "round": 2,
+          "input": 1591,
+          "cached": 0,
+          "output": 164,
+          "total": 1755,
+          "cost": 0.00072575
+        },
+        {
+          "round": 3,
+          "input": 1749,
+          "cached": 0,
+          "output": 20,
+          "total": 1769,
+          "cost": 0.00047724999999999997
+        },
+        {
+          "round": 4,
+          "input": 201,
+          "cached": 1664,
+          "output": 60,
+          "total": 1925,
+          "cost": 0.00021185
+        }
+      ],
+      "toolsCalled": [
+        "read",
+        "edit",
+        "read"
+      ]
+    },
+    {
+      "taskName": "create-module",
+      "status": "completed",
+      "rounds": 6,
+      "inputTokens": 3430,
+      "outputTokens": 560,
+      "cacheReadTokens": 6016,
+      "totalTokens": 10006,
+      "cost": 0.0021279,
+      "durationMs": 7166,
+      "assertionsPassed": 3,
+      "assertionsTotal": 4,
+      "passed": false,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1435,
+          "cached": 0,
+          "output": 34,
+          "total": 1469,
+          "cost": 0.00042674999999999994
+        },
+        {
+          "round": 2,
+          "input": 59,
+          "cached": 1408,
+          "output": 22,
+          "total": 1489,
+          "cost": 0.00009395000000000001
+        },
+        {
+          "round": 3,
+          "input": 1499,
+          "cached": 0,
+          "output": 35,
+          "total": 1534,
+          "cost": 0.00044474999999999994
+        },
+        {
+          "round": 4,
+          "input": 133,
+          "cached": 1408,
+          "output": 414,
+          "total": 1955,
+          "cost": 0.0008964499999999999
+        },
+        {
+          "round": 5,
+          "input": 155,
+          "cached": 1536,
+          "output": 32,
+          "total": 1723,
+          "cost": 0.00014115000000000002
+        },
+        {
+          "round": 6,
+          "input": 149,
+          "cached": 1664,
+          "output": 23,
+          "total": 1836,
+          "cost": 0.00012485
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "write",
+        "read"
+      ]
+    },
+    {
+      "taskName": "rename-export",
+      "status": "completed",
+      "rounds": 12,
+      "inputTokens": 11339,
+      "outputTokens": 1440,
+      "cacheReadTokens": 10624,
+      "totalTokens": 23403,
+      "cost": 0.00598035,
+      "durationMs": 17674,
+      "assertionsPassed": 4,
+      "assertionsTotal": 4,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1426,
+          "cached": 0,
+          "output": 45,
+          "total": 1471,
+          "cost": 0.00044649999999999996
+        },
+        {
+          "round": 2,
+          "input": 1458,
+          "cached": 0,
+          "output": 41,
+          "total": 1499,
+          "cost": 0.00044649999999999996
+        },
+        {
+          "round": 3,
+          "input": 1496,
+          "cached": 0,
+          "output": 42,
+          "total": 1538,
+          "cost": 0.00045799999999999997
+        },
+        {
+          "round": 4,
+          "input": 1535,
+          "cached": 0,
+          "output": 19,
+          "total": 1554,
+          "cost": 0.00042175
+        },
+        {
+          "round": 5,
+          "input": 222,
+          "cached": 1408,
+          "output": 32,
+          "total": 1662,
+          "cost": 0.00015470000000000002
+        },
+        {
+          "round": 6,
+          "input": 178,
+          "cached": 1536,
+          "output": 440,
+          "total": 2154,
+          "cost": 0.0009628999999999999
+        },
+        {
+          "round": 7,
+          "input": 1896,
+          "cached": 0,
+          "output": 19,
+          "total": 1915,
+          "cost": 0.000512
+        },
+        {
+          "round": 8,
+          "input": 1991,
+          "cached": 0,
+          "output": 59,
+          "total": 2050,
+          "cost": 0.00061575
+        },
+        {
+          "round": 9,
+          "input": 145,
+          "cached": 1920,
+          "output": 19,
+          "total": 2084,
+          "cost": 0.00012225
+        },
+        {
+          "round": 10,
+          "input": 568,
+          "cached": 1536,
+          "output": 163,
+          "total": 2267,
+          "cost": 0.0005064
+        },
+        {
+          "round": 11,
+          "input": 234,
+          "cached": 2048,
+          "output": 19,
+          "total": 2301,
+          "cost": 0.00014769999999999999
+        },
+        {
+          "round": 12,
+          "input": 190,
+          "cached": 2176,
+          "output": 542,
+          "total": 2908,
+          "cost": 0.0011859
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "read",
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "read"
+      ]
+    },
+    {
+      "taskName": "extract-function",
+      "status": "completed",
+      "rounds": 12,
+      "inputTokens": 9554,
+      "outputTokens": 4785,
+      "cacheReadTokens": 18688,
+      "totalTokens": 33027,
+      "cost": 0.012425700000000001,
+      "durationMs": 47990,
+      "assertionsPassed": 4,
+      "assertionsTotal": 4,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1482,
+          "cached": 0,
+          "output": 44,
+          "total": 1526,
+          "cost": 0.00045850000000000003
+        },
+        {
+          "round": 2,
+          "input": 1514,
+          "cached": 0,
+          "output": 22,
+          "total": 1536,
+          "cost": 0.00042249999999999997
+        },
+        {
+          "round": 3,
+          "input": 138,
+          "cached": 1408,
+          "output": 20,
+          "total": 1566,
+          "cost": 0.0001097
+        },
+        {
+          "round": 4,
+          "input": 1845,
+          "cached": 0,
+          "output": 930,
+          "total": 2775,
+          "cost": 0.00232125
+        },
+        {
+          "round": 5,
+          "input": 635,
+          "cached": 1408,
+          "output": 2085,
+          "total": 4128,
+          "cost": 0.00436395
+        },
+        {
+          "round": 6,
+          "input": 666,
+          "cached": 1536,
+          "output": 929,
+          "total": 3131,
+          "cost": 0.0020629
+        },
+        {
+          "round": 7,
+          "input": 642,
+          "cached": 1664,
+          "output": 20,
+          "total": 2326,
+          "cost": 0.0002421
+        },
+        {
+          "round": 8,
+          "input": 308,
+          "cached": 2304,
+          "output": 199,
+          "total": 2811,
+          "cost": 0.0005325999999999999
+        },
+        {
+          "round": 9,
+          "input": 1102,
+          "cached": 1664,
+          "output": 20,
+          "total": 2786,
+          "cost": 0.00035709999999999995
+        },
+        {
+          "round": 10,
+          "input": 365,
+          "cached": 2688,
+          "output": 396,
+          "total": 3449,
+          "cost": 0.0009504499999999999
+        },
+        {
+          "round": 11,
+          "input": 650,
+          "cached": 2688,
+          "output": 20,
+          "total": 3358,
+          "cost": 0.0002697
+        },
+        {
+          "round": 12,
+          "input": 207,
+          "cached": 3328,
+          "output": 100,
+          "total": 3635,
+          "cost": 0.00033495
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "write",
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "read"
+      ]
+    },
+    {
+      "taskName": "add-error-handling",
+      "status": "completed",
+      "rounds": 10,
+      "inputTokens": 10226,
+      "outputTokens": 6950,
+      "cacheReadTokens": 14464,
+      "totalTokens": 31640,
+      "cost": 0.016818100000000006,
+      "durationMs": 54494,
+      "assertionsPassed": 4,
+      "assertionsTotal": 4,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1465,
+          "cached": 0,
+          "output": 32,
+          "total": 1497,
+          "cost": 0.00043024999999999997
+        },
+        {
+          "round": 2,
+          "input": 1497,
+          "cached": 0,
+          "output": 22,
+          "total": 1519,
+          "cost": 0.00041824999999999995
+        },
+        {
+          "round": 3,
+          "input": 121,
+          "cached": 1408,
+          "output": 19,
+          "total": 1548,
+          "cost": 0.00010345
+        },
+        {
+          "round": 4,
+          "input": 378,
+          "cached": 1408,
+          "output": 4922,
+          "total": 6708,
+          "cost": 0.009973700000000002
+        },
+        {
+          "round": 5,
+          "input": 370,
+          "cached": 1664,
+          "output": 47,
+          "total": 2081,
+          "cost": 0.0002281
+        },
+        {
+          "round": 6,
+          "input": 473,
+          "cached": 1920,
+          "output": 527,
+          "total": 2920,
+          "cost": 0.0012202500000000002
+        },
+        {
+          "round": 7,
+          "input": 2678,
+          "cached": 0,
+          "output": 27,
+          "total": 2705,
+          "cost": 0.0007235
+        },
+        {
+          "round": 8,
+          "input": 1429,
+          "cached": 1664,
+          "output": 1263,
+          "total": 4356,
+          "cost": 0.00292485
+        },
+        {
+          "round": 9,
+          "input": 1131,
+          "cached": 2688,
+          "output": 27,
+          "total": 3846,
+          "cost": 0.00040395
+        },
+        {
+          "round": 10,
+          "input": 684,
+          "cached": 3712,
+          "output": 64,
+          "total": 4460,
+          "cost": 0.0003918
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "read"
+      ]
+    },
+    {
+      "taskName": "config-from-data",
+      "status": "completed",
+      "rounds": 8,
+      "inputTokens": 9706,
+      "outputTokens": 3768,
+      "cacheReadTokens": 6528,
+      "totalTokens": 20002,
+      "cost": 0.0101257,
+      "durationMs": 34975,
+      "assertionsPassed": 6,
+      "assertionsTotal": 6,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1451,
+          "cached": 0,
+          "output": 33,
+          "total": 1484,
+          "cost": 0.00042875
+        },
+        {
+          "round": 2,
+          "input": 1627,
+          "cached": 0,
+          "output": 850,
+          "total": 2477,
+          "cost": 0.00210675
+        },
+        {
+          "round": 3,
+          "input": 1659,
+          "cached": 0,
+          "output": 22,
+          "total": 1681,
+          "cost": 0.00045874999999999996
+        },
+        {
+          "round": 4,
+          "input": 175,
+          "cached": 1536,
+          "output": 49,
+          "total": 1760,
+          "cost": 0.00018015000000000001
+        },
+        {
+          "round": 5,
+          "input": 1743,
+          "cached": 0,
+          "output": 84,
+          "total": 1827,
+          "cost": 0.00060375
+        },
+        {
+          "round": 6,
+          "input": 111,
+          "cached": 1664,
+          "output": 2424,
+          "total": 4199,
+          "cost": 0.00491735
+        },
+        {
+          "round": 7,
+          "input": 1082,
+          "cached": 1664,
+          "output": 34,
+          "total": 2780,
+          "cost": 0.0003800999999999999
+        },
+        {
+          "round": 8,
+          "input": 1858,
+          "cached": 1664,
+          "output": 272,
+          "total": 3794,
+          "cost": 0.0010500999999999998
+        }
+      ],
+      "toolsCalled": [
+        "read",
+        "ls",
+        "ls",
+        "ls",
+        "bash",
+        "write",
+        "read"
+      ]
+    },
+    {
+      "taskName": "find-bugs",
+      "status": "completed",
+      "rounds": 7,
+      "inputTokens": 8903,
+      "outputTokens": 726,
+      "cacheReadTokens": 5376,
+      "totalTokens": 15005,
+      "cost": 0.00381215,
+      "durationMs": 9056,
+      "assertionsPassed": 3,
+      "assertionsTotal": 3,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1427,
+          "cached": 0,
+          "output": 29,
+          "total": 1456,
+          "cost": 0.00041474999999999997
+        },
+        {
+          "round": 2,
+          "input": 1694,
+          "cached": 0,
+          "output": 214,
+          "total": 1908,
+          "cost": 0.0008515
+        },
+        {
+          "round": 3,
+          "input": 1808,
+          "cached": 0,
+          "output": 47,
+          "total": 1855,
+          "cost": 0.0005459999999999999
+        },
+        {
+          "round": 4,
+          "input": 291,
+          "cached": 1792,
+          "output": 199,
+          "total": 2282,
+          "cost": 0.00051555
+        },
+        {
+          "round": 5,
+          "input": 428,
+          "cached": 1792,
+          "output": 148,
+          "total": 2368,
+          "cost": 0.0004478
+        },
+        {
+          "round": 6,
+          "input": 591,
+          "cached": 1792,
+          "output": 27,
+          "total": 2410,
+          "cost": 0.00024655
+        },
+        {
+          "round": 7,
+          "input": 2664,
+          "cached": 0,
+          "output": 62,
+          "total": 2726,
+          "cost": 0.0007899999999999999
+        }
+      ],
+      "toolsCalled": [
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "edit",
+        "read"
+      ]
+    },
+    {
+      "taskName": "dependency-audit",
+      "status": "completed",
+      "rounds": 9,
+      "inputTokens": 10678,
+      "outputTokens": 1050,
+      "cacheReadTokens": 4480,
+      "totalTokens": 16208,
+      "cost": 0.0048814999999999996,
+      "durationMs": 17771,
+      "assertionsPassed": 0,
+      "assertionsTotal": 1,
+      "passed": false,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1445,
+          "cached": 0,
+          "output": 49,
+          "total": 1494,
+          "cost": 0.00045924999999999997
+        },
+        {
+          "round": 2,
+          "input": 1484,
+          "cached": 0,
+          "output": 38,
+          "total": 1522,
+          "cost": 0.00044699999999999997
+        },
+        {
+          "round": 3,
+          "input": 1516,
+          "cached": 0,
+          "output": 22,
+          "total": 1538,
+          "cost": 0.000423
+        },
+        {
+          "round": 4,
+          "input": 152,
+          "cached": 1408,
+          "output": 32,
+          "total": 1592,
+          "cost": 0.00013719999999999997
+        },
+        {
+          "round": 5,
+          "input": 1637,
+          "cached": 0,
+          "output": 124,
+          "total": 1761,
+          "cost": 0.0006572500000000001
+        },
+        {
+          "round": 6,
+          "input": 1720,
+          "cached": 0,
+          "output": 20,
+          "total": 1740,
+          "cost": 0.00047
+        },
+        {
+          "round": 7,
+          "input": 180,
+          "cached": 1664,
+          "output": 19,
+          "total": 1863,
+          "cost": 0.0001246
+        },
+        {
+          "round": 8,
+          "input": 1932,
+          "cached": 0,
+          "output": 19,
+          "total": 1951,
+          "cost": 0.000521
+        },
+        {
+          "round": 9,
+          "input": 612,
+          "cached": 1408,
+          "output": 727,
+          "total": 2747,
+          "cost": 0.0016422
+        }
+      ],
+      "toolsCalled": [
+        "find",
+        "ls",
+        "ls",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read"
+      ]
+    },
+    {
+      "taskName": "dead-code",
+      "status": "completed",
+      "rounds": 6,
+      "inputTokens": 6673,
+      "outputTokens": 897,
+      "cacheReadTokens": 3072,
+      "totalTokens": 10642,
+      "cost": 0.00353905,
+      "durationMs": 11380,
+      "assertionsPassed": 0,
+      "assertionsTotal": 1,
+      "passed": false,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1454,
+          "cached": 0,
+          "output": 36,
+          "total": 1490,
+          "cost": 0.0004355
+        },
+        {
+          "round": 2,
+          "input": 1491,
+          "cached": 0,
+          "output": 31,
+          "total": 1522,
+          "cost": 0.00043474999999999997
+        },
+        {
+          "round": 3,
+          "input": 127,
+          "cached": 1408,
+          "output": 106,
+          "total": 1641,
+          "cost": 0.00027895
+        },
+        {
+          "round": 4,
+          "input": 1660,
+          "cached": 0,
+          "output": 20,
+          "total": 1680,
+          "cost": 0.000455
+        },
+        {
+          "round": 5,
+          "input": 1760,
+          "cached": 0,
+          "output": 29,
+          "total": 1789,
+          "cost": 0.000498
+        },
+        {
+          "round": 6,
+          "input": 181,
+          "cached": 1664,
+          "output": 675,
+          "total": 2520,
+          "cost": 0.0014368499999999997
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "read",
+        "read",
+        "read",
+        "read"
+      ]
+    },
+    {
+      "taskName": "read-fix-test",
+      "status": "completed",
+      "rounds": 12,
+      "inputTokens": 16416,
+      "outputTokens": 2354,
+      "cacheReadTokens": 7296,
+      "totalTokens": 26066,
+      "cost": 0.0089944,
+      "durationMs": 30857,
+      "assertionsPassed": 5,
+      "assertionsTotal": 5,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1440,
+          "cached": 0,
+          "output": 37,
+          "total": 1477,
+          "cost": 0.000434
+        },
+        {
+          "round": 2,
+          "input": 1472,
+          "cached": 0,
+          "output": 32,
+          "total": 1504,
+          "cost": 0.000432
+        },
+        {
+          "round": 3,
+          "input": 1629,
+          "cached": 0,
+          "output": 106,
+          "total": 1735,
+          "cost": 0.00061925
+        },
+        {
+          "round": 4,
+          "input": 1659,
+          "cached": 0,
+          "output": 51,
+          "total": 1710,
+          "cost": 0.00051675
+        },
+        {
+          "round": 5,
+          "input": 1694,
+          "cached": 0,
+          "output": 68,
+          "total": 1762,
+          "cost": 0.0005595
+        },
+        {
+          "round": 6,
+          "input": 1726,
+          "cached": 0,
+          "output": 450,
+          "total": 2176,
+          "cost": 0.0013315
+        },
+        {
+          "round": 7,
+          "input": 1933,
+          "cached": 0,
+          "output": 32,
+          "total": 1965,
+          "cost": 0.00054725
+        },
+        {
+          "round": 8,
+          "input": 2104,
+          "cached": 0,
+          "output": 51,
+          "total": 2155,
+          "cost": 0.000628
+        },
+        {
+          "round": 9,
+          "input": 222,
+          "cached": 1920,
+          "output": 159,
+          "total": 2301,
+          "cost": 0.0004215
+        },
+        {
+          "round": 10,
+          "input": 510,
+          "cached": 1664,
+          "output": 1280,
+          "total": 3454,
+          "cost": 0.0027291
+        },
+        {
+          "round": 11,
+          "input": 631,
+          "cached": 2048,
+          "output": 31,
+          "total": 2710,
+          "cost": 0.00027095
+        },
+        {
+          "round": 12,
+          "input": 1396,
+          "cached": 1664,
+          "output": 57,
+          "total": 3117,
+          "cost": 0.0005046
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "read",
+        "ls",
+        "find",
+        "ls",
+        "edit",
+        "read",
+        "find",
+        "ls",
+        "write",
+        "read"
+      ]
+    },
+    {
+      "taskName": "refactor-rename",
+      "status": "completed",
+      "rounds": 13,
+      "inputTokens": 6485,
+      "outputTokens": 1136,
+      "cacheReadTokens": 19968,
+      "totalTokens": 27589,
+      "cost": 0.004392450000000001,
+      "durationMs": 18005,
+      "assertionsPassed": 3,
+      "assertionsTotal": 3,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1472,
+          "cached": 0,
+          "output": 33,
+          "total": 1505,
+          "cost": 0.000434
+        },
+        {
+          "round": 2,
+          "input": 1504,
+          "cached": 0,
+          "output": 32,
+          "total": 1536,
+          "cost": 0.00043999999999999996
+        },
+        {
+          "round": 3,
+          "input": 1543,
+          "cached": 0,
+          "output": 35,
+          "total": 1578,
+          "cost": 0.00045575
+        },
+        {
+          "round": 4,
+          "input": 189,
+          "cached": 1536,
+          "output": 34,
+          "total": 1759,
+          "cost": 0.00015365
+        },
+        {
+          "round": 5,
+          "input": 163,
+          "cached": 1664,
+          "output": 19,
+          "total": 1846,
+          "cost": 0.00012035
+        },
+        {
+          "round": 6,
+          "input": 112,
+          "cached": 1792,
+          "output": 410,
+          "total": 2314,
+          "cost": 0.0008928
+        },
+        {
+          "round": 7,
+          "input": 150,
+          "cached": 1792,
+          "output": 67,
+          "total": 2009,
+          "cost": 0.0002163
+        },
+        {
+          "round": 8,
+          "input": 125,
+          "cached": 1920,
+          "output": 231,
+          "total": 2276,
+          "cost": 0.00054125
+        },
+        {
+          "round": 9,
+          "input": 483,
+          "cached": 1792,
+          "output": 21,
+          "total": 2296,
+          "cost": 0.00020755
+        },
+        {
+          "round": 10,
+          "input": 202,
+          "cached": 2176,
+          "output": 168,
+          "total": 2546,
+          "cost": 0.0004409
+        },
+        {
+          "round": 11,
+          "input": 246,
+          "cached": 2304,
+          "output": 19,
+          "total": 2569,
+          "cost": 0.00015709999999999997
+        },
+        {
+          "round": 12,
+          "input": 195,
+          "cached": 2432,
+          "output": 23,
+          "total": 2650,
+          "cost": 0.00015555
+        },
+        {
+          "round": 13,
+          "input": 101,
+          "cached": 2560,
+          "output": 44,
+          "total": 2705,
+          "cost": 0.00017725
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "read",
+        "read",
+        "bash",
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "read",
+        "grep"
+      ]
+    },
+    {
+      "taskName": "data-transform",
+      "status": "completed",
+      "rounds": 6,
+      "inputTokens": 5636,
+      "outputTokens": 1757,
+      "cacheReadTokens": 4992,
+      "totalTokens": 12385,
+      "cost": 0.005047800000000001,
+      "durationMs": 19978,
+      "assertionsPassed": 5,
+      "assertionsTotal": 5,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1450,
+          "cached": 0,
+          "output": 48,
+          "total": 1498,
+          "cost": 0.0004585
+        },
+        {
+          "round": 2,
+          "input": 1482,
+          "cached": 0,
+          "output": 38,
+          "total": 1520,
+          "cost": 0.0004465
+        },
+        {
+          "round": 3,
+          "input": 1514,
+          "cached": 0,
+          "output": 19,
+          "total": 1533,
+          "cost": 0.0004165
+        },
+        {
+          "round": 4,
+          "input": 222,
+          "cached": 1408,
+          "output": 1544,
+          "total": 3174,
+          "cost": 0.0031787
+        },
+        {
+          "round": 5,
+          "input": 633,
+          "cached": 1536,
+          "output": 38,
+          "total": 2207,
+          "cost": 0.00027265
+        },
+        {
+          "round": 6,
+          "input": 335,
+          "cached": 2048,
+          "output": 70,
+          "total": 2453,
+          "cost": 0.00027495
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "bash",
+        "read"
+      ]
+    },
+    {
+      "taskName": "add-feature",
+      "status": "completed",
+      "rounds": 13,
+      "inputTokens": 15120,
+      "outputTokens": 3715,
+      "cacheReadTokens": 13440,
+      "totalTokens": 32275,
+      "cost": 0.011545999999999999,
+      "durationMs": 34684,
+      "assertionsPassed": 5,
+      "assertionsTotal": 5,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1479,
+          "cached": 0,
+          "output": 32,
+          "total": 1511,
+          "cost": 0.00043374999999999995
+        },
+        {
+          "round": 2,
+          "input": 103,
+          "cached": 1408,
+          "output": 22,
+          "total": 1533,
+          "cost": 0.00010495
+        },
+        {
+          "round": 3,
+          "input": 1544,
+          "cached": 0,
+          "output": 30,
+          "total": 1574,
+          "cost": 0.000446
+        },
+        {
+          "round": 4,
+          "input": 1735,
+          "cached": 0,
+          "output": 241,
+          "total": 1976,
+          "cost": 0.0009157499999999999
+        },
+        {
+          "round": 5,
+          "input": 231,
+          "cached": 1536,
+          "output": 284,
+          "total": 2051,
+          "cost": 0.0006641499999999999
+        },
+        {
+          "round": 6,
+          "input": 1799,
+          "cached": 0,
+          "output": 275,
+          "total": 2074,
+          "cost": 0.0009997499999999998
+        },
+        {
+          "round": 7,
+          "input": 167,
+          "cached": 1664,
+          "output": 212,
+          "total": 2043,
+          "cost": 0.00050735
+        },
+        {
+          "round": 8,
+          "input": 71,
+          "cached": 1792,
+          "output": 1148,
+          "total": 3011,
+          "cost": 0.00235855
+        },
+        {
+          "round": 9,
+          "input": 2348,
+          "cached": 0,
+          "output": 407,
+          "total": 2755,
+          "cost": 0.001401
+        },
+        {
+          "round": 10,
+          "input": 1101,
+          "cached": 1664,
+          "output": 116,
+          "total": 2881,
+          "cost": 0.00054885
+        },
+        {
+          "round": 11,
+          "input": 345,
+          "cached": 2688,
+          "output": 21,
+          "total": 3054,
+          "cost": 0.00019545
+        },
+        {
+          "round": 12,
+          "input": 3356,
+          "cached": 0,
+          "output": 780,
+          "total": 4136,
+          "cost": 0.002399
+        },
+        {
+          "round": 13,
+          "input": 841,
+          "cached": 2688,
+          "output": 147,
+          "total": 3676,
+          "cost": 0.0005714499999999999
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "ls",
+        "ls",
+        "ls",
+        "ls",
+        "edit",
+        "write",
+        "read",
+        "read",
+        "edit"
+      ]
+    },
+    {
+      "taskName": "large-project",
+      "status": "completed",
+      "rounds": 19,
+      "inputTokens": 16119,
+      "outputTokens": 3329,
+      "cacheReadTokens": 41216,
+      "totalTokens": 60664,
+      "cost": 0.01171815,
+      "durationMs": 40454,
+      "assertionsPassed": 3,
+      "assertionsTotal": 3,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1523,
+          "cached": 0,
+          "output": 42,
+          "total": 1565,
+          "cost": 0.00046474999999999994
+        },
+        {
+          "round": 2,
+          "input": 192,
+          "cached": 1408,
+          "output": 30,
+          "total": 1630,
+          "cost": 0.0001432
+        },
+        {
+          "round": 3,
+          "input": 1711,
+          "cached": 0,
+          "output": 38,
+          "total": 1749,
+          "cost": 0.00050375
+        },
+        {
+          "round": 4,
+          "input": 316,
+          "cached": 1536,
+          "output": 20,
+          "total": 1872,
+          "cost": 0.0001574
+        },
+        {
+          "round": 5,
+          "input": 192,
+          "cached": 1792,
+          "output": 20,
+          "total": 2004,
+          "cost": 0.0001328
+        },
+        {
+          "round": 6,
+          "input": 199,
+          "cached": 1920,
+          "output": 39,
+          "total": 2158,
+          "cost": 0.00017575
+        },
+        {
+          "round": 7,
+          "input": 167,
+          "cached": 2048,
+          "output": 151,
+          "total": 2366,
+          "cost": 0.00039495
+        },
+        {
+          "round": 8,
+          "input": 2531,
+          "cached": 0,
+          "output": 145,
+          "total": 2676,
+          "cost": 0.00092275
+        },
+        {
+          "round": 9,
+          "input": 2847,
+          "cached": 0,
+          "output": 83,
+          "total": 2930,
+          "cost": 0.00087775
+        },
+        {
+          "round": 10,
+          "input": 716,
+          "cached": 2176,
+          "output": 73,
+          "total": 2965,
+          "cost": 0.0003794
+        },
+        {
+          "round": 11,
+          "input": 180,
+          "cached": 2816,
+          "output": 1179,
+          "total": 4175,
+          "cost": 0.0024733999999999997
+        },
+        {
+          "round": 12,
+          "input": 394,
+          "cached": 2816,
+          "output": 71,
+          "total": 3281,
+          "cost": 0.0003109
+        },
+        {
+          "round": 13,
+          "input": 710,
+          "cached": 2816,
+          "output": 750,
+          "total": 4276,
+          "cost": 0.0017479
+        },
+        {
+          "round": 14,
+          "input": 1034,
+          "cached": 2816,
+          "output": 28,
+          "total": 3878,
+          "cost": 0.0003849
+        },
+        {
+          "round": 15,
+          "input": 1198,
+          "cached": 2816,
+          "output": 294,
+          "total": 4308,
+          "cost": 0.0009578999999999999
+        },
+        {
+          "round": 16,
+          "input": 472,
+          "cached": 3840,
+          "output": 28,
+          "total": 4340,
+          "cost": 0.00027
+        },
+        {
+          "round": 17,
+          "input": 621,
+          "cached": 3840,
+          "output": 291,
+          "total": 4752,
+          "cost": 0.00083325
+        },
+        {
+          "round": 18,
+          "input": 928,
+          "cached": 3840,
+          "output": 28,
+          "total": 4796,
+          "cost": 0.000384
+        },
+        {
+          "round": 19,
+          "input": 188,
+          "cached": 4736,
+          "output": 19,
+          "total": 4943,
+          "cost": 0.0002034
+        }
+      ],
+      "toolsCalled": [
+        "find",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "grep",
+        "grep",
+        "grep",
+        "read",
+        "edit",
+        "grep",
+        "edit",
+        "read",
+        "edit",
+        "read",
+        "edit",
+        "read"
+      ]
+    },
+    {
+      "taskName": "recovery",
+      "status": "completed",
+      "rounds": 9,
+      "inputTokens": 10237,
+      "outputTokens": 7851,
+      "cacheReadTokens": 7552,
+      "totalTokens": 25640,
+      "cost": 0.01845005,
+      "durationMs": 57358,
+      "assertionsPassed": 4,
+      "assertionsTotal": 4,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1477,
+          "cached": 0,
+          "output": 33,
+          "total": 1510,
+          "cost": 0.00043525
+        },
+        {
+          "round": 2,
+          "input": 1509,
+          "cached": 0,
+          "output": 22,
+          "total": 1531,
+          "cost": 0.00042124999999999997
+        },
+        {
+          "round": 3,
+          "input": 136,
+          "cached": 1408,
+          "output": 19,
+          "total": 1563,
+          "cost": 0.00010719999999999999
+        },
+        {
+          "round": 4,
+          "input": 89,
+          "cached": 1536,
+          "output": 19,
+          "total": 1644,
+          "cost": 0.00009865
+        },
+        {
+          "round": 5,
+          "input": 1709,
+          "cached": 0,
+          "output": 7038,
+          "total": 8747,
+          "cost": 0.01450325
+        },
+        {
+          "round": 6,
+          "input": 2117,
+          "cached": 0,
+          "output": 87,
+          "total": 2204,
+          "cost": 0.00070325
+        },
+        {
+          "round": 7,
+          "input": 2443,
+          "cached": 0,
+          "output": 381,
+          "total": 2824,
+          "cost": 0.0013727499999999998
+        },
+        {
+          "round": 8,
+          "input": 588,
+          "cached": 2048,
+          "output": 19,
+          "total": 2655,
+          "cost": 0.0002362
+        },
+        {
+          "round": 9,
+          "input": 169,
+          "cached": 2560,
+          "output": 233,
+          "total": 2962,
+          "cost": 0.0005722500000000001
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "read",
+        "read",
+        "write",
+        "read",
+        "edit",
+        "read"
+      ]
+    },
+    {
+      "taskName": "gate-verification",
+      "status": "completed",
+      "rounds": 5,
+      "inputTokens": 3748,
+      "outputTokens": 1210,
+      "cacheReadTokens": 4736,
+      "totalTokens": 9694,
+      "cost": 0.0034754,
+      "durationMs": 12346,
+      "assertionsPassed": 4,
+      "assertionsTotal": 4,
+      "passed": true,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1445,
+          "cached": 0,
+          "output": 38,
+          "total": 1483,
+          "cost": 0.00043725
+        },
+        {
+          "round": 2,
+          "input": 1477,
+          "cached": 0,
+          "output": 30,
+          "total": 1507,
+          "cost": 0.00042925
+        },
+        {
+          "round": 3,
+          "input": 184,
+          "cached": 1408,
+          "output": 1107,
+          "total": 2699,
+          "cost": 0.0022952
+        },
+        {
+          "round": 4,
+          "input": 373,
+          "cached": 1536,
+          "output": 20,
+          "total": 1929,
+          "cost": 0.00017165
+        },
+        {
+          "round": 5,
+          "input": 269,
+          "cached": 1792,
+          "output": 15,
+          "total": 2076,
+          "cost": 0.00014205
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "read",
+        "edit",
+        "read"
+      ]
+    },
+    {
+      "taskName": "long-refactor-hodor",
+      "status": "max_rounds",
+      "rounds": 25,
+      "inputTokens": 41240,
+      "outputTokens": 4220,
+      "cacheReadTokens": 257152,
+      "totalTokens": 302612,
+      "cost": 0.0251788,
+      "durationMs": 54298,
+      "assertionsPassed": 0,
+      "assertionsTotal": 5,
+      "passed": false,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1563,
+          "cached": 0,
+          "output": 35,
+          "total": 1598,
+          "cost": 0.00046075
+        },
+        {
+          "round": 2,
+          "input": 1595,
+          "cached": 0,
+          "output": 42,
+          "total": 1637,
+          "cost": 0.00048274999999999994
+        },
+        {
+          "round": 3,
+          "input": 143,
+          "cached": 1536,
+          "output": 56,
+          "total": 1735,
+          "cost": 0.00018615
+        },
+        {
+          "round": 4,
+          "input": 557,
+          "cached": 1536,
+          "output": 145,
+          "total": 2238,
+          "cost": 0.00046765
+        },
+        {
+          "round": 5,
+          "input": 6886,
+          "cached": 0,
+          "output": 316,
+          "total": 7202,
+          "cost": 0.0023534999999999997
+        },
+        {
+          "round": 6,
+          "input": 2000,
+          "cached": 6784,
+          "output": 20,
+          "total": 8804,
+          "cost": 0.0007096
+        },
+        {
+          "round": 7,
+          "input": 786,
+          "cached": 8704,
+          "output": 19,
+          "total": 9509,
+          "cost": 0.0004521
+        },
+        {
+          "round": 8,
+          "input": 841,
+          "cached": 9472,
+          "output": 205,
+          "total": 10518,
+          "cost": 0.0008570499999999999
+        },
+        {
+          "round": 9,
+          "input": 11068,
+          "cached": 0,
+          "output": 27,
+          "total": 11095,
+          "cost": 0.0028209999999999997
+        },
+        {
+          "round": 10,
+          "input": 1714,
+          "cached": 10240,
+          "output": 19,
+          "total": 11973,
+          "cost": 0.0007225
+        },
+        {
+          "round": 11,
+          "input": 1769,
+          "cached": 11008,
+          "output": 55,
+          "total": 12832,
+          "cost": 0.00082745
+        },
+        {
+          "round": 12,
+          "input": 262,
+          "cached": 12672,
+          "output": 19,
+          "total": 12953,
+          "cost": 0.00042029999999999997
+        },
+        {
+          "round": 13,
+          "input": 184,
+          "cached": 12928,
+          "output": 97,
+          "total": 13209,
+          "cost": 0.0005632
+        },
+        {
+          "round": 14,
+          "input": 255,
+          "cached": 13056,
+          "output": 614,
+          "total": 13925,
+          "cost": 0.00161815
+        },
+        {
+          "round": 15,
+          "input": 345,
+          "cached": 13056,
+          "output": 568,
+          "total": 13969,
+          "cost": 0.00154865
+        },
+        {
+          "round": 16,
+          "input": 506,
+          "cached": 13056,
+          "output": 123,
+          "total": 13685,
+          "cost": 0.0006988999999999999
+        },
+        {
+          "round": 17,
+          "input": 279,
+          "cached": 13440,
+          "output": 610,
+          "total": 14329,
+          "cost": 0.00162575
+        },
+        {
+          "round": 18,
+          "input": 2161,
+          "cached": 13056,
+          "output": 68,
+          "total": 15285,
+          "cost": 0.00100265
+        },
+        {
+          "round": 19,
+          "input": 282,
+          "cached": 15104,
+          "output": 108,
+          "total": 15494,
+          "cost": 0.0006640999999999999
+        },
+        {
+          "round": 20,
+          "input": 292,
+          "cached": 15360,
+          "output": 234,
+          "total": 15886,
+          "cost": 0.000925
+        },
+        {
+          "round": 21,
+          "input": 963,
+          "cached": 15360,
+          "output": 142,
+          "total": 16465,
+          "cost": 0.0009087499999999999
+        },
+        {
+          "round": 22,
+          "input": 2045,
+          "cached": 16256,
+          "output": 190,
+          "total": 18491,
+          "cost": 0.00129765
+        },
+        {
+          "round": 23,
+          "input": 441,
+          "cached": 18176,
+          "output": 191,
+          "total": 18808,
+          "cost": 0.00094665
+        },
+        {
+          "round": 24,
+          "input": 687,
+          "cached": 18176,
+          "output": 126,
+          "total": 18989,
+          "cost": 0.0008781500000000001
+        },
+        {
+          "round": 25,
+          "input": 3616,
+          "cached": 18176,
+          "output": 191,
+          "total": 21983,
+          "cost": 0.0017403999999999998
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "find",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "grep",
+        "read",
+        "grep",
+        "grep",
+        "grep",
+        "grep",
+        "read",
+        "grep",
+        "grep",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read"
+      ]
+    },
+    {
+      "taskName": "long-audit-hodor",
+      "status": "max_rounds",
+      "rounds": 25,
+      "inputTokens": 46355,
+      "outputTokens": 1080,
+      "cacheReadTokens": 166784,
+      "totalTokens": 214219,
+      "cost": 0.01791835,
+      "durationMs": 27974,
+      "assertionsPassed": 0,
+      "assertionsTotal": 4,
+      "passed": false,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1597,
+          "cached": 0,
+          "output": 51,
+          "total": 1648,
+          "cost": 0.00050125
+        },
+        {
+          "round": 2,
+          "input": 93,
+          "cached": 1536,
+          "output": 32,
+          "total": 1661,
+          "cost": 0.00012565
+        },
+        {
+          "round": 3,
+          "input": 166,
+          "cached": 1536,
+          "output": 47,
+          "total": 1749,
+          "cost": 0.0001739
+        },
+        {
+          "round": 4,
+          "input": 1786,
+          "cached": 0,
+          "output": 78,
+          "total": 1864,
+          "cost": 0.0006025
+        },
+        {
+          "round": 5,
+          "input": 1850,
+          "cached": 0,
+          "output": 32,
+          "total": 1882,
+          "cost": 0.0005265
+        },
+        {
+          "round": 6,
+          "input": 1888,
+          "cached": 0,
+          "output": 18,
+          "total": 1906,
+          "cost": 0.000508
+        },
+        {
+          "round": 7,
+          "input": 124,
+          "cached": 1792,
+          "output": 34,
+          "total": 1950,
+          "cost": 0.0001438
+        },
+        {
+          "round": 8,
+          "input": 261,
+          "cached": 1792,
+          "output": 64,
+          "total": 2117,
+          "cost": 0.00023805
+        },
+        {
+          "round": 9,
+          "input": 297,
+          "cached": 1792,
+          "output": 34,
+          "total": 2123,
+          "cost": 0.00018705000000000002
+        },
+        {
+          "round": 10,
+          "input": 97,
+          "cached": 2048,
+          "output": 73,
+          "total": 2218,
+          "cost": 0.00022145
+        },
+        {
+          "round": 11,
+          "input": 6938,
+          "cached": 0,
+          "output": 38,
+          "total": 6976,
+          "cost": 0.0018104999999999998
+        },
+        {
+          "round": 12,
+          "input": 272,
+          "cached": 6912,
+          "output": 20,
+          "total": 7204,
+          "cost": 0.0002808
+        },
+        {
+          "round": 13,
+          "input": 349,
+          "cached": 7168,
+          "output": 20,
+          "total": 7537,
+          "cost": 0.00030645
+        },
+        {
+          "round": 14,
+          "input": 1991,
+          "cached": 7424,
+          "output": 19,
+          "total": 9434,
+          "cost": 0.0007213499999999999
+        },
+        {
+          "round": 15,
+          "input": 826,
+          "cached": 9344,
+          "output": 20,
+          "total": 10190,
+          "cost": 0.0004801
+        },
+        {
+          "round": 16,
+          "input": 1556,
+          "cached": 10112,
+          "output": 19,
+          "total": 11687,
+          "cost": 0.0006797999999999999
+        },
+        {
+          "round": 17,
+          "input": 198,
+          "cached": 11648,
+          "output": 20,
+          "total": 11866,
+          "cost": 0.00038070000000000004
+        },
+        {
+          "round": 18,
+          "input": 741,
+          "cached": 11776,
+          "output": 19,
+          "total": 12536,
+          "cost": 0.00051765
+        },
+        {
+          "round": 19,
+          "input": 979,
+          "cached": 12416,
+          "output": 20,
+          "total": 13415,
+          "cost": 0.00059515
+        },
+        {
+          "round": 20,
+          "input": 2053,
+          "cached": 13312,
+          "output": 19,
+          "total": 15384,
+          "cost": 0.0008840499999999999
+        },
+        {
+          "round": 21,
+          "input": 828,
+          "cached": 15360,
+          "output": 20,
+          "total": 16208,
+          "cost": 0.000631
+        },
+        {
+          "round": 22,
+          "input": 766,
+          "cached": 16128,
+          "output": 21,
+          "total": 16915,
+          "cost": 0.0006367
+        },
+        {
+          "round": 23,
+          "input": 17210,
+          "cached": 0,
+          "output": 19,
+          "total": 17229,
+          "cost": 0.0043405
+        },
+        {
+          "round": 24,
+          "input": 472,
+          "cached": 17152,
+          "output": 20,
+          "total": 17644,
+          "cost": 0.0005868
+        },
+        {
+          "round": 25,
+          "input": 3017,
+          "cached": 17536,
+          "output": 323,
+          "total": 20876,
+          "cost": 0.00183865
+        }
+      ],
+      "toolsCalled": [
+        "ls",
+        "ls",
+        "find",
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "ls",
+        "bash",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "grep"
+      ]
+    },
+    {
+      "taskName": "long-add-feature-hodor",
+      "status": "max_rounds",
+      "rounds": 25,
+      "inputTokens": 23779,
+      "outputTokens": 7245,
+      "cacheReadTokens": 227968,
+      "totalTokens": 258992,
+      "cost": 0.02613395,
+      "durationMs": 85041,
+      "assertionsPassed": 1,
+      "assertionsTotal": 7,
+      "passed": false,
+      "perRound": [
+        {
+          "round": 1,
+          "input": 1629,
+          "cached": 0,
+          "output": 41,
+          "total": 1670,
+          "cost": 0.00048925
+        },
+        {
+          "round": 2,
+          "input": 2043,
+          "cached": 0,
+          "output": 30,
+          "total": 2073,
+          "cost": 0.0005707500000000001
+        },
+        {
+          "round": 3,
+          "input": 2714,
+          "cached": 0,
+          "output": 20,
+          "total": 2734,
+          "cost": 0.0007185
+        },
+        {
+          "round": 4,
+          "input": 7507,
+          "cached": 0,
+          "output": 30,
+          "total": 7537,
+          "cost": 0.0019367499999999999
+        },
+        {
+          "round": 5,
+          "input": 961,
+          "cached": 7424,
+          "output": 47,
+          "total": 8432,
+          "cost": 0.00051985
+        },
+        {
+          "round": 6,
+          "input": 888,
+          "cached": 8320,
+          "output": 20,
+          "total": 9228,
+          "cost": 0.00047
+        },
+        {
+          "round": 7,
+          "input": 826,
+          "cached": 9088,
+          "output": 64,
+          "total": 9978,
+          "cost": 0.0005616999999999999
+        },
+        {
+          "round": 8,
+          "input": 236,
+          "cached": 9856,
+          "output": 293,
+          "total": 10385,
+          "cost": 0.0008914
+        },
+        {
+          "round": 9,
+          "input": 299,
+          "cached": 9984,
+          "output": 36,
+          "total": 10319,
+          "cost": 0.00039635
+        },
+        {
+          "round": 10,
+          "input": 471,
+          "cached": 10240,
+          "output": 118,
+          "total": 10829,
+          "cost": 0.00060975
+        },
+        {
+          "round": 11,
+          "input": 518,
+          "cached": 10240,
+          "output": 68,
+          "total": 10826,
+          "cost": 0.0005215
+        },
+        {
+          "round": 12,
+          "input": 563,
+          "cached": 10240,
+          "output": 51,
+          "total": 10854,
+          "cost": 0.0004987500000000001
+        },
+        {
+          "round": 13,
+          "input": 699,
+          "cached": 10240,
+          "output": 20,
+          "total": 10959,
+          "cost": 0.00047075000000000003
+        },
+        {
+          "round": 14,
+          "input": 730,
+          "cached": 10880,
+          "output": 76,
+          "total": 11686,
+          "cost": 0.0006064999999999999
+        },
+        {
+          "round": 15,
+          "input": 130,
+          "cached": 11520,
+          "output": 85,
+          "total": 11735,
+          "cost": 0.0004905
+        },
+        {
+          "round": 16,
+          "input": 560,
+          "cached": 11136,
+          "output": 126,
+          "total": 11822,
+          "cost": 0.0006704
+        },
+        {
+          "round": 17,
+          "input": 597,
+          "cached": 11136,
+          "output": 142,
+          "total": 11875,
+          "cost": 0.00071165
+        },
+        {
+          "round": 18,
+          "input": 123,
+          "cached": 11648,
+          "output": 166,
+          "total": 11937,
+          "cost": 0.00065395
+        },
+        {
+          "round": 19,
+          "input": 169,
+          "cached": 11648,
+          "output": 30,
+          "total": 11847,
+          "cost": 0.00039345000000000005
+        },
+        {
+          "round": 20,
+          "input": 790,
+          "cached": 11776,
+          "output": 404,
+          "total": 12970,
+          "cost": 0.0012999
+        },
+        {
+          "round": 21,
+          "input": 708,
+          "cached": 11904,
+          "output": 71,
+          "total": 12683,
+          "cost": 0.0006165999999999999
+        },
+        {
+          "round": 22,
+          "input": 173,
+          "cached": 12544,
+          "output": 61,
+          "total": 12778,
+          "cost": 0.00047885000000000007
+        },
+        {
+          "round": 23,
+          "input": 90,
+          "cached": 12672,
+          "output": 611,
+          "total": 13373,
+          "cost": 0.0015612999999999998
+        },
+        {
+          "round": 24,
+          "input": 135,
+          "cached": 12672,
+          "output": 4585,
+          "total": 17392,
+          "cost": 0.009520550000000001
+        },
+        {
+          "round": 25,
+          "input": 220,
+          "cached": 12800,
+          "output": 50,
+          "total": 13070,
+          "cost": 0.000475
+        }
+      ],
+      "toolsCalled": [
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "edit",
+        "read",
+        "grep",
+        "grep",
+        "grep",
+        "read",
+        "grep",
+        "grep",
+        "grep",
+        "grep",
+        "grep",
+        "bash",
+        "grep",
+        "find",
+        "grep",
+        "bash",
+        "edit",
+        "read"
+      ]
+    }
+  ]
+}

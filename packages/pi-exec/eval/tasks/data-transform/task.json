@@ -1,0 +1,17 @@
+{
+  "name": "data-transform",
+  "plan": [
+    { "description": "Read data/input.csv and parse its contents. Record the headers and row count in state.", "tools": ["read"] },
+    { "description": "Group the data by city. For each city, calculate: count, average age, average score, and highest scorer. Write the results to data/output.json as a JSON object keyed by city.", "tools": ["read", "write"] }
+  ],
+  "initialState": {
+    "task": "Read input.csv, group by city, compute stats per city, write results to output.json."
+  },
+  "assertions": [
+    { "type": "file_exists", "path": "data/output.json", "description": "output.json should be created" },
+    { "type": "file_contains", "path": "data/output.json", "expected": "New York", "description": "Should contain New York group" },
+    { "type": "file_contains", "path": "data/output.json", "expected": "San Francisco", "description": "Should contain San Francisco group" },
+    { "type": "file_contains", "path": "data/output.json", "expected": "Chicago", "description": "Should contain Chicago group" },
+    { "type": "file_contains", "path": "data/output.json", "expected": "average", "description": "Should contain computed averages" }
+  ]
+}

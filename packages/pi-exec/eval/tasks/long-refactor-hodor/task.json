@@ -1,0 +1,19 @@
+{
+  "name": "long-refactor-hodor",
+  "plan": [
+    { "description": "Find all .ts files in src/. Read each one to map out the codebase structure: which files import what, where ReviewOutput and ReviewFinding types are used.", "tools": ["find", "ls", "read", "grep"] },
+    { "description": "Rename the type ReviewFinding to ReviewIssue everywhere — in types.ts (definition), review.ts (schema and validation), render.ts, agent.ts, and any other files that reference it. Also rename the REVIEW_FINDING_SCHEMA to REVIEW_ISSUE_SCHEMA.", "tools": ["read", "edit", "grep"] },
+    { "description": "Rename the findings field to issues everywhere — in ReviewOutput interface (types.ts), SUBMIT_REVIEW_SCHEMA (review.ts), validateReviewOutput (review.ts), render functions, agent.ts, and all other references.", "tools": ["read", "edit", "grep"] },
+    { "description": "Verify all changes: grep for any remaining 'ReviewFinding' or old 'findings' field references. Read key files to confirm they compile logically.", "tools": ["grep", "read"] }
+  ],
+  "initialState": {
+    "task": "Rename ReviewFinding -> ReviewIssue and findings -> issues across the entire hodor codebase (~15 files, 2300 lines)."
+  },
+  "assertions": [
+    { "type": "file_contains", "path": "src/types.ts", "expected": "ReviewIssue", "description": "types.ts should use ReviewIssue" },
+    { "type": "file_not_contains", "path": "src/types.ts", "expected": "ReviewFinding", "description": "types.ts should not have ReviewFinding" },
+    { "type": "file_contains", "path": "src/review.ts", "expected": "REVIEW_ISSUE_SCHEMA", "description": "review.ts should have renamed schema" },
+    { "type": "file_not_contains", "path": "src/review.ts", "expected": "REVIEW_FINDING_SCHEMA", "description": "review.ts should not have old schema name" },
+    { "type": "file_contains", "path": "src/types.ts", "expected": "issues:", "description": "ReviewOutput should use issues field" }
+  ]
+}

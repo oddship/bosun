@@ -53,6 +53,18 @@ export function checkAssertions(
           return { assertion, passed, actual: content.slice(0, 200) };
         }
 
+        case "file_not_contains": {
+          const fullPathNc = join(workDir, assertion.path);
+          if (!existsSync(fullPathNc)) {
+            return { assertion, passed: false, error: "File does not exist" };
+          }
+          const contentNc = readFileSync(fullPathNc, "utf-8");
+          const passedNc = typeof assertion.expected === "string"
+            ? !contentNc.includes(assertion.expected)
+            : false;
+          return { assertion, passed: passedNc, actual: contentNc.slice(0, 200) };
+        }
+
         default:
           return { assertion, passed: false, error: `Unknown assertion type: ${assertion.type}` };
       }

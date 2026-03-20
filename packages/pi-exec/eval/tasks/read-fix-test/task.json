@@ -1,0 +1,16 @@
+{
+  "name": "read-fix-test",
+  "plan": [
+    { "description": "Read src/stack.ts and identify bugs. The pop() and peek() methods don't handle empty stacks — they should throw an error when the stack is empty.", "tools": ["read"] },
+    { "description": "Fix pop() and peek() to throw an Error when the stack is empty.", "tools": ["read", "edit"] },
+    { "description": "Create src/stack.test.ts with tests: push/pop basics, peek, isEmpty, and the new empty-stack error behavior.", "tools": ["read", "write"] }
+  ],
+  "initialState": {},
+  "assertions": [
+    { "type": "file_contains", "path": "src/stack.ts", "expected": "throw", "description": "pop/peek should throw on empty stack" },
+    { "type": "file_contains", "path": "src/stack.ts", "expected": "isEmpty()", "description": "Should check isEmpty before accessing" },
+    { "type": "file_exists", "path": "src/stack.test.ts", "description": "Test file should be created" },
+    { "type": "file_contains", "path": "src/stack.test.ts", "expected": "throw", "description": "Tests should verify throw behavior" },
+    { "type": "file_contains", "path": "src/stack.test.ts", "expected": "push", "description": "Tests should cover push" }
+  ]
+}

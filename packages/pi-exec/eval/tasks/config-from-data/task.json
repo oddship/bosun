@@ -1,0 +1,18 @@
+{
+  "name": "config-from-data",
+  "plan": [
+    { "description": "Read data/settings.json and understand its structure. Note all sections, field names, and types.", "tools": ["read"] },
+    { "description": "Create src/config.ts with TypeScript interfaces matching the JSON structure (AppConfig, DatabaseConfig, AuthConfig, FeatureConfig, Config) and a loadConfig() function that reads and validates the JSON.", "tools": ["read", "write"] }
+  ],
+  "initialState": {
+    "task": "Generate a typed TypeScript config module from data/settings.json with interfaces and a loader function."
+  },
+  "assertions": [
+    { "type": "file_exists", "path": "src/config.ts", "description": "config.ts should be created" },
+    { "type": "file_contains", "path": "src/config.ts", "expected": "interface", "description": "Should define interfaces" },
+    { "type": "file_contains", "path": "src/config.ts", "expected": "DatabaseConfig", "description": "Should have DatabaseConfig interface" },
+    { "type": "file_contains", "path": "src/config.ts", "expected": "loadConfig", "description": "Should export loadConfig function" },
+    { "type": "file_contains", "path": "src/config.ts", "expected": "port", "description": "Should include port field" },
+    { "type": "file_contains", "path": "src/config.ts", "expected": "number", "description": "Should use number type" }
+  ]
+}

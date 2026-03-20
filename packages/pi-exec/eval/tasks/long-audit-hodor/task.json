@@ -1,0 +1,18 @@
+{
+  "name": "long-audit-hodor",
+  "plan": [
+    { "description": "Discover all TypeScript files in src/ and src/utils/. List them and record their sizes.", "tools": ["find", "ls"] },
+    { "description": "Read every source file in src/ (agent.ts, cli.ts, github.ts, gitlab.ts, index.ts, metrics.ts, model.ts, prompt.ts, render.ts, review.ts, system-prompt.ts, types.ts, workspace.ts) and the utils/ files. For each file, note its purpose and exports.", "tools": ["read"] },
+    { "description": "Analyze the codebase for potential issues: (1) Find any functions over 50 lines that could be broken up. (2) Find any 'any' type usage that could be typed. (3) Find missing error handling around async operations. (4) Find hardcoded strings that should be constants. Record all findings in state with file, line, and description.", "tools": ["read", "grep"] },
+    { "description": "Write a markdown audit report to AUDIT.md with sections: Overview, Architecture, Findings (grouped by severity), and Recommendations.", "tools": ["write"] }
+  ],
+  "initialState": {
+    "task": "Perform a full code quality audit of the hodor codebase (~15 files, 2300 lines). Read every file, identify issues, write an audit report."
+  },
+  "assertions": [
+    { "type": "file_exists", "path": "AUDIT.md", "description": "Audit report should be created" },
+    { "type": "file_contains", "path": "AUDIT.md", "expected": "agent.ts", "description": "Report should mention the largest file" },
+    { "type": "file_contains", "path": "AUDIT.md", "expected": "Finding", "description": "Report should contain findings" },
+    { "type": "file_contains", "path": "AUDIT.md", "expected": "Recommendation", "description": "Report should contain recommendations" }
+  ]
+}

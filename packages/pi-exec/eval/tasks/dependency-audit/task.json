@@ -1,0 +1,11 @@
+{
+  "name": "dependency-audit",
+  "plan": [
+    { "description": "Find all .ts files in src/ and read each one. For every file, record its imports (which files it depends on) and its exports.", "tools": ["find", "read", "grep"] },
+    { "description": "Build a complete dependency analysis in state: for each file, list what it imports from and what imports it. Identify the entry point (the file with no importers) and any leaf modules (files with no outgoing imports). Store results in state.", "tools": ["read"] }
+  ],
+  "initialState": {},
+  "assertions": [
+    { "type": "state_field", "path": "entryPoint", "description": "Should identify the entry point" }
+  ]
+}

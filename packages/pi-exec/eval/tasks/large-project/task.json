@@ -1,0 +1,16 @@
+{
+  "name": "large-project",
+  "plan": [
+    { "description": "Explore the project structure: find all .ts files, read index.ts to understand the module layout. Map out models/, services/, utils/ directories.", "tools": ["find", "ls", "read"] },
+    { "description": "Read all model files (user.ts, product.ts, order.ts) and identify the SQL injection vulnerability — all queries use string interpolation with template literals instead of parameterized queries.", "tools": ["read", "grep"] },
+    { "description": "Fix all three model files to stop using string interpolation in SQL. Use parameterized queries with placeholders ($1, ?, :name, etc.) instead of embedding values in the SQL string.", "tools": ["read", "edit"] }
+  ],
+  "initialState": {
+    "task": "Find and fix the SQL injection vulnerabilities in the model layer. All model files use template literal string interpolation in SQL queries — e.g. `SELECT * FROM users WHERE id = '${id}'` instead of parameterized queries."
+  },
+  "assertions": [
+    { "type": "file_not_contains", "path": "src/models/user.ts", "expected": "${id}", "description": "user.ts should not use string interpolation for id" },
+    { "type": "file_not_contains", "path": "src/models/product.ts", "expected": "${name}", "description": "product.ts should not use string interpolation for name" },
+    { "type": "file_not_contains", "path": "src/models/order.ts", "expected": "${userId}", "description": "order.ts should not use string interpolation for userId" }
+  ]
+}

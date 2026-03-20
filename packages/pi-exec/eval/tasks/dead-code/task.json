@@ -1,0 +1,13 @@
+{
+  "name": "dead-code",
+  "plan": [
+    { "description": "Read all .ts files in src/. For each file, record its exports and all import references from other files.", "tools": ["find", "read", "grep"] },
+    { "description": "Cross-reference exports with imports. Identify functions that are exported but never imported by any other file (dead exports). Store the list in state.deadExports with file path and function name.", "tools": ["read"] }
+  ],
+  "initialState": {
+    "task": "Find all unused/dead exports in the project — functions that are exported but never imported by another file."
+  },
+  "assertions": [
+    { "type": "state_field", "path": "deadExports", "description": "Should list dead exports" }
+  ]
+}

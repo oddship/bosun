@@ -1,0 +1,18 @@
+{
+  "name": "add-feature",
+  "plan": [
+    { "description": "Read src/eventEmitter.ts to understand the current API: on(), emit(), off().", "tools": ["read"] },
+    { "description": "Add a once() method that registers a listener which auto-removes itself after being called once. Also add a listenerCount(event) method that returns the number of registered listeners for an event.", "tools": ["read", "edit"] },
+    { "description": "Create src/eventEmitter.test.ts with tests covering: on/emit basics, off removes listeners, once fires exactly once then is removed, listenerCount returns correct counts.", "tools": ["read", "write"] }
+  ],
+  "initialState": {
+    "task": "Add once() and listenerCount() methods to EventEmitter and write tests."
+  },
+  "assertions": [
+    { "type": "file_contains", "path": "src/eventEmitter.ts", "expected": "once(", "description": "Should add once method" },
+    { "type": "file_contains", "path": "src/eventEmitter.ts", "expected": "listenerCount(", "description": "Should add listenerCount method" },
+    { "type": "file_exists", "path": "src/eventEmitter.test.ts", "description": "Test file should be created" },
+    { "type": "file_contains", "path": "src/eventEmitter.test.ts", "expected": "once", "description": "Tests should cover once" },
+    { "type": "file_contains", "path": "src/eventEmitter.test.ts", "expected": "listenerCount", "description": "Tests should cover listenerCount" }
+  ]
+}

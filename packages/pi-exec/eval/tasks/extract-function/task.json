@@ -1,0 +1,17 @@
+{
+  "name": "extract-function",
+  "plan": [
+    { "description": "Read src/processor.ts and understand its structure. Identify the CSV parsing logic (the for loop that splits lines) as the extraction target.", "tools": ["read"] },
+    { "description": "Create src/parser.ts with the extracted parseCSV function. It should take csvLines: string[] and return DataRow[]. Import DataRow from processor.ts or co-locate the interface.", "tools": ["read", "write"] },
+    { "description": "Update src/processor.ts to import and use parseCSV from parser.ts instead of inline parsing.", "tools": ["read", "edit"] }
+  ],
+  "initialState": {
+    "task": "Extract the CSV parsing logic from processData() in src/processor.ts into a separate src/parser.ts module."
+  },
+  "assertions": [
+    { "type": "file_exists", "path": "src/parser.ts", "description": "parser.ts should be created" },
+    { "type": "file_contains", "path": "src/parser.ts", "expected": "parseCSV", "description": "Should export parseCSV function" },
+    { "type": "file_contains", "path": "src/processor.ts", "expected": "parseCSV", "description": "processor.ts should call parseCSV" },
+    { "type": "file_contains", "path": "src/processor.ts", "expected": "import", "description": "processor.ts should import from parser" }
+  ]
+}

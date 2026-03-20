@@ -1,0 +1,21 @@
+{
+  "name": "gate-verification",
+  "plan": [
+    { "description": "Read src/sanitize.ts and identify all missing sanitization cases. sanitizeHtml should also handle & (&amp;), double quotes (&quot;), and single quotes (&#39;). sanitizeForSql should also handle backslashes and semicolons.", "tools": ["read"] },
+    {
+      "description": "Fix both functions to handle all edge cases.",
+      "tools": ["read", "edit"],
+      "gate": "Read src/sanitize.ts and verify: sanitizeHtml handles <, >, &, double quotes, and single quotes. sanitizeForSql handles single quotes, backslashes, and semicolons. All replacements should use proper escape sequences.",
+      "maxRetries": 2
+    }
+  ],
+  "initialState": {
+    "task": "Complete the sanitization functions to handle all common injection vectors."
+  },
+  "assertions": [
+    { "type": "file_contains", "path": "src/sanitize.ts", "expected": "&amp;", "description": "sanitizeHtml should handle &" },
+    { "type": "file_contains", "path": "src/sanitize.ts", "expected": "&quot;", "description": "sanitizeHtml should handle double quotes" },
+    { "type": "file_contains", "path": "src/sanitize.ts", "expected": "&#39;", "description": "sanitizeHtml should handle single quotes" },
+    { "type": "file_contains", "path": "src/sanitize.ts", "expected": "\\\\", "description": "sanitizeForSql should handle backslashes" }
+  ]
+}

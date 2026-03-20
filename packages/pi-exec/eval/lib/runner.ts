@@ -18,6 +18,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { createExecutor, type RunResult, type PhaseEvent, type ToolRegistry } from "pi-exec";
 import type { TaskDefinition } from "./types.js";
+import { REALISTIC_SYSTEM_PROMPT } from "./prompts.js";
 
 export interface RunConfig {
   model: Model<any>;
@@ -72,7 +73,7 @@ export async function runTask(
   const executor = createExecutor({
     model: config.model,
     apiKey: config.apiKey,
-    systemPrompt: taskDef.systemPrompt ?? "You are X, a task executor. Execute the plan step by step.",
+    systemPrompt: taskDef.systemPrompt ?? REALISTIC_SYSTEM_PROMPT,
     tools: allTools,
     maxCostUsd: config.maxCostUsd ?? 0.50,
     phaseBudget: config.phaseBudget ?? 30_000,
