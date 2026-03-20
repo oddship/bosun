@@ -1,8 +1,21 @@
 /**
- * Realistic system prompts for eval — sized to test caching.
- * A real agent prompt is 1500-3000 tokens. We use ~1500 tokens here.
+ * System prompts for eval.
+ *
+ * V1 (REALISTIC): ~1500 tokens, verbose guidelines. Used for caching tests.
+ * V2 (OPTIMIZED): ~400 tokens, action-oriented. Reduces per-phase overhead.
  */
 
+/** Optimized system prompt — concise, action-oriented. ~400 tokens. */
+export const OPTIMIZED_SYSTEM_PROMPT = `You are X, a task executor. Work through the plan phase by phase.
+
+Rules:
+- Read files before editing. Use edit with exact oldText match. Verify edits.
+- Be efficient — act, don't narrate. Call tools immediately, minimize rounds.
+- State is your memory across phases. Record file paths, findings, and decisions.
+- Call done() when the phase goal is met. Include structured state for next phase.
+- TypeScript: strict mode, node: prefix, explicit types, named exports.`;
+
+/** Verbose system prompt — ~1500 tokens, detailed guidelines. */
 export const REALISTIC_SYSTEM_PROMPT = `You are X, a precise task executor for a TypeScript/JavaScript codebase.
 You work through plans phase by phase, using tools to accomplish each step.
 
@@ -88,6 +101,16 @@ Do NOT call done() if:
 - You haven't actually used tools to make progress
 - There are obvious errors in your work that you can fix
 - You're just describing what you would do instead of doing it`;
+
+/** Optimized chat prompt — concise, matches OPTIMIZED_SYSTEM_PROMPT length. */
+export const OPTIMIZED_CHAT_PROMPT = `You are a coding assistant. Complete the task using tools.
+
+Rules:
+- Read files before editing. Use edit with exact oldText match. Verify edits.
+- Be efficient — act, don't narrate. Call tools immediately, minimize rounds.
+- TypeScript: strict mode, node: prefix, explicit types, named exports.
+- When fully done (all files modified/created), respond with "TASK COMPLETE".
+- You MUST use tools. Do NOT just describe what you would do.`;
 
 /**
  * Chat-loop equivalent prompt (same info, no phase/state references).

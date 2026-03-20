@@ -26,6 +26,8 @@ export interface RunConfig {
   maxCostUsd?: number;
   phaseBudget?: number;
   verbose?: boolean;
+  /** Override system prompt. */
+  systemPrompt?: string;
 }
 
 export interface TaskRunResult {
@@ -73,7 +75,7 @@ export async function runTask(
   const executor = createExecutor({
     model: config.model,
     apiKey: config.apiKey,
-    systemPrompt: taskDef.systemPrompt ?? REALISTIC_SYSTEM_PROMPT,
+    systemPrompt: config.systemPrompt ?? taskDef.systemPrompt ?? REALISTIC_SYSTEM_PROMPT,
     tools: allTools,
     maxCostUsd: config.maxCostUsd ?? 0.50,
     phaseBudget: config.phaseBudget ?? 30_000,

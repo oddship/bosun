@@ -1,0 +1,18 @@
+{
+  "name": "hodor-review",
+  "plan": [
+    { "description": "Read all source files (src/auth.ts, src/api.ts). Identify every security vulnerability. There are at least 7: hardcoded secret, SQL injection, weak hashing, long token expiry, missing auth on getUser, missing admin check on deleteUser, mass assignment on updateUser, no input validation on listUsers.", "tools": ["read", "find", "grep"] },
+    { "description": "Write a security review report to REVIEW.md. For each finding: title with severity [P0]-[P3], file and line range, description of the vulnerability, and recommended fix. P0 = critical (SQL injection, hardcoded secret), P1 = high (weak hash, mass assignment), P2 = medium (missing auth, long expiry), P3 = low (no bounds check).", "tools": ["read", "write"] }
+  ],
+  "initialState": {
+    "task": "Perform a security-focused code review of auth.ts and api.ts. Write findings as a structured review report."
+  },
+  "assertions": [
+    { "type": "file_exists", "path": "REVIEW.md", "description": "Review report should be created" },
+    { "type": "file_contains", "path": "REVIEW.md", "expected": "SQL injection", "description": "Should find SQL injection" },
+    { "type": "file_contains", "path": "REVIEW.md", "expected": "SECRET", "description": "Should find hardcoded secret" },
+    { "type": "file_contains", "path": "REVIEW.md", "expected": "P0", "description": "Should use priority tags" },
+    { "type": "file_contains", "path": "REVIEW.md", "expected": "auth.ts", "description": "Should reference file locations" },
+    { "type": "file_contains", "path": "REVIEW.md", "expected": "deleteUser", "description": "Should find missing admin check" }
+  ]
+}

@@ -13,17 +13,11 @@ import type { DoneCallArgs } from "./tools.js";
 const EXECUTION_INSTRUCTIONS = `
 ## Instructions
 
-Execute only the current phase. Use the provided tools to accomplish the phase goal.
-When the phase is complete, call done() with:
-- state: your updated working state (must contain everything subsequent phases need)
-- summary: a human-readable summary of what you accomplished
-- result: (optional) structured output, only on the final phase
+Execute the current phase using tools. When done, call done() with:
+- state: updated working state (everything subsequent phases need)
+- summary: what you accomplished
 
-Your state should be intentional — record exactly what downstream phases need.
-Do not include raw tool outputs. Summarize findings into structured state.
-
-If you encounter an error, try to recover. If you cannot, call done() with
-what you have and note the error in the summary.
+Act efficiently. Use tools, don't narrate. Record findings in structured state.
 `.trim();
 
 /**

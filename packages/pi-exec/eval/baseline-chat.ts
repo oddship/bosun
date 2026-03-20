@@ -29,7 +29,7 @@ import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { getApiKey } from "./lib/auth.js";
 import { checkAssertions } from "./lib/assertions.js";
 import type { TaskDefinition, Assertion } from "./lib/types.js";
-import { REALISTIC_CHAT_PROMPT } from "./lib/prompts.js";
+import { OPTIMIZED_CHAT_PROMPT, REALISTIC_CHAT_PROMPT } from "./lib/prompts.js";
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -45,6 +45,7 @@ const taskFilter = getArg("task");
 const modelId = getArg("model") ?? "gpt-5.1-codex-mini";
 const maxRounds = parseInt(getArg("max-rounds") ?? "30", 10);
 const outputPath = getArg("output");
+const promptStyle = getArg("prompt") ?? "optimized";
 
 const evalDir = resolve(import.meta.dirname!, ".");
 const tasksDir = join(evalDir, "tasks");
@@ -136,7 +137,8 @@ async function runChatBaseline(taskDir: string): Promise<ChatResult> {
       : ""
   }`;
 
-  const systemPrompt = REALISTIC_CHAT_PROMPT + taskSection;
+  const chatPrompt = promptStyle === "optimized" ? OPTIMIZED_CHAT_PROMPT : REALISTIC_CHAT_PROMPT;
+  const systemPrompt = chatPrompt + taskSection;
 
   // Single growing conversation — the chat loop
   const messages: Message[] = [

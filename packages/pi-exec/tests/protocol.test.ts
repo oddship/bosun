@@ -28,7 +28,7 @@ describe("buildCachedPrefix", () => {
     ]);
 
     expect(prefix).toContain("You are X.");
-    expect(prefix).toContain("Execute only the current phase");
+    expect(prefix).toContain("Execute the current phase");
     expect(prefix).toContain("Phase 1: Read files [tools: read, grep]");
     expect(prefix).toContain("Phase 2: Write fix [tools: edit]");
   });

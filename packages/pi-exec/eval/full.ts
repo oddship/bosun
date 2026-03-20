@@ -17,6 +17,7 @@ import { getApiKey } from "./lib/auth.js";
 import { runTask } from "./lib/runner.js";
 import { checkAssertions } from "./lib/assertions.js";
 import type { TaskDefinition, TaskResult } from "./lib/types.js";
+import { OPTIMIZED_SYSTEM_PROMPT, REALISTIC_SYSTEM_PROMPT } from "./lib/prompts.js";
 
 // ---------------------------------------------------------------------------
 // CLI args
@@ -35,6 +36,8 @@ const taskFilter = getArg("task");
 const outputPath = getArg("output");
 const verbose = hasFlag("verbose");
 const maxCostPerTask = parseFloat(getArg("max-cost") ?? "0.50");
+const promptStyle = getArg("prompt") ?? "optimized"; // "optimized" or "realistic"
+const phaseBudgetOverride = getArg("phase-budget") ? parseInt(getArg("phase-budget")!, 10) : undefined;
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -94,6 +97,8 @@ console.log(`Models:    ${modelIds.join(", ")}`);
 console.log(`Tasks:     ${taskDirs.length}`);
 console.log(`Runs:      ${numRuns} per task per model`);
 console.log(`Max cost:  $${maxCostPerTask.toFixed(2)} per task`);
+console.log(`Prompt:    ${promptStyle}`);
+console.log(`Phase $:   ${phaseBudgetOverride ?? 50_000} tokens`);
 console.log(`Total:     ${taskDirs.length * modelIds.length * numRuns} task runs`);
 console.log("═".repeat(80));
 console.log();
@@ -117,12 +122,14 @@ for (const { id: modelId, model } of models) {
       process.stdout.write(`  ▶ ${label.padEnd(45)} `);
 
       try {
+        const systemPrompt = promptStyle === "optimized" ? OPTIMIZED_SYSTEM_PROMPT : REALISTIC_SYSTEM_PROMPT;
         const runResult = await runTask(taskDir, {
           model,
           apiKey,
           maxCostUsd: maxCostPerTask,
-          phaseBudget: 30_000,
+          phaseBudget: phaseBudgetOverride ?? 50_000,
           verbose,
+          systemPrompt,
         });
 
         const assertionResults = taskDef.assertions
