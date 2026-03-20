@@ -2,12 +2,13 @@
 
 ## Executive Summary
 
-pi-exec is a plan-driven execution runtime that replaces the standard chat loop with structured phases. After comprehensive evaluation against a chat-loop baseline, the findings are:
+pi-exec is a plan-driven execution runtime that replaces the standard chat loop with structured phases. After comprehensive evaluation:
 
-1. **pi-exec is 1.4-3.2x more expensive** than a chat loop on the same model/tasks — the gap narrows on longer tasks
-2. **pi-exec is more reliable** on weaker models (90% vs 80% on gpt-5.4-mini, 65% vs 60% on codex-mini)
-3. **Both are equally reliable** on stronger models at 100% across 3 runs
-4. **pi-exec's value is architectural** — composable plans, tool safety, bounded context — not raw cost savings
+1. **95.7% pass rate** on 23 tasks with gpt-5.4-mini ($0.75/$4.50)
+2. **Real-world tasks pass**: QM dependency security scan, Hodor code review, 15-file codebase refactor/audit
+3. **100% reliability** across 3 runs on representative tasks
+4. **1.4-3.2x more expensive** than chat loop — gap narrows on longer tasks
+5. **Value is architectural**: composable plans, tool safety, bounded context, protocol reliability
 
 ## Methodology
 
