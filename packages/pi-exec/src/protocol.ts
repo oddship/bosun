@@ -51,18 +51,24 @@ ${planText}
 
 /**
  * Build the user message for a phase: current state + phase marker.
+ * Optional budgetNote is appended when approaching the phase budget.
  */
 export function buildPhasePrompt(
   state: State,
   phase: Phase,
   phaseIndex: number,
   totalPhases: number,
+  budgetNote?: string,
 ): string {
   const stateJson = JSON.stringify(state, null, 2);
-  return `## Current State
-${stateJson}
-
-You are executing Phase ${phaseIndex + 1} of ${totalPhases}: ${phase.description}`;
+  const parts = [
+    `## Current State\n${stateJson}`,
+    `You are executing Phase ${phaseIndex + 1} of ${totalPhases}: ${phase.description}`,
+  ];
+  if (budgetNote) {
+    parts.push(budgetNote);
+  }
+  return parts.join("\n\n");
 }
 
 /**
@@ -99,8 +105,8 @@ export function extractDoneCall(response: AssistantMessage): DoneCallArgs | null
   if (!doneCall) return null;
 
   const args = doneCall.arguments as DoneCallArgs;
-  // Basic shape validation
-  if (!args || typeof args.state !== "object" || typeof args.summary !== "string") {
+  // Basic shape validation — typeof null === "object" in JS, so check explicitly
+  if (!args || args.state === null || typeof args.state !== "object" || typeof args.summary !== "string") {
     return null;
   }
   return args;

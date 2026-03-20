@@ -48,16 +48,11 @@ async function generatePlan(
   const availableToolNames = Object.keys(config.tools).join(", ");
   const planningPrompt = PLANNING_INSTRUCTIONS.replace("{tools}", availableToolNames);
 
-  // Default to read-only tools for planning
-  const defaultPlanningTools = Object.keys(config.tools).filter((name) => {
-    const lower = name.toLowerCase();
-    return ["read", "grep", "find", "ls", "bash"].some((ro) => lower.includes(ro));
-  });
+  // Use caller-specified planning tools, or fall back to all tools.
+  // Callers that want read-only planning should pass planningTools explicitly.
   const toolNames = planningTools.length > 0
     ? planningTools
-    : defaultPlanningTools.length > 0
-      ? defaultPlanningTools
-      : Object.keys(config.tools);
+    : Object.keys(config.tools);
 
   const phase0 = {
     description: `Understand the task and create an execution plan: ${task}`,
@@ -68,7 +63,7 @@ async function generatePlan(
     model: config.model,
     cachedPrefix: planningPrompt,
     phase: phase0,
-    phaseIndex: -1,
+    phaseIndex: 0, // Phase 0 (planning) — indexed at 0 in metrics
     totalPhases: 1,
     state: { ...initialState, task },
     config,
@@ -165,6 +160,16 @@ export function createExecutor(options: ExecutorOptions): Executor {
             };
           }
         }
+      }
+
+      // Empty plan — nothing to execute
+      if (plan.length === 0) {
+        return {
+          status: "completed",
+          state,
+          metrics: aggregateMetrics(allPhaseMetrics),
+          phaseSummaries,
+        };
       }
 
       // Build cached prefix (stable across all execution phases)

@@ -119,6 +119,14 @@ describe("extractDoneCall", () => {
   test("returns null for text-only response", () => {
     expect(extractDoneCall(mockTextResponse("hello"))).toBeNull();
   });
+
+  test("returns null for null state (typeof null === 'object')", () => {
+    const response = mockToolCallResponse({
+      name: "done",
+      args: { state: null, summary: "oops" },
+    });
+    expect(extractDoneCall(response)).toBeNull();
+  });
 });
 
 describe("hasToolCallsWithDone", () => {

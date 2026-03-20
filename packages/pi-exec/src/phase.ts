@@ -149,17 +149,24 @@ export async function runPhase(opts: PhaseRunnerOptions): Promise<PhaseResult> {
       return finalize("phase_budget", opts.state, "Cost limit reached", metrics, opts.state);
     }
 
-    // Budget warning — appended to system prompt for this call only
-    const budgetNote = metrics.getCumulativeTokens() > phaseBudget * 0.8
-      ? "\n\nApproaching phase budget. Wrap up and call done()."
-      : "";
+    // Budget warning — injected as a user message to avoid breaking prompt cache.
+    // The cached prefix (system prompt) must stay stable across all calls.
+    const overBudget = metrics.getCumulativeTokens() > phaseBudget * 0.8;
+    if (overBudget) {
+      emit(onPhase, { type: "budget_warning", phaseIndex, phase, round });
+      messages.push({
+        role: "user",
+        content: "⚠️ Approaching phase budget. Wrap up and call done() with your current state.",
+        timestamp: Date.now(),
+      });
+    }
 
     emit(onPhase, { type: "round_start", phaseIndex, phase, round });
 
-    // Make LLM call
+    // Make LLM call — system prompt is always the stable cachedPrefix (for caching)
     const response = await llm.call(
       model,
-      { systemPrompt: cachedPrefix + budgetNote, messages, tools: allToolDefs },
+      { systemPrompt: cachedPrefix, messages, tools: allToolDefs },
       { sessionId, signal: config.signal },
       onPhase
         ? (event) => emit(onPhase, { type: "stream_event", phaseIndex, phase, streamEvent: event })
@@ -171,10 +178,14 @@ export async function runPhase(opts: PhaseRunnerOptions): Promise<PhaseResult> {
     // Check for done() call
     const doneCall = extractDoneCall(response);
     if (doneCall) {
-      // Handle co-occurring tool calls (execute but discard results)
-      if (hasToolCallsWithDone(response)) {
-        const otherCalls = extractToolCalls(response).filter((tc) => tc.name !== "done");
-        await runToolCalls(otherCalls, phaseTools, config.signal);
+      const allCalls = extractToolCalls(response);
+      const otherCalls = allCalls.filter((tc) => tc.name !== "done");
+      const hasConcurrentTools = otherCalls.length > 0;
+
+      // Execute co-occurring tool calls (results used only for message ordering)
+      let otherResults: Message[] = [];
+      if (hasConcurrentTools) {
+        otherResults = await runToolCalls(otherCalls, phaseTools, config.signal);
         emit(onPhase, {
           type: "force_done",
           phaseIndex,
@@ -206,8 +217,13 @@ export async function runPhase(opts: PhaseRunnerOptions): Promise<PhaseResult> {
             });
           }
 
-          // Feed validation error back to LLM as a tool result
-          const doneToolCall = extractToolCalls(response).find((tc) => tc.name === "done")!;
+          // Push tool results for ALL tool calls in this response to maintain
+          // valid message ordering. OpenAI requires a toolResult for every
+          // toolCall in an assistant message.
+          if (hasConcurrentTools) {
+            messages.push(...otherResults);
+          }
+          const doneToolCall = allCalls.find((tc) => tc.name === "done")!;
           messages.push({
             role: "toolResult",
             toolCallId: doneToolCall.id,
@@ -225,7 +241,7 @@ export async function runPhase(opts: PhaseRunnerOptions): Promise<PhaseResult> {
       });
     }
 
-    // No done() — execute tool calls
+    // No valid done() — execute tool calls (including malformed done() calls)
     const toolCalls = extractToolCalls(response);
     if (toolCalls.length === 0 && response.stopReason === "stop") {
       // LLM produced text only. Nudge it to call done().
@@ -292,6 +308,14 @@ async function runToolCalls(
 ): Promise<Message[]> {
   return Promise.all(
     toolCalls.map(async (tc) => {
+      // Handle malformed done() calls (extractDoneCall returned null but tool call exists)
+      if (tc.name === "done") {
+        return createErrorResult(tc,
+          'Invalid done() call. The "state" argument must be a non-null object and "summary" must be a string. ' +
+          "Call done() again with valid arguments.",
+        );
+      }
+
       const tool = phaseTools.find((t) => t.name === tc.name);
       if (!tool) {
         return createErrorResult(tc, `Tool "${tc.name}" is not available in this phase.`);

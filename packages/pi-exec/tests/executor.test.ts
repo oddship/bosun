@@ -295,6 +295,25 @@ describe("createExecutor", () => {
     expect(call1.systemPrompt).toBe(call2.systemPrompt);
   });
 
+  test("empty plan returns completed immediately", async () => {
+    const llm = new MockLLM();
+
+    const result = await createExecutor({
+      model: fakeModel,
+      systemPrompt: "Test",
+      tools: {},
+      llmCaller: createMockCaller(llm),
+    }).run({
+      plan: [],
+      initialState: { preserved: true },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.state.preserved).toBe(true);
+    expect(llm.callCount).toBe(0);
+    expect(result.metrics.phases).toHaveLength(0);
+  });
+
   test("state carries between phases", async () => {
     const llm = new MockLLM();
 

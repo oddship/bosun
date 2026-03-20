@@ -8,7 +8,6 @@ import type {
   AssistantMessageEvent,
 } from "@mariozechner/pi-ai";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
-import type { TSchema } from "@sinclair/typebox";
 
 // ---------------------------------------------------------------------------
 // Plan & Phase
