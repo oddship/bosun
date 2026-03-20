@@ -176,8 +176,6 @@ export interface ExecutorConfig {
   onPhase?: OnPhaseCallback;
   /** AbortSignal for cancellation. */
   signal?: AbortSignal;
-  /** Override LLM caller (for testing). Internal use only. */
-  _llmCaller?: unknown;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { createExecutor } from "../src/executor.js";
 import type { LLMCaller } from "../src/phase.js";
-import type { ExecutorConfig, PhaseEvent } from "../src/types.js";
+import type { ExecutorOptions } from "../src/executor.js";
+import type { PhaseEvent } from "../src/types.js";
 import {
   MockLLM,
   mockDoneResponse,
@@ -54,8 +55,8 @@ describe("createExecutor", () => {
       systemPrompt: "You are X.",
       tools: { read: readTool, edit: editTool },
       onPhase: (e) => events.push(e),
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       plan: [
         { description: "Find the bug", tools: ["read"] },
         { description: "Fix the bug", tools: ["edit"] },
@@ -81,8 +82,8 @@ describe("createExecutor", () => {
       model: fakeModel,
       systemPrompt: "Test",
       tools: { read: createMockTool("read") },
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       plan: [
         { description: "Bad phase", tools: ["read", "nonexistent_tool"] },
       ],
@@ -107,8 +108,8 @@ describe("createExecutor", () => {
       systemPrompt: "Test",
       tools: { read: readTool },
       maxCostUsd: 0.002, // Very low — will be exceeded after phase 1
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       plan: [
         { description: "Phase 1", tools: ["read"] },
         { description: "Phase 2", tools: ["read"] },
@@ -143,8 +144,8 @@ describe("createExecutor", () => {
       systemPrompt: "Test",
       tools: { read: readTool },
       maxPhaseRounds: 1, // Only 1 round before force-done
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       plan: [
         { description: "Phase 1", tools: ["read"] },
         { description: "Phase 2", tools: [] },
@@ -174,8 +175,8 @@ describe("createExecutor", () => {
           error: { issues: [{ path: ["x"], message: "Required" }] },
         }),
       },
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       plan: [
         { description: "Phase 1", tools: [] },
         { description: "Phase 2 (never reached)", tools: [] },
@@ -200,8 +201,8 @@ describe("createExecutor", () => {
       model: fakeModel,
       systemPrompt: "Test",
       tools: {},
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       plan: [{ description: "Do it", tools: [] }],
     });
 
@@ -254,8 +255,8 @@ describe("createExecutor", () => {
       model: fakeModel,
       systemPrompt: "You are X.",
       tools: { read: readTool },
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       task: "Summarize the codebase",
     });
 
@@ -278,8 +279,8 @@ describe("createExecutor", () => {
       model: fakeModel,
       systemPrompt: "You are X.",
       tools: {},
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       plan: [
         { description: "First step", tools: [] },
         { description: "Second step", tools: [] },
@@ -306,8 +307,8 @@ describe("createExecutor", () => {
       model: fakeModel,
       systemPrompt: "Test",
       tools: {},
-      _llmCaller: createMockCaller(llm),
-    } as ExecutorConfig).run({
+      llmCaller: createMockCaller(llm),
+    }).run({
       plan: [
         { description: "Phase 1", tools: [] },
         { description: "Phase 2", tools: [] },

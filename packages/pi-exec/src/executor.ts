@@ -2,24 +2,15 @@
  * pi-exec executor — the top-level plan loop.
  *
  * Iterates through phases, passing state between them, tracking metrics,
- * and handling Phase 0 plan generation.
+ * and handling Phase 0 plan generation when no plan is provided.
  */
 
 import { randomUUID } from "node:crypto";
-import type { Model, Tool } from "@mariozechner/pi-ai";
-import type {
-  ExecutorConfig,
-  Plan,
-  RunOptions,
-  RunResult,
-  State,
-  PhaseMetrics,
-} from "./types.js";
+import type { ExecutorConfig, Plan, RunOptions, RunResult, State, PhaseMetrics } from "./types.js";
 import { isRunWithPlan } from "./types.js";
 import { buildCachedPrefix, validatePlanFromState } from "./protocol.js";
 import { runPhase, type LLMCaller } from "./phase.js";
 import { aggregateMetrics } from "./metrics.js";
-import { doneTool } from "./tools.js";
 
 // ---------------------------------------------------------------------------
 // Default system prompt
@@ -41,7 +32,7 @@ Explore the codebase as needed using the available tools. Then call done() with:
 - state.context_gathered: any context from your exploration that subsequent phases will need
 - summary: a description of your plan
 
-Available tool names you can assign to phases: ${"{tools}"}
+Available tool names you can assign to phases: {tools}
 
 Make phases focused and well-scoped. Each phase should have a clear deliverable.
 Prefer fewer phases with broader scope over many tiny phases.`;
@@ -52,20 +43,21 @@ async function generatePlan(
   planningTools: string[],
   initialState: State,
   sessionId: string,
+  llmCaller?: LLMCaller,
 ): Promise<{ plan: Plan; state: State; metrics: PhaseMetrics }> {
   const availableToolNames = Object.keys(config.tools).join(", ");
   const planningPrompt = PLANNING_INSTRUCTIONS.replace("{tools}", availableToolNames);
 
-  // Phase 0 uses planning tools (default: read-only)
-  const phase0Tools = planningTools.length > 0
+  // Default to read-only tools for planning
+  const defaultPlanningTools = Object.keys(config.tools).filter((name) => {
+    const lower = name.toLowerCase();
+    return ["read", "grep", "find", "ls", "bash"].some((ro) => lower.includes(ro));
+  });
+  const toolNames = planningTools.length > 0
     ? planningTools
-    : Object.keys(config.tools).filter((name) => {
-        const lower = name.toLowerCase();
-        return ["read", "grep", "find", "ls", "bash"].some((ro) => lower.includes(ro));
-      });
-
-  // If no read-only tools found, use all tools
-  const toolNames = phase0Tools.length > 0 ? phase0Tools : Object.keys(config.tools);
+    : defaultPlanningTools.length > 0
+      ? defaultPlanningTools
+      : Object.keys(config.tools);
 
   const phase0 = {
     description: `Understand the task and create an execution plan: ${task}`,
@@ -76,13 +68,13 @@ async function generatePlan(
     model: config.model,
     cachedPrefix: planningPrompt,
     phase: phase0,
-    phaseIndex: -1, // Phase 0 is special
+    phaseIndex: -1,
     totalPhases: 1,
     state: { ...initialState, task },
     config,
     sessionId,
     priorCost: 0,
-    llmCaller: config._llmCaller as LLMCaller | undefined,
+    llmCaller,
   });
 
   if (result.status === "error") {
@@ -91,38 +83,48 @@ async function generatePlan(
 
   const plan = validatePlanFromState(result.state);
 
-  // Extract context_gathered for subsequent phases, remove plan from state
+  // Carry context_gathered forward, drop the plan from state
   const { plan: _plan, ...carryState } = result.state;
 
-  return {
-    plan,
-    state: carryState,
-    metrics: result.metrics,
-  };
+  return { plan, state: carryState, metrics: result.metrics };
 }
 
 // ---------------------------------------------------------------------------
 // Executor
 // ---------------------------------------------------------------------------
 
+export interface ExecutorOptions extends ExecutorConfig {
+  /** Override LLM caller (for testing). */
+  llmCaller?: LLMCaller;
+}
+
 export interface Executor {
   run(options: RunOptions): Promise<RunResult>;
 }
 
 /**
- * Create an executor instance with the given configuration.
+ * Create an executor instance.
  *
- * Usage:
+ * @example
  * ```typescript
- * const result = await createExecutor({ model, tools, ... }).run({ plan, initialState });
+ * const result = await createExecutor({
+ *   model: getModel("openai-codex", "gpt-5.4"),
+ *   tools: { read: createReadTool(cwd), edit: createEditTool(cwd) },
+ * }).run({
+ *   plan: [
+ *     { description: "Read code", tools: ["read"] },
+ *     { description: "Apply fix", tools: ["read", "edit"] },
+ *   ],
+ * });
  * ```
  */
-export function createExecutor(config: ExecutorConfig): Executor {
+export function createExecutor(options: ExecutorOptions): Executor {
+  const { llmCaller, ...config } = options;
   const model = config.model;
   const systemPrompt = config.systemPrompt || DEFAULT_SYSTEM_PROMPT;
 
   return {
-    async run(options: RunOptions): Promise<RunResult> {
+    async run(runOptions: RunOptions): Promise<RunResult> {
       const sessionId = `pi-exec-${randomUUID()}`;
       const allPhaseMetrics: PhaseMetrics[] = [];
       const phaseSummaries: string[] = [];
@@ -131,17 +133,17 @@ export function createExecutor(config: ExecutorConfig): Executor {
       let plan: Plan;
       let state: State;
 
-      // Phase 0 or caller-provided plan
-      if (isRunWithPlan(options)) {
-        plan = options.plan;
-        state = options.initialState ?? {};
+      if (isRunWithPlan(runOptions)) {
+        plan = runOptions.plan;
+        state = runOptions.initialState ?? {};
       } else {
         const phase0 = await generatePlan(
           config,
-          options.task,
-          options.planningTools ?? [],
-          options.initialState ?? {},
+          runOptions.task,
+          runOptions.planningTools ?? [],
+          runOptions.initialState ?? {},
           sessionId,
+          llmCaller,
         );
         plan = phase0.plan;
         state = phase0.state;
@@ -150,7 +152,7 @@ export function createExecutor(config: ExecutorConfig): Executor {
         phaseSummaries.push(`Phase 0 (planning): Generated ${plan.length}-phase plan`);
       }
 
-      // Validate all phase tools exist before starting
+      // Validate all phase tool references before starting execution
       for (let i = 0; i < plan.length; i++) {
         for (const toolName of plan[i].tools) {
           if (!config.tools[toolName]) {
@@ -168,7 +170,6 @@ export function createExecutor(config: ExecutorConfig): Executor {
       // Build cached prefix (stable across all execution phases)
       const cachedPrefix = buildCachedPrefix(systemPrompt, plan);
 
-      // Execute phases
       for (let i = 0; i < plan.length; i++) {
         const phase = plan[i];
 
@@ -184,7 +185,6 @@ export function createExecutor(config: ExecutorConfig): Executor {
           };
         }
 
-        // Check abort
         if (config.signal?.aborted) {
           return {
             status: "error",
@@ -205,7 +205,7 @@ export function createExecutor(config: ExecutorConfig): Executor {
           config,
           sessionId,
           priorCost: cumulativeCost,
-          llmCaller: config._llmCaller as LLMCaller | undefined,
+          llmCaller,
         });
 
         allPhaseMetrics.push(result.metrics);
@@ -229,10 +229,8 @@ export function createExecutor(config: ExecutorConfig): Executor {
           }
         }
 
-        // Update state
         state = result.state;
 
-        // Check phase result status
         if (result.status === "error") {
           return {
             status: "error",
@@ -243,23 +241,17 @@ export function createExecutor(config: ExecutorConfig): Executor {
           };
         }
 
-        if (result.status === "phase_budget") {
-          // Phase budget exceeded but we got some state.
-          // If this is the last phase, return as completed-ish.
-          // Otherwise, continue with partial state.
-          if (i === plan.length - 1) {
-            return {
-              status: "phase_budget",
-              state,
-              output: result.result,
-              metrics: aggregateMetrics(allPhaseMetrics),
-              phaseSummaries,
-            };
-          }
-          // Continue to next phase with whatever state we got
+        if (result.status === "phase_budget" && i === plan.length - 1) {
+          return {
+            status: "phase_budget",
+            state,
+            output: result.result,
+            metrics: aggregateMetrics(allPhaseMetrics),
+            phaseSummaries,
+          };
         }
 
-        // Last phase — extract output
+        // Last phase — return completed
         if (i === plan.length - 1) {
           return {
             status: "completed",
@@ -271,7 +263,7 @@ export function createExecutor(config: ExecutorConfig): Executor {
         }
       }
 
-      // Should not reach here, but just in case
+      // Should not reach here
       return {
         status: "completed",
         state,

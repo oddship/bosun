@@ -32,27 +32,22 @@
  */
 
 export { createExecutor } from "./executor.js";
-export type { Executor } from "./executor.js";
+export type { Executor, ExecutorOptions } from "./executor.js";
 
 export type {
-  // Plan & Phase
   Phase,
   Plan,
   State,
   StateDiff,
   ToolRegistry,
-  // Events
   PhaseEvent,
   PhaseEventType,
   OnPhaseCallback,
-  // Metrics
   PhaseMetrics,
   RunMetrics,
-  // Results
   RunStatus,
   RunResult,
   PhaseResult,
-  // Config
   ExecutorConfig,
   RunOptions,
   RunWithPlan,
@@ -62,7 +57,6 @@ export type {
 export { doneTool } from "./tools.js";
 export type { DoneCallArgs } from "./tools.js";
 
-// Re-export protocol utilities for advanced usage
 export {
   buildCachedPrefix,
   buildPhasePrompt,
@@ -74,5 +68,4 @@ export {
 
 export { aggregateMetrics, MetricsAccumulator } from "./metrics.js";
 
-// Testing utilities
 export type { LLMCaller } from "./phase.js";

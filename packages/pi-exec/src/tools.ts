@@ -1,8 +1,12 @@
 /**
  * pi-exec tools — the done() tool definition and tool execution bridge.
+ *
+ * Tool execution follows the same pattern as pi-agent-core's agent-loop:
+ * validate arguments → execute → handle errors → produce ToolResultMessage.
  */
 
 import { Type } from "@sinclair/typebox";
+import { validateToolArguments } from "@mariozechner/pi-ai";
 import type {
   Tool,
   ToolCall,
@@ -49,14 +53,30 @@ export interface DoneCallArgs {
 
 /**
  * Execute an AgentTool and produce a ToolResultMessage compatible with pi-ai.
+ *
+ * Follows the same validate → execute → handle pattern as pi-agent-core:
+ * 1. Validate arguments against tool schema (via pi-ai's validateToolArguments)
+ * 2. Execute the tool with validated args
+ * 3. On error, produce an error result (never throw)
  */
 export async function executeAgentTool(
   tool: AgentTool<any, any>,
   toolCall: ToolCall,
   signal?: AbortSignal,
 ): Promise<ToolResultMessage> {
+  // Validate arguments against schema (same as pi-agent-core's prepareToolCall)
+  let validatedArgs: unknown;
   try {
-    const result = await tool.execute(toolCall.id, toolCall.arguments, signal);
+    validatedArgs = validateToolArguments(tool, toolCall);
+  } catch (err) {
+    return createErrorResult(
+      toolCall,
+      err instanceof Error ? err.message : `Argument validation failed: ${String(err)}`,
+    );
+  }
+
+  try {
+    const result = await tool.execute(toolCall.id, validatedArgs, signal);
     return {
       role: "toolResult",
       toolCallId: toolCall.id,
@@ -66,21 +86,18 @@ export async function executeAgentTool(
       timestamp: Date.now(),
     };
   } catch (err) {
-    return {
-      role: "toolResult",
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      content: [{ type: "text", text: String(err) }],
-      isError: true,
-      timestamp: Date.now(),
-    };
+    return createErrorResult(
+      toolCall,
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 
 /**
- * Create an error ToolResultMessage for an unknown tool call.
+ * Create an error ToolResultMessage. Used for unknown tools, validation
+ * failures, and execution errors. Matches pi-agent-core's pattern.
  */
-export function unknownToolResult(toolCall: ToolCall, message: string): ToolResultMessage {
+export function createErrorResult(toolCall: ToolCall, message: string): ToolResultMessage {
   return {
     role: "toolResult",
     toolCallId: toolCall.id,
