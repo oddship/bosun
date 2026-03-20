@@ -8,7 +8,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { AgentsConfig } from "./config.js";
@@ -37,6 +37,24 @@ function getTmuxSocket(config: AgentsConfig, cwd: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Get the tmux session name for the current process.
+ * Uses `tmux display-message` which resolves the session from $TMUX_PANE or
+ * the attached client. This is critical when multiple sessions share a socket
+ * (e.g. "bosun" and "bosun-daemon") — without targeting the correct session,
+ * new-window may create windows in the wrong session.
+ */
+function getTmuxSession(socket: string | null): string | null {
+  try {
+    const args: string[] = [];
+    if (socket) args.push("-S", socket);
+    args.push("display-message", "-p", "#{session_name}");
+    return execFileSync("tmux", args, { encoding: "utf-8" }).trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -108,7 +126,12 @@ export function registerSpawnAgent(
 
       // Check for duplicate tmux window names
       const checkSocket = getTmuxSocket(config, ctx.cwd);
-      const listArgs = checkSocket ? ["-S", checkSocket, "list-windows", "-F", "#{window_name}"] : ["list-windows", "-F", "#{window_name}"];
+      const sessionName = getTmuxSession(checkSocket);
+      const listArgs: string[] = [];
+      if (checkSocket) listArgs.push("-S", checkSocket);
+      listArgs.push("list-windows");
+      if (sessionName) listArgs.push("-t", sessionName);
+      listArgs.push("-F", "#{window_name}");
       try {
         const { execFileSync } = await import("node:child_process");
         const existing = execFileSync("tmux", listArgs, { encoding: "utf-8" }).trim().split("\n");
@@ -184,8 +207,8 @@ export function registerSpawnAgent(
       // Wrap command so failures keep the window open for debugging
       const command = `${rawCommand}; EXIT=$?; if [ $EXIT -ne 0 ]; then echo "=== AGENT EXITED ($EXIT) ==="; sleep 30; fi`;
 
-      // Build tmux arguments
-      const socket = getTmuxSocket(config, ctx.cwd);
+      // Build tmux arguments (reuse socket from duplicate check above)
+      const socket = checkSocket;
       const tmuxBaseArgs: string[] = [];
       if (socket) {
         tmuxBaseArgs.push("-S", socket);
@@ -199,6 +222,10 @@ export function registerSpawnAgent(
         ...tmuxBaseArgs,
         "new-window",
         "-d", // Don't switch to the new window
+        // Target the correct session — critical when multiple sessions share
+        // a socket (e.g. "bosun" + "bosun-daemon"). Without this, tmux may
+        // create the window in whichever session was most recently active.
+        ...(sessionName ? ["-t", `${sessionName}:`] : []),
         "-n",
         windowName,
         "-e",
