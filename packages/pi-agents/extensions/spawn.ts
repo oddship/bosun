@@ -48,9 +48,15 @@ function getTmuxSocket(config: AgentsConfig, cwd: string): string | null {
  */
 function getTmuxSession(socket: string | null): string | null {
   try {
+    const pane = process.env.TMUX_PANE;
     const args: string[] = [];
     if (socket) args.push("-S", socket);
-    args.push("display-message", "-p", "#{session_name}");
+    // Use -t $TMUX_PANE to anchor the lookup to the spawner's pane.
+    // Without this, display-message resolves via "current client" which is
+    // ambiguous from a child process and may pick the wrong session.
+    args.push("display-message");
+    if (pane) args.push("-t", pane);
+    args.push("-p", "#{session_name}");
     return execFileSync("tmux", args, { encoding: "utf-8" }).trim() || null;
   } catch {
     return null;
