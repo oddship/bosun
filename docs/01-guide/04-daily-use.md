@@ -143,6 +143,19 @@ allow_paths = ["/tmp"]            # additional allowed paths
 heartbeat = 30                    # seconds between checks
 ```
 
+#### Web search
+
+Agents use `web_search` and `fetch_content` tools via the [pi-web-access](https://www.npmjs.com/package/pi-web-access) extension. At least one provider key is required — without one, agents can't search the web.
+
+```toml
+[web_access]
+gemini_api_key = "AIza..."              # Free tier at aistudio.google.com/apikey
+# perplexity_api_key = "pplx-..."       # ~$5/mo at perplexity.ai/settings/api
+# provider = "auto"                     # auto | perplexity | gemini
+```
+
+After adding or changing a key, run `just init` to regenerate `~/.pi/web-search.json`, then **restart pi** (the extension caches the config in memory on startup).
+
 ### Updating
 
 ```bash

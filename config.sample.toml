@@ -151,6 +151,13 @@ include_by_default = false
 # =============================================================================
 
 [web_access]
+# At least one provider key is required for web_search and fetch_content tools.
+# Without a key, agents cannot search the web. After adding a key, run `just init`
+# to regenerate ~/.pi/web-search.json, then restart pi to pick up the change.
+#
+# Gemini: Free tier available at https://aistudio.google.com/apikey
+# Perplexity: ~$5/mo at https://perplexity.ai/settings/api (best search quality)
+#
 # perplexity_api_key = "pplx-..."
 # gemini_api_key = "AIza..."
 # provider = "auto"                      # auto | perplexity | gemini
