@@ -27,6 +27,11 @@ Bosun is a monorepo of independent Pi packages that compose into a multi-agent c
 │  │split,    │ │TUI multi-│ │tool-level│           │
 │  │send_keys │ │select    │ │access    │           │
 │  └──────────┘ └──────────┘ └──────────┘           │
+│  ┌──────────┐ ┌──────────────┐ ┌──────────────┐   │
+│  │pi-memory │ │pi-bash-      │ │pi-auto-      │   │
+│  │search,   │ │readonly      │ │resume        │   │
+│  │get       │ │bwrap ro mode │ │after compact │   │
+│  └──────────┘ └──────────────┘ └──────────────┘   │
 ├─────────────────────────────────────────────────────┤
 │  Background                                         │
 │  ┌──────────┐ ┌──────────────────┐                 │
@@ -36,11 +41,11 @@ Bosun is a monorepo of independent Pi packages that compose into a multi-agent c
 │  └──────────┘ └──────────────────┘                 │
 ├─────────────────────────────────────────────────────┤
 │  Domain                                             │
-│  ┌──────────┐ ┌──────────────┐                     │
-│  │  pi-q    │ │pi-chronicles │                     │
-│  │tasks,    │ │analyze,      │                     │
-│  │projects  │ │scribe        │                     │
-│  └──────────┘ └──────────────┘                     │
+│  ┌──────────┐ ┌──────────────┐ ┌──────────────┐   │
+│  │  pi-q    │ │pi-chronicles │ │pi-meta-skills│   │
+│  │tasks,    │ │analyze,      │ │agent, skill, │   │
+│  │projects  │ │scribe        │ │tool creators │   │
+│  └──────────┘ └──────────────┘ └──────────────┘   │
 └─────────────────────────────────────────────────────┘
 ```
 

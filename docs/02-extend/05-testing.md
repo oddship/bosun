@@ -12,15 +12,15 @@ Bosun has three levels of testing: unit tests, e2e scripts, and live Pi tests.
 Each package has its own `tests/` directory using `bun:test`.
 
 ```bash
-# Run all tests
-bun test
+# Run all tests (scoped to packages/ to avoid workspace clutter)
+just test
 
 # Run tests for a specific package
-bun test packages/pi-agents/tests/
-bun test packages/pi-memory/tests/
+just test packages/pi-agents
+just test packages/pi-memory
 
 # Run a specific test file
-bun test packages/pi-agents/tests/template.test.ts
+just test packages/pi-agents/tests/template.test.ts
 ```
 
 ### What's tested
@@ -149,10 +149,10 @@ just init
 
 | Change | Run |
 |--------|-----|
-| Package code (src/) | `bun test` |
-| Agent definitions, slots, template engine | `bun test` + `just e2e-agent-slots` |
-| Config/init pipeline | `bun test` + `just e2e-memory-init` |
-| Memory tools | `bun test` + `just e2e-memory-cli` |
+| Package code (src/) | `just test` |
+| Agent definitions, slots, template engine | `just test` + `just e2e-agent-slots` |
+| Config/init pipeline | `just test` + `just e2e-memory-init` |
+| Memory tools | `just test` + `just e2e-memory-cli` |
 | Tmux/spawn behavior | `just e2e-runtime-identity` |
 | Before merge | All of the above |
 
