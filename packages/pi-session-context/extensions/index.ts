@@ -19,7 +19,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "session_context",
     label: "Session Context",
-    description: "Get current session info (ID, file path, name, cwd) for context management.",
+    description: "Return the current session's ID, persisted file path, display name, and working directory.",
+    promptSnippet: "Get current session info (ID, file path, name, cwd) for context management.",
     parameters: Type.Object({}),
 
     async execute(_id, _params, _signal, _onUpdate, ctx) {
@@ -53,7 +54,8 @@ export default function (pi: ExtensionAPI) {
     name: "handoff",
     label: "Create Handoff",
     description:
-      "Create a handoff document for the current session. The daemon will analyze the session and fill in content. Use for context transfer between sessions.",
+      "Generate a handoff markdown template from the current session. Extracts metadata (title, model, modified files) and writes a structured document that the daemon's fill-handoff handler will complete with session analysis. Use /pickup to resume.",
+    promptSnippet: "Create a handoff document for the current session. The daemon will analyze the session and fill in content. Use for context transfer between sessions.",
     parameters: Type.Object({
       focus: Type.Optional(
         Type.String({ description: "Focus area or reason for handoff" }),

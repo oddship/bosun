@@ -48,7 +48,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "question",
     label: "Question",
-    description: "Ask the user a question and let them pick from options. Supports headers for context and multiple selection for bulk operations.",
+    description: "Present an interactive question to the user with selectable options. Supports optional header text, option descriptions, multiple selection (Space to toggle, Enter to confirm), and free-form text input as a fallback.",
+    promptSnippet: "Ask the user a question and let them pick from options. Supports headers for context and multiple selection for bulk operations.",
     parameters: QuestionParams,
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {

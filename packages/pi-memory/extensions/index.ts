@@ -43,7 +43,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "memory",
     label: "Memory",
-    description: "Search and retrieve curated markdown memory like sessions, plans, docs, skills, and agent definitions. Prefer over grep when recalling prior context rather than exact code symbols. Use action=search|get|multi_get|status. Required params per action: search→query, get→id, multi_get→pattern.",
+    description: "Search and retrieve indexed markdown documents (sessions, plans, handoffs, docs, skills, agent definitions). Use action=search with a query for fuzzy/keyword lookup, action=get with an id for a specific document, action=multi_get with a glob pattern for batch retrieval, or action=status to check index health.",
+    promptSnippet: "Search and retrieve curated markdown memory like sessions, plans, docs, skills, and agent definitions. Prefer over grep when recalling prior context rather than exact code symbols.",
     parameters: MemoryParams,
     async execute(_id, params, _signal, _onUpdate, ctx) {
       const cwd = ctx.sessionManager.getCwd();

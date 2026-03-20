@@ -40,7 +40,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "split_pane",
     label: "Split Pane",
-    description: "Open a command in a new tmux split pane.",
+    description: "Open a command in a new tmux split pane. Wraps the command in an interactive bash shell so aliases and .bashrc apply.",
+    promptSnippet: "Open a command in a new tmux split pane.",
     parameters: Type.Object({
       command: Type.String({ description: "Shell command to run in the new pane" }),
       vertical: Type.Optional(Type.Boolean({ description: "Split vertically (default: horizontal)", default: false })),
@@ -71,7 +72,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "send_keys",
     label: "Send Keys",
-    description: "Send text or keystrokes to a tmux window/pane. Use to communicate with other agents or interactive programs.",
+    description: "Send literal text or tmux key names (C-c, Escape, Enter, etc.) to a tmux window or pane. Sends Enter after text by default. Key sequences are space-separated tmux key names; everything else is sent as literal text.",
+    promptSnippet: "Send text or keystrokes to a tmux window/pane. Use to communicate with other agents or interactive programs.",
     parameters: Type.Object({
       target: Type.String({ description: "Window name or index (e.g., 'lite' or '2')" }),
       text: Type.String({ description: "Text to send (press Enter after by default)" }),
@@ -120,7 +122,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "capture_pane",
     label: "Capture Pane",
-    description: "Capture screen content from a tmux window. ONLY for non-mesh agents (e.g., Q) or debugging stuck agents. If the agent has mesh tools, wait for their mesh_send report instead — NEVER poll with capture_pane.",
+    description: "Capture the visible screen content of a tmux window. Returns the last N lines (default 50) of the window's terminal output.",
+    promptSnippet: "Capture screen content from a tmux window. ONLY for non-mesh agents (e.g., Q) or debugging stuck agents. If the agent has mesh tools, wait for their mesh_send report instead — NEVER poll with capture_pane.",
     parameters: Type.Object({
       target: Type.String({ description: "Window name or index" }),
       lines: Type.Optional(Type.Number({ description: "Number of lines to capture (default: 50)", default: 50 })),
@@ -146,7 +149,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "list_windows",
     label: "List Windows",
-    description: "List all tmux windows in the current session.",
+    description: "List all tmux windows with their index, name, and active status.",
+    promptSnippet: "List all tmux windows in the current session.",
     parameters: Type.Object({}),
     async execute() {
       if (!isInTmux()) return notInTmux();
@@ -173,7 +177,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "kill_window",
     label: "Kill Window",
-    description: "Kill a tmux window by name or index. Use to clean up finished agent windows or stuck processes.",
+    description: "Destroy a tmux window by name or index. The window and all processes in it are terminated immediately.",
+    promptSnippet: "Kill a tmux window by name or index. Use to clean up finished agent windows or stuck processes.",
     parameters: Type.Object({
       target: Type.String({ description: "Window name or index to kill" }),
     }),

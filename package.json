@@ -16,7 +16,7 @@
     "postinstall": "cd node_modules/@tobilu/qmd && [ -d dist ] || bun run build"
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "0.58.4",
+    "@mariozechner/pi-coding-agent": "0.61.0",
     "@tobilu/qmd": "github:tobi/qmd#v2.0.1",
     "pi-agents": "workspace:*",
     "pi-auto-resume": "workspace:*",
