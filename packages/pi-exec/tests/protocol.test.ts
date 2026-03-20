@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach } from "bun:test";
 import {
   buildCachedPrefix,
   buildPhasePrompt,
+  buildGatePrompt,
   buildForceDonePrompt,
   extractToolCalls,
   extractDoneCall,
@@ -57,6 +58,22 @@ describe("buildPhasePrompt", () => {
 
     expect(prompt).toContain("{}");
     expect(prompt).toContain("Phase 1 of 1: Start");
+  });
+});
+
+describe("buildGatePrompt", () => {
+  test("includes verification instructions, gate description, phase description, and state", () => {
+    const prompt = buildGatePrompt(
+      { fixed: true, file: "auth.ts" },
+      "Tests pass and the null check exists",
+      "Fix the null check bug in auth.ts",
+    );
+    expect(prompt).toContain("Verification Gate");
+    expect(prompt).toContain("Tests pass and the null check exists");
+    expect(prompt).toContain("Fix the null check bug in auth.ts");
+    expect(prompt).toContain('"fixed": true');
+    expect(prompt).toContain("passed");
+    expect(prompt).toContain("issues");
   });
 });
 

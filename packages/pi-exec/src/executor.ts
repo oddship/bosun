@@ -6,9 +6,9 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { ExecutorConfig, Plan, RunOptions, RunResult, State, PhaseMetrics } from "./types.js";
+import type { ExecutorConfig, Plan, RunOptions, RunResult, State, PhaseMetrics, Phase } from "./types.js";
 import { isRunWithPlan } from "./types.js";
-import { buildCachedPrefix, validatePlanFromState } from "./protocol.js";
+import { buildCachedPrefix, buildGatePrompt, validatePlanFromState } from "./protocol.js";
 import { runPhase, type LLMCaller } from "./phase.js";
 import { aggregateMetrics } from "./metrics.js";
 
@@ -177,6 +177,9 @@ export function createExecutor(options: ExecutorOptions): Executor {
 
       for (let i = 0; i < plan.length; i++) {
         const phase = plan[i];
+        // maxRetries is the number of times the work phase can be retried after a gate failure.
+        // Total gate attempts = maxRetries + 1 (initial + retries).
+        const maxRetries = phase.maxRetries ?? 2;
 
         // Check cost limit before starting a new phase
         const maxCost = config.maxCostUsd ?? 2.0;
@@ -200,57 +203,140 @@ export function createExecutor(options: ExecutorOptions): Executor {
           };
         }
 
-        const result = await runPhase({
-          model,
-          cachedPrefix,
-          phase,
-          phaseIndex: i,
-          totalPhases: plan.length,
-          state,
-          config,
-          sessionId,
-          priorCost: cumulativeCost,
-          llmCaller,
-        });
+        // Run work phase with gate retry loop
+        let lastResult = await runWorkPhase(
+          model, cachedPrefix, phase, i, plan.length, state,
+          config, sessionId, cumulativeCost, llmCaller,
+        );
 
-        allPhaseMetrics.push(result.metrics);
-        cumulativeCost += result.metrics.cost;
-        phaseSummaries.push(`Phase ${i + 1}: ${result.summary}`);
+        allPhaseMetrics.push(lastResult.metrics);
+        cumulativeCost += lastResult.metrics.cost;
 
-        // Emit phase_end event
-        if (config.onPhase) {
-          try {
-            config.onPhase({
-              type: "phase_end",
+        // Gate check: if phase has a gate and work succeeded, verify it.
+        // Runs the gate, and if it fails, retries the work phase up to maxRetries times.
+        if (phase.gate && lastResult.status === "completed") {
+          for (let retry = 0; retry <= maxRetries; retry++) {
+            // Cost limit check before each gate/retry iteration
+            const maxCost = config.maxCostUsd ?? 2.0;
+            if (cumulativeCost >= maxCost) {
+              return {
+                status: "max_cost",
+                state: lastResult.state,
+                metrics: aggregateMetrics(allPhaseMetrics),
+                phaseSummaries,
+                error: `Cost limit ($${maxCost.toFixed(2)}) reached during gate retry for phase ${i + 1}`,
+              };
+            }
+
+            const gateResult = await runGate(
+              model, cachedPrefix, phase, i, lastResult.state,
+              config, sessionId, cumulativeCost, llmCaller,
+            );
+
+            allPhaseMetrics.push(gateResult.metrics);
+            cumulativeCost += gateResult.metrics.cost;
+
+            if (gateResult.passed) {
+              emitSafe(config.onPhase, {
+                type: "gate_pass",
+                phaseIndex: i,
+                phase,
+                summary: gateResult.summary,
+              });
+              break;
+            }
+
+            // Gate failed
+            emitSafe(config.onPhase, {
+              type: "gate_fail",
               phaseIndex: i,
               phase,
-              summary: result.summary,
-              state: result.state,
-              stateDiff: result.stateDiff,
-              metrics: result.metrics,
+              gateIssues: gateResult.issues,
+              gateAttempt: retry + 1,
+              summary: `Gate failed (attempt ${retry + 1}/${maxRetries + 1}): ${gateResult.issues.join("; ")}`,
             });
-          } catch {
-            // Don't let callback errors break the executor
+
+            // No more retries left
+            if (retry >= maxRetries) {
+              phaseSummaries.push(
+                `Phase ${i + 1}: Gate failed after ${maxRetries} ${maxRetries === 1 ? "retry" : "retries"}: ${gateResult.issues.join("; ")}`,
+              );
+              return {
+                status: "error",
+                state: lastResult.state,
+                metrics: aggregateMetrics(allPhaseMetrics),
+                phaseSummaries,
+                error: `Phase ${i + 1} gate failed after ${maxRetries} ${maxRetries === 1 ? "retry" : "retries"}: ${gateResult.issues.join("; ")}`,
+              };
+            }
+
+            // Re-run work phase with gate failure context injected into state
+            const retryState = {
+              ...state,
+              _gate_failure: {
+                attempt: retry + 1,
+                issues: gateResult.issues,
+                instruction: `Previous attempt failed verification. Issues: ${gateResult.issues.join("; ")}. Fix these issues.`,
+              },
+            };
+
+            lastResult = await runWorkPhase(
+              model, cachedPrefix, phase, i, plan.length, retryState,
+              config, sessionId, cumulativeCost, llmCaller,
+            );
+
+            allPhaseMetrics.push(lastResult.metrics);
+            cumulativeCost += lastResult.metrics.cost;
+
+            if (lastResult.status !== "completed") {
+              // Work phase itself failed on retry — don't silently continue
+              phaseSummaries.push(
+                `Phase ${i + 1}: Work phase failed on gate retry: ${lastResult.error || lastResult.status}`,
+              );
+              return {
+                status: lastResult.status === "phase_budget" ? "phase_budget" : "error",
+                state: lastResult.state,
+                metrics: aggregateMetrics(allPhaseMetrics),
+                phaseSummaries,
+                error: lastResult.error || `Phase ${i + 1} failed during gate retry (${lastResult.status})`,
+              };
+            }
           }
         }
 
-        state = result.state;
+        phaseSummaries.push(`Phase ${i + 1}: ${lastResult.summary}`);
 
-        if (result.status === "error") {
+        // Emit phase_end event
+        emitSafe(config.onPhase, {
+          type: "phase_end",
+          phaseIndex: i,
+          phase,
+          summary: lastResult.summary,
+          state: lastResult.state,
+          stateDiff: lastResult.stateDiff,
+          metrics: lastResult.metrics,
+        });
+
+        state = lastResult.state;
+
+        // Clean up gate failure context from state before passing forward
+        delete state._gate_failure;
+
+        if (lastResult.status === "error") {
           return {
             status: "error",
             state,
             metrics: aggregateMetrics(allPhaseMetrics),
             phaseSummaries,
-            error: result.error || `Phase ${i + 1} failed`,
+            error: lastResult.error || `Phase ${i + 1} failed`,
           };
         }
 
-        if (result.status === "phase_budget" && i === plan.length - 1) {
+        if (lastResult.status === "phase_budget" && i === plan.length - 1) {
           return {
             status: "phase_budget",
             state,
-            output: result.result,
+            output: lastResult.result,
             metrics: aggregateMetrics(allPhaseMetrics),
             phaseSummaries,
           };
@@ -261,7 +347,7 @@ export function createExecutor(options: ExecutorOptions): Executor {
           return {
             status: "completed",
             state,
-            output: result.result,
+            output: lastResult.result,
             metrics: aggregateMetrics(allPhaseMetrics),
             phaseSummaries,
           };
@@ -277,4 +363,153 @@ export function createExecutor(options: ExecutorOptions): Executor {
       };
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/** Run a work phase. Thin wrapper over runPhase for readability. */
+async function runWorkPhase(
+  model: ExecutorConfig["model"],
+  cachedPrefix: string,
+  phase: Phase,
+  phaseIndex: number,
+  totalPhases: number,
+  state: State,
+  config: ExecutorConfig,
+  sessionId: string,
+  priorCost: number,
+  llmCaller?: LLMCaller,
+) {
+  return runPhase({
+    model,
+    cachedPrefix,
+    phase,
+    phaseIndex,
+    totalPhases,
+    state,
+    config,
+    sessionId,
+    priorCost,
+    llmCaller,
+  });
+}
+
+/** Gate result from a gate sub-phase. */
+interface GateResult {
+  passed: boolean;
+  issues: string[];
+  summary: string;
+  metrics: PhaseMetrics;
+}
+
+/**
+ * Tool name patterns allowed in gate verification phases.
+ * Gates get read-only tools by default — they verify, not modify.
+ * If no matching tools are found, falls back to all phase tools with a warning.
+ */
+const GATE_TOOL_PATTERNS = ["read", "grep", "find", "ls"];
+
+/**
+ * Run a gate sub-phase to verify a work phase's output.
+ *
+ * The gate verifier gets read-only tools and checks the verification criteria.
+ * Returns passed/failed with issues.
+ */
+async function runGate(
+  model: ExecutorConfig["model"],
+  cachedPrefix: string,
+  phase: Phase,
+  phaseIndex: number,
+  workState: State,
+  config: ExecutorConfig,
+  sessionId: string,
+  priorCost: number,
+  llmCaller?: LLMCaller,
+): Promise<GateResult> {
+  // Gate tools: read-only subset of the phase's tools.
+  // Falls back to all phase tools if no read-only tools match (with warning).
+  const gateToolNames = phase.tools.filter((name) => {
+    const lower = name.toLowerCase();
+    return GATE_TOOL_PATTERNS.some((pattern) => lower.includes(pattern));
+  });
+  const toolNames = gateToolNames.length > 0 ? gateToolNames : phase.tools;
+  if (gateToolNames.length === 0 && phase.tools.length > 0) {
+    emitSafe(config.onPhase, {
+      type: "gate_start",
+      phaseIndex,
+      phase,
+      summary: `Warning: no read-only tools found for gate. Using all phase tools: ${phase.tools.join(", ")}`,
+    });
+  }
+
+  const gatePhase: Phase = {
+    description: `Verify: ${phase.gate}`,
+    tools: toolNames,
+  };
+
+  emitSafe(config.onPhase, {
+    type: "gate_start",
+    phaseIndex,
+    phase,
+    summary: `Gate: ${phase.gate}`,
+  });
+
+  const result = await runPhase({
+    model,
+    cachedPrefix,
+    phase: gatePhase,
+    phaseIndex,
+    totalPhases: 1,
+    state: workState,
+    initialPrompt: buildGatePrompt(workState, phase.gate!, phase.description),
+    config: {
+      ...config,
+      // Gate gets a smaller budget — it's just verification
+      phaseBudget: Math.min(config.phaseBudget ?? 30_000, 15_000),
+      maxPhaseRounds: Math.min(config.maxPhaseRounds ?? 15, 8),
+    },
+    sessionId,
+    priorCost,
+    llmCaller,
+  });
+
+  // Extract gate verdict from done()'s result field
+  const passed = result.result?.passed === true;
+  const issues: string[] = Array.isArray(result.result?.issues)
+    ? (result.result.issues as string[])
+    : [];
+
+  // If gate phase errored or budget-exceeded, treat as failed
+  if (result.status !== "completed") {
+    return {
+      passed: false,
+      issues: [result.error || `Gate phase ${result.status}`],
+      summary: result.summary,
+      metrics: result.metrics,
+    };
+  }
+
+  return {
+    passed,
+    issues: passed ? [] : (issues.length > 0 ? issues : [result.summary]),
+    summary: result.summary,
+    metrics: result.metrics,
+  };
+}
+
+/**
+ * Emit a phase event safely. Swallows callback errors.
+ */
+function emitSafe(
+  onPhase: ExecutorConfig["onPhase"],
+  event: Partial<import("./types.js").PhaseEvent> & { type: import("./types.js").PhaseEventType; phaseIndex: number; phase: Phase },
+): void {
+  if (!onPhase) return;
+  try {
+    onPhase(event as import("./types.js").PhaseEvent);
+  } catch {
+    // Don't let callback errors break the executor
+  }
 }

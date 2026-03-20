@@ -72,6 +72,34 @@ export function buildPhasePrompt(
 }
 
 /**
+ * Build the user message for a gate sub-phase.
+ *
+ * The gate verifier checks whether the work phase accomplished its goal.
+ * It calls done() with result.passed (boolean) and result.issues (string[]).
+ */
+export function buildGatePrompt(
+  state: State,
+  gateDescription: string,
+  phaseDescription: string,
+): string {
+  return `## Verification Gate
+
+You are verifying that the previous phase accomplished its goal.
+
+**Phase that was executed:** ${phaseDescription}
+
+**What to verify:** ${gateDescription}
+
+## Current State
+${JSON.stringify(state, null, 2)}
+
+Check the verification criteria using the available tools. When done, call done() with:
+- state: the current state (pass it through unchanged)
+- summary: what you found
+- result: { "passed": true } if all criteria met, or { "passed": false, "issues": ["issue1", "issue2"] } if not`;
+}
+
+/**
  * Build the force-done user message when budget is exceeded.
  */
 export function buildForceDonePrompt(state: State): string {

@@ -37,7 +37,6 @@ import {
   buildValidationErrorMessage,
   extractToolCalls,
   extractDoneCall,
-  hasToolCallsWithDone,
   diffState,
 } from "./protocol.js";
 import { doneTool, executeAgentTool, createErrorResult } from "./tools.js";
@@ -104,6 +103,8 @@ export interface PhaseRunnerOptions {
   priorCost: number;
   /** Override LLM caller (for testing). */
   llmCaller?: LLMCaller;
+  /** Override the initial user message (used by gates). */
+  initialPrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,11 +125,11 @@ export async function runPhase(opts: PhaseRunnerOptions): Promise<PhaseResult> {
   const phaseTools = resolvePhaseTools(phase, config, phaseIndex);
   const allToolDefs: Tool[] = [...phaseTools.map((t) => t as Tool), doneTool];
 
-  // Initialize conversation with the phase prompt
+  // Initialize conversation with the phase prompt (or custom initial prompt for gates)
   const messages: Message[] = [
     {
       role: "user",
-      content: buildPhasePrompt(opts.state, phase, phaseIndex, totalPhases),
+      content: opts.initialPrompt ?? buildPhasePrompt(opts.state, phase, phaseIndex, totalPhases),
       timestamp: Date.now(),
     },
   ];

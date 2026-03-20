@@ -60,6 +60,7 @@ export type { DoneCallArgs } from "./tools.js";
 export {
   buildCachedPrefix,
   buildPhasePrompt,
+  buildGatePrompt,
   extractDoneCall,
   extractToolCalls,
   diffState,

@@ -18,6 +18,18 @@ export interface Phase {
   description: string;
   /** Tool names (keys into the tool registry) available in this phase. */
   tools: string[];
+  /**
+   * Verification criteria for this phase. When present, the executor runs a
+   * gate sub-phase after done() to verify the work. If the gate fails, the
+   * work phase is retried with the failure context injected into state.
+   *
+   * The gate description tells the verifier LLM what to check. The verifier
+   * gets read-only tools and calls done() with `result.passed` (boolean) and
+   * optionally `result.issues` (string[]).
+   */
+  gate?: string;
+  /** Max retries if gate fails. Default: 2. */
+  maxRetries?: number;
 }
 
 /** A complete execution plan — an ordered list of phases. */
@@ -27,7 +39,13 @@ export type Plan = Phase[];
 // State
 // ---------------------------------------------------------------------------
 
-/** Working state passed between phases. JSON-serializable. */
+/**
+ * Working state passed between phases. JSON-serializable.
+ *
+ * Reserved keys (managed by the executor, do not use in user state):
+ * - `_gate_failure`: Injected when a gate fails, contains retry context.
+ *   Cleaned up before state passes to the next phase.
+ */
 export type State = Record<string, unknown>;
 
 /** Diff of state changes between phases (for debugging/logging). */
@@ -60,7 +78,10 @@ export type PhaseEventType =
   | "tool_execute_end"
   | "budget_warning"
   | "force_done"
-  | "state_validation_error";
+  | "state_validation_error"
+  | "gate_start"
+  | "gate_pass"
+  | "gate_fail";
 
 export interface PhaseEvent {
   type: PhaseEventType;
@@ -74,7 +95,7 @@ export interface PhaseEvent {
   toolName?: string;
   /** Tool call ID (when type === "tool_execute_start/end"). */
   toolCallId?: string;
-  /** Phase summary from done() (when type === "phase_end"). */
+  /** Summary text (set on phase_end, gate_start, gate_pass, gate_fail). */
   summary?: string;
   /** State after this phase (when type === "phase_end"). */
   state?: State;
@@ -82,6 +103,10 @@ export interface PhaseEvent {
   stateDiff?: StateDiff;
   /** Validation errors (when type === "state_validation_error"). */
   validationErrors?: string[];
+  /** Gate issues (when type === "gate_fail"). */
+  gateIssues?: string[];
+  /** Gate retry attempt (when type === "gate_fail"). */
+  gateAttempt?: number;
   /** Phase metrics (when type === "phase_end"). */
   metrics?: PhaseMetrics;
 }
