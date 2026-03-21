@@ -1,6 +1,6 @@
 ---
 name: meta-bosun-bootstrap
-description: Bootstrap a new project using bosun as a git submodule foundation. Use when creating a downstream project that inherits bosun's multi-agent infrastructure while adding custom agents, skills, and extensions. Works standalone — fetchable by any pi agent via raw GitHub URL.
+description: Bootstrap a new project using bosun as a foundation — via bun dependency (recommended) or git submodule. Creates a downstream project that inherits bosun's multi-agent infrastructure while adding custom agents, skills, and extensions. Works standalone — fetchable by any pi agent via raw GitHub URL.
 license: MIT
 compatibility: pi
 metadata:
@@ -12,15 +12,29 @@ metadata:
 # Create Project from Bosun
 
 Scaffold a downstream project that uses [bosun](https://github.com/oddship/bosun)
-as a git submodule, inheriting its multi-agent infrastructure while layering
+as a foundation, inheriting its multi-agent infrastructure while layering
 your own agents, skills, and domain-specific tooling on top.
+
+## Dependency vs Submodule
+
+**Prefer `bun add`** — bosun's `init.ts` has a built-in dependency mode that
+auto-discovers packages from `node_modules/bosun/packages/`. No workspace
+globs, no adapted init scripts, no submodule management.
+
+```bash
+bun add github:oddship/bosun    # or pin: github:oddship/bosun#v0.1.0
+```
+
+The submodule steps below are for environments where npm/GitHub access is
+restricted. See [Downstream Projects](../../docs/02-extend/02-downstream.md)
+for the full comparison of approaches.
 
 ## When to Use
 
 - You want bosun's packages (pi-agents, pi-tmux, pi-daemon, pi-mesh, etc.)
   without forking the repo
 - You have domain-specific agents and skills to add
-- You want to sync upstream improvements with `git submodule update`
+- You want to sync upstream improvements with `bun update bosun`
 
 ## Prerequisites
 

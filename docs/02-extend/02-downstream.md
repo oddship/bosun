@@ -5,12 +5,51 @@ description: Build your own multi-agent environment on top of bosun
 
 # Downstream Projects
 
-Build your own multi-agent environment using bosun as a foundation. There are two approaches depending on your needs.
+Build your own multi-agent environment using bosun as a foundation. Three
+approaches, from simplest to most controlled.
 
-## Option A: bun link (recommended)
+## Option A: bun add (simplest)
 
-Use bosun as a linked dependency. Your project gets all agents, skills, and
-tooling. Override anything by placing files in `.pi/`.
+Install bosun as a regular dependency. No local clone needed.
+
+### Setup
+
+```bash
+mkdir my-project && cd my-project
+bun init
+
+# Install bosun (from GitHub — tracks main branch)
+bun add github:oddship/bosun
+
+# Or pin to a tag for stability
+# bun add github:oddship/bosun#v0.1.0
+
+# Scaffold config, justfile, and directory structure
+npx bosun onboard
+
+# Edit config.toml with your API keys and model preferences
+vim config.toml
+
+# Start
+just start
+```
+
+This puts bosun at `node_modules/bosun/`. The `init.ts` script auto-detects
+**dependency mode** — it discovers packages, agents, and skills from
+`node_modules/bosun/packages/` automatically. No workspace globs or custom
+paths needed.
+
+### Upgrades
+
+```bash
+bun update bosun    # pulls latest from GitHub (or pinned tag)
+just init           # regenerate .pi/*.json
+```
+
+## Option B: bun link (for bosun co-development)
+
+Use when you're actively developing bosun alongside your project. Changes to
+the local bosun repo are reflected immediately without reinstalling.
 
 ### Setup
 
@@ -150,10 +189,10 @@ $ npx bosun doctor
   /path/to/node_modules/bosun/config.sample.toml
 ```
 
-## Option B: Git submodule
+## Option C: Git submodule
 
-For production deployments or when you need version pinning, use bosun as a
-git submodule.
+For environments where npm/GitHub access is restricted, or when you need the
+bosun source vendored into your repo.
 
 ### Setup
 

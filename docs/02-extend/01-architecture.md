@@ -55,12 +55,38 @@ Two independent layers of isolation:
 
 ### Process-level (bwrap)
 
-`scripts/sandbox.sh` wraps the entire Pi process in bubblewrap:
+`scripts/sandbox.sh` wraps the **tmux server** in bubblewrap — not individual Pi
+processes. Every window, pane, and child process spawned by that tmux server
+inherits the same mount namespace:
+
+```
+Host
+ └─ just start
+     └─ sandbox.sh tmux ...     ← bwrap wraps tmux
+         └─ tmux server         ← everything below is sandboxed
+             ├─ window: bosun   → pi
+             ├─ window: lite    → pi (spawn_agent)
+             ├─ window: verify  → pi (spawn_agent)
+             └─ session: bosun-daemon → bun pi-daemon
+```
+
+The sandbox:
 
 - Fakes `HOME` to `.bosun-home/`
-- Restricts filesystem access (explicit bind mounts)
-- Filters environment variables via `.pi/bwrap.json`
+- Restricts filesystem access (explicit bind mounts from `.pi/bwrap.json`)
+- Filters environment variables via allowlist
 - Passes through tmux socket for agent spawning
+
+When `spawn_agent` calls `sandbox.sh` recursively, nested detection kicks in
+(`BOSUN_SANDBOX=1`) and the command runs directly — no double-wrapping.
+
+**Mount namespace is frozen at startup.** bwrap creates a Linux mount namespace
+once when the tmux server starts. This means:
+
+- All windows/panes see the same filesystem — same bind mounts, same restrictions
+- Changes to `config.toml` paths (`ro_bind`, `rw_bind`) require **`just stop && just start`**
+- Running `just init` regenerates `.pi/bwrap.json`, but the running sandbox
+  won't see new mounts until restart
 
 This is the outer wall. If bwrap is not installed, use `just start-unsandboxed` — tool-level sandboxing still applies.
 

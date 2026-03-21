@@ -58,6 +58,10 @@ allowed = [
 # =============================================================================
 # Sandbox Paths (process-level, bwrap)
 # =============================================================================
+# NOTE: Changes here require `just stop && just start` to take effect.
+# The bwrap mount namespace is frozen when the tmux server starts.
+# Running `just init` regenerates bwrap.json, but the running sandbox
+# won't see new mounts until restart.
 
 [paths]
 # Additional read-only bind mounts beyond defaults
@@ -145,6 +149,14 @@ include_by_default = false
 path = ".pi/agents"
 pattern = "**/*.md"
 include_by_default = false
+
+# Embedding — generates vectors for semantic/hybrid search.
+# Runs as a daemon workflow (memory-embed). First run downloads ~2GB of GGUF models.
+# Disable if you only need keyword search or don't have the disk/compute.
+# [memory.embed]
+# enabled = true                          # Set false to skip embedding entirely
+# schedule = "daily:04"                   # When to re-embed (cron-style)
+# startup = true                          # Also embed on daemon startup
 
 # =============================================================================
 # Web Access (pi-web-access)
