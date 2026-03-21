@@ -56,6 +56,21 @@ pi-exec is a plan-driven execution runtime that replaces the standard chat loop 
 | Input tokens | 901K | 266K |
 | Chat cache rate | — | 75.7% |
 
+## Latency Comparison (gpt-5.4-mini, optimized prompt)
+
+| Task | pi-exec | Chat | Ratio |
+|------|---------|------|-------|
+| fix-bug | 14s | 12s | 1.2x |
+| find-bugs | 20s | 13s | 1.5x |
+| extract-function | 24s | 8s | 3.0x |
+| add-feature | 16s | 13s | 1.2x |
+| qm-dep-update (4 phases) | 41s | 9s | 4.5x |
+| hodor-review | 15s | 9s | 1.7x |
+| long-refactor-hodor | 52s | 27s | 1.9x |
+| long-audit-hodor | 37s | 25s | 1.5x |
+
+**pi-exec is 1.2-4.5x slower.** Each phase boundary adds latency (new API call, cold context). Tasks with more phases have larger gaps. The long tasks (1.5-1.9x) are less affected because per-phase work dominates boundary cost.
+
 ## Why pi-exec Costs More
 
 1. **Per-phase overhead**: Each phase resends system prompt + plan + state. For a 4-phase task, that's 4 prompt serializations. The chat loop sends it once.
