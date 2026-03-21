@@ -29,20 +29,24 @@ just doctor     # checks what's installed
 just onboard    # installs deps, creates config from template
 ```
 
-Edit `config.toml` with your API keys:
+Edit `config.toml` — add your API keys to the environment allowlist and choose models:
 
 ```toml
-[keys]
-anthropic = "sk-ant-..."
-
 [models]
-lite = "claude-haiku-4-5-20251001"
-medium = "claude-sonnet-4-6"
-high = "claude-opus-4-6"
-oracle = "o3"
+lite = "claude-haiku-4-5"           # fast, cheap
+medium = "claude-sonnet-4-6"        # balanced
+high = "claude-opus-4-6"            # best quality
+oracle = "gpt-5.3-codex"            # deep reasoning
+
+[env]
+allowed = [
+  "ANTHROPIC_API_KEY",              # set in your shell, passed into sandbox
+  "OPENAI_API_KEY",
+  # ...
+]
 ```
 
-Models are mapped to tiers. Each agent declares a tier (`lite`, `medium`, `high`, `oracle`), and the tier resolves to whatever model you configure.
+API keys are **not stored in config.toml** — they're environment variables on your host. The `[env].allowed` list controls which ones get passed into the bwrap sandbox. Models are mapped to tiers — each agent declares a tier (`lite`, `medium`, `high`, `oracle`), and the tier resolves to whatever model you configure.
 
 ## Start
 

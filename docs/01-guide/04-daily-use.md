@@ -126,21 +126,26 @@ Bosun spawns two agents, reserves files for each, coordinates results.
 The single config file. Key sections:
 
 ```toml
-[keys]
-anthropic = "sk-ant-..."         # API keys
-
 [models]
-lite = "claude-haiku-4-5-20251001"
+lite = "claude-haiku-4-5"
 medium = "claude-sonnet-4-6"
 high = "claude-opus-4-6"
-oracle = "o3"
+oracle = "gpt-5.3-codex"
+
+[env]
+allowed = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", ...]  # passed into sandbox
+
+[paths]
+# Changes require `just stop && just start` (bwrap mounts are frozen at startup)
+ro_bind = ["/path/to/other/repo"]     # read-only access from sandbox
+rw_bind = ["/path/to/writable/dir"]   # read-write access from sandbox
 
 [sandbox]
-enabled = true                    # bwrap process sandboxing
-allow_paths = ["/tmp"]            # additional allowed paths
+enabled = true                         # tool-level sandboxing (independent of bwrap)
 
 [daemon]
-heartbeat = 30                    # seconds between checks
+enabled = true
+heartbeat_interval_seconds = 30
 ```
 
 #### Web search
