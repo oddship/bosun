@@ -91,6 +91,18 @@ once when the tmux server starts. This means:
 
 This is the outer wall. If bwrap is not installed, use `just start-unsandboxed` — tool-level sandboxing still applies.
 
+### Bundled configs
+
+The sandbox fakes `HOME` to `.bosun-home/`, which symlinks into `config/`:
+
+| Config | Source | Purpose |
+|--------|--------|---------|
+| `config/tmux.conf` | `.bosun-home/.tmux.conf` | Keybindings, status bar, agent spawn shortcuts |
+| `config/nvim/init.lua` | `.bosun-home/.config/nvim/` | Neovim with lazy.nvim, render-markdown, OSC 52 clipboard |
+| `config/bashrc` | `.bosun-home/.bashrc` | Shell config for new panes/splits |
+
+**Clipboard** uses OSC 52 escape sequences — vim yanks flow through tmux to the host terminal without needing the Wayland/X11 socket inside the sandbox. tmux has `set-clipboard on` and `allow-passthrough on` to support this.
+
 ### Tool-level (pi-sandbox)
 
 Pi extension that intercepts tool calls at runtime:
