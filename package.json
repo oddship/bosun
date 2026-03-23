@@ -14,7 +14,7 @@
   "scripts": {
     "init": "bun run scripts/init.ts",
     "test": "bun test packages/",
-    "postinstall": "cd node_modules/@tobilu/qmd && [ -d dist ] || bun run build"
+    "postinstall": "[ -d node_modules/@tobilu/qmd ] && (cd node_modules/@tobilu/qmd && [ -d dist ] || bun run build) || true"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "0.61.0",
