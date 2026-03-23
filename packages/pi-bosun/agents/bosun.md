@@ -1,5 +1,6 @@
 ---
 name: bosun
+emoji: 🧭
 description: Main orchestrator agent. Delegates to specialists, manages workflows.
 tools: read, grep, find, ls, bash, write, edit
 model: high

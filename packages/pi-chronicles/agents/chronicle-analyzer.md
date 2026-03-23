@@ -1,5 +1,6 @@
 ---
 name: chronicle-analyzer
+emoji: 📈
 description: Analyzes Pi session files to extract timelines, decisions, and key events.
 tools: read, grep, find, ls, bash
 model: lite

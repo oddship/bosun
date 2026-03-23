@@ -1,5 +1,6 @@
 ---
 name: lite
+emoji: ⚡
 description: Fast helper agent for quick tasks — summaries, context gathering, simple edits.
 tools: read, grep, find, ls, bash, write, edit
 model: lite

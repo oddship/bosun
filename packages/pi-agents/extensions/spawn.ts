@@ -248,6 +248,8 @@ export function registerSpawnAgent(
         `PI_AGENT_NAME=${windowName}`,
         "-e",
         `PI_PARENT_AGENT=${parentName}`,
+        "-e",
+        `PI_AGENT_EMOJI=${agent.emoji || "🤖"}`,
         command,
       ];
 

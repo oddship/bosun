@@ -1,5 +1,6 @@
 ---
 name: scout
+emoji: 🔍
 description: Fast codebase explorer. Maps structure, finds files, gathers context.
 tools: read, grep, find, ls, bash
 model: lite

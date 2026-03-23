@@ -2,6 +2,7 @@
 
 | Agent | Use For |
 |-------|---------|
+| `deckhand` | Interactive project work: sustained coding sessions, full tool access |
 | `lite` | Fast tasks: summaries, context gathering, quick edits |
 | `verify` | Verification: test running, code review, validation |
 | `scout` | Codebase exploration and file discovery |

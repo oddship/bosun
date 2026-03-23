@@ -1,5 +1,6 @@
 ---
 name: verify
+emoji: ✅
 description: Verification specialist — tests, code review, validation.
 tools: read, grep, find, ls, bash
 model: medium

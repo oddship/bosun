@@ -67,8 +67,14 @@ export default function (pi: ExtensionAPI) {
     pi.appendEntry("agent_identity", { agent: agentName });
 
     // Update TUI with the runtime instance name rather than the persona name.
+    // Load emoji from agent frontmatter and expose via env for other extensions.
+    const config = getConfig(ctx.cwd);
+    const agentFile = findAgentFile(ctx.cwd, config.agentPaths, agentName);
+    const agentEmoji = agentFile ? loadAgent(agentFile).emoji || "🤖" : "🤖";
+    process.env.PI_AGENT_EMOJI = agentEmoji;
+
     ctx.ui.setTitle(`pi — ${runtimeName}`);
-    ctx.ui.setStatus("agent", `🤖 ${runtimeName}`);
+    ctx.ui.setStatus("agent", `${agentEmoji} ${runtimeName}`);
 
     // --- Enforce tools: frontmatter ---
     // If the agent declares a `tools:` field, restrict built-in tools to only

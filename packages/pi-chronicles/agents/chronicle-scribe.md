@@ -1,5 +1,6 @@
 ---
 name: chronicle-scribe
+emoji: ✍️
 description: Writes daily builder's logs from analyzed session data.
 tools: read, grep, find, ls, bash, write
 model: medium

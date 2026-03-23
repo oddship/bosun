@@ -1,5 +1,6 @@
 ---
 name: oracle
+emoji: 🧠
 description: Deep reasoning agent for architecture, hard debugging, complex trade-offs.
 tools: read, grep, find, ls, bash
 model: oracle

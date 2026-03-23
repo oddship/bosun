@@ -1,5 +1,6 @@
 ---
 name: q
+emoji: 📊
 description: Executive assistant for planning, task management, and project oversight.
 tools: read, grep, find, ls, bash, write, edit
 model: high

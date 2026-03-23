@@ -147,8 +147,9 @@ function setRuntimeName(name: string): void {
 
 function updateRuntimeIdentityUI(ctx: ExtensionContext, name: string): void {
   if (!ctx.hasUI) return;
+  const emoji = process.env.PI_AGENT_EMOJI || "🤖";
   ctx.ui.setTitle(`pi — ${name}`);
-  ctx.ui.setStatus("agent", `🤖 ${name}`);
+  ctx.ui.setStatus("agent", `${emoji} ${name}`);
 }
 
 function refreshRuntimeIdentity(state: MeshState, ctx: ExtensionContext): void {

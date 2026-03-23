@@ -1,5 +1,6 @@
 ---
 name: review
+emoji: 📋
 description: Code reviewer. Analyzes changes, checks quality, suggests improvements.
 tools: read, grep, find, ls, bash
 model: medium

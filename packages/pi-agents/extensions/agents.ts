@@ -24,6 +24,8 @@ export interface AgentDef {
   extensions?: string | string[];
   /** Comma-separated skill names to inject. */
   skill?: string;
+  /** Emoji displayed in TUI footer to identify agent type (default: 🤖). */
+  emoji?: string;
   /** Markdown body (the persona / system prompt content). */
   body: string;
   /** Raw frontmatter for any extra fields. */
@@ -106,6 +108,7 @@ export function loadAgent(filePath: string): AgentDef {
         ? data.extensions
         : undefined,
     skill: typeof data.skill === "string" ? data.skill : undefined,
+    emoji: typeof data.emoji === "string" ? data.emoji : undefined,
     body: body.trim(),
     frontmatter: data,
   };
