@@ -77,6 +77,7 @@ The sandbox:
 - Filters environment variables via allowlist
 - Passes through tmux socket for agent spawning
 - Binds GPU render nodes and `/sys` for hardware-accelerated compute (configurable via `gpu_passthrough`)
+- Optionally binds the Docker socket for container access (`docker_passthrough`, off by default — socket access ≈ root)
 
 When `spawn_agent` calls `sandbox.sh` recursively, nested detection kicks in
 (`BOSUN_SANDBOX=1`) and the command runs directly — no double-wrapping.
