@@ -79,8 +79,6 @@ export default function (pi: ExtensionAPI) {
     // --- Enforce tools: frontmatter ---
     // If the agent declares a `tools:` field, restrict built-in tools to only
     // those listed while preserving ALL extension-registered tools.
-    const config = getConfig(ctx.cwd);
-    const agentFile = findAgentFile(ctx.cwd, config.agentPaths, agentName);
     if (agentFile) {
       const agent = loadAgent(agentFile);
       if (agent.tools) {
