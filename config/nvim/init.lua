@@ -12,6 +12,9 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
+-- Clipboard: use system clipboard (wl-copy/wl-paste on Wayland)
+vim.opt.clipboard = "unnamedplus"
+
 -- Basic settings
 vim.g.mapleader = " "
 vim.opt.number = true
