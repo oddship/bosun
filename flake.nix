@@ -46,6 +46,14 @@
           shellHook = ''
             export PATH="$PWD/node_modules/.bin:$PATH"
 
+            # Synthesize VULKAN_SDK for CMake's FindVulkan.cmake
+            # Nix splits headers and libs into separate store paths, but
+            # FindVulkan expects $VULKAN_SDK/{include,lib} in one prefix.
+            export VULKAN_SDK="$PWD/.vulkan-sdk"
+            mkdir -p "$VULKAN_SDK"
+            ln -sfn "${pkgs.vulkan-headers}/include" "$VULKAN_SDK/include"
+            ln -sfn "${pkgs.vulkan-loader}/lib"      "$VULKAN_SDK/lib"
+
             echo "Bosun Dev Environment"
             echo "  just start           — start bosun (sandboxed)"
             echo "  just start-unsandboxed — start without bwrap"

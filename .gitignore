@@ -41,3 +41,4 @@ Thumbs.db
 # User config (contains secrets)
 .vscode/
 workspace/
+.vulkan-sdk
