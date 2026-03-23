@@ -12,8 +12,22 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
--- Clipboard: use system clipboard (wl-copy/wl-paste on Wayland)
+-- Clipboard: use OSC 52 to pass yank through tmux to the host terminal.
+-- This works inside the bwrap sandbox where wl-copy can't reach the Wayland socket.
 vim.opt.clipboard = "unnamedplus"
+if os.getenv("TMUX") then
+  vim.g.clipboard = {
+    name = "OSC 52",
+    copy = {
+      ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+      ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+    },
+    paste = {
+      ["+"] = require("vim.ui.clipboard.osc52").paste("+"),
+      ["*"] = require("vim.ui.clipboard.osc52").paste("*"),
+    },
+  }
+end
 
 -- Basic settings
 vim.g.mapleader = " "
