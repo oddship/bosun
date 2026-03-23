@@ -215,13 +215,16 @@ if [[ "$DOCKER_PASSTHROUGH" == "true" ]]; then
     DOCKER_SOCK="${DOCKER_HOST#unix://}"
   elif [[ -S /var/run/docker.sock ]]; then
     DOCKER_SOCK="/var/run/docker.sock"
+  elif [[ -S /run/docker.sock ]]; then
+    DOCKER_SOCK="/run/docker.sock"
   fi
   if [[ -n "$DOCKER_SOCK" ]] && [[ -S "$DOCKER_SOCK" ]]; then
-    DOCKER_BIND_ARGS="--bind $DOCKER_SOCK $DOCKER_SOCK"
-    # Preserve DOCKER_HOST if it was set
-    if [[ -n "$DOCKER_HOST" ]]; then
-      DOCKER_BIND_ARGS="$DOCKER_BIND_ARGS --setenv DOCKER_HOST $DOCKER_HOST"
-    fi
+    # Resolve symlinks to get the real path (e.g., /var/run → /run on NixOS).
+    # bwrap can't bind into directories that don't exist in the sandbox namespace.
+    DOCKER_SOCK_REAL=$(realpath "$DOCKER_SOCK")
+    DOCKER_BIND_ARGS="--bind $DOCKER_SOCK_REAL $DOCKER_SOCK_REAL"
+    # Tell Docker where to find the socket inside the sandbox
+    DOCKER_BIND_ARGS="$DOCKER_BIND_ARGS --setenv DOCKER_HOST unix://$DOCKER_SOCK_REAL"
   fi
 fi
 
