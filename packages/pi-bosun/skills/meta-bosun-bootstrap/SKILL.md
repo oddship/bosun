@@ -25,6 +25,10 @@ globs, no adapted init scripts, no submodule management.
 bun add github:oddship/bosun    # or pin: github:oddship/bosun#v0.1.0
 ```
 
+**Important**: Add `"bosun"` and `"@tobilu/qmd"` to `trustedDependencies` in
+your `package.json` so bosun's postinstall can build qmd. Without this, the
+pi-memory extension will fail to load.
+
 The submodule steps below are for environments where npm/GitHub access is
 restricted. See [Downstream Projects](../../docs/02-extend/02-downstream.md)
 for the full comparison of approaches.
@@ -69,7 +73,41 @@ mkdir -p .pi/agents .pi/skills packages scripts workspace .bosun-home config
 
 ### Step 2: package.json
 
-Write a new `package.json`:
+**If using `bun add` (recommended):**
+
+```json
+{
+  "name": "{{PROJECT_NAME}}",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "init": "bun node_modules/bosun/scripts/init.ts",
+    "postinstall": "cd node_modules/@tobilu/qmd && [ -d dist ] || bun run build"
+  },
+  "dependencies": {
+    "bosun": "github:oddship/bosun",
+    "pi-mcp-adapter": "2.1.2",
+    "pi-mesh": "0.2.1",
+    "pi-web-access": "0.10.2"
+  },
+  "devDependencies": {
+    "@iarna/toml": "3.0.0",
+    "@types/bun": "latest"
+  },
+  "trustedDependencies": [
+    "@tobilu/qmd",
+    "better-sqlite3",
+    "bosun",
+    "node-pty"
+  ]
+}
+```
+
+No `workspaces` needed — bosun's `init.ts` dependency mode discovers
+packages from `node_modules/bosun/packages/` automatically. Skip to Step 3.
+
+**If using submodule:**
 
 ```json
 {
@@ -90,12 +128,12 @@ Write a new `package.json`:
     "pi-sandbox": "workspace:*",
     "pi-session-context": "workspace:*",
     "pi-tmux": "workspace:*",
-    "pi-mesh": "^0.1.2",
-    "pi-web-access": "^0.10.2",
-    "pi-mcp-adapter": "^2.1.2"
+    "pi-mesh": "0.2.1",
+    "pi-web-access": "0.10.2",
+    "pi-mcp-adapter": "2.1.2"
   },
   "devDependencies": {
-    "@iarna/toml": "^3.0.0",
+    "@iarna/toml": "3.0.0",
     "@types/bun": "latest"
   }
 }
@@ -108,18 +146,22 @@ npm packages (`pi-mesh`, `pi-web-access`, `pi-mcp-adapter`) are fetched from the
 
 ### Step 3: config.sample.toml
 
-Read `upstream/config.sample.toml` and write an adapted version:
+Read bosun's `config.sample.toml` and write an adapted version:
 
 **Adaptations:**
 - Change `[agents]` → `default_agent` to `"{{ORCHESTRATOR_NAME}}"`
-- Change `[backend]` → `command_prefix` to `"upstream/scripts/sandbox.sh"`
+- Change `[backend]` → `command_prefix`:
+  - bun add: `"node_modules/bosun/scripts/sandbox.sh"`
+  - submodule: `"upstream/scripts/sandbox.sh"`
 - Add any project-specific env vars to `[env].allowed` (e.g., `"MY_API_KEY"`)
-- Adjust `[daemon.watch]` patterns if your home dir name differs
 - Keep everything else — the upstream config structure is the contract
 
-### Step 4: scripts/init.ts
+### Step 4: scripts/init.ts (submodule only)
 
-Read `upstream/scripts/init.ts` and write an adapted version:
+**Skip this step if using `bun add`** — just use `bun node_modules/bosun/scripts/init.ts`
+directly. The dependency mode handles everything automatically.
+
+For submodule, read `upstream/scripts/init.ts` and write an adapted version:
 
 **Adaptations:**
 - In the `packages` array: keep all upstream package names (they resolve via workspaces)

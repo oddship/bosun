@@ -39,6 +39,22 @@ This puts bosun at `node_modules/bosun/`. The `init.ts` script auto-detects
 `node_modules/bosun/packages/` automatically. No workspace globs or custom
 paths needed.
 
+### Post-install notes
+
+Bosun's `@tobilu/qmd` dependency needs a build step. Add `bosun` to your
+`trustedDependencies` so its postinstall runs, or build manually:
+
+```json
+{
+  "trustedDependencies": ["bosun", "@tobilu/qmd", "better-sqlite3", "node-pty"]
+}
+```
+
+If the postinstall is blocked, build qmd manually:
+```bash
+cd node_modules/@tobilu/qmd && bun run build
+```
+
 ### Upgrades
 
 ```bash
