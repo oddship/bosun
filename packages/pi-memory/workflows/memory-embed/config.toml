@@ -1,0 +1,20 @@
+[workflow]
+name = "memory-embed"
+description = "Generate vector embeddings for memory documents to enable semantic/hybrid search"
+type = "script"
+
+[trigger]
+schedule = "daily:04"
+startup = true
+
+[script]
+command = "embed.ts"
+
+[validators]
+input = "validate-input.ts"
+
+[retry]
+max_attempts = 1
+
+[timeout]
+minutes = 30
