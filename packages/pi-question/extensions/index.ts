@@ -276,7 +276,7 @@ export default function (pi: ExtensionAPI) {
       };
     },
 
-    renderCall(args, theme) {
+    renderCall(args, theme, _context) {
       let text = theme.fg("toolTitle", theme.bold("question "));
       if (args.header) text += theme.fg("accent", `[${args.header}] `);
       text += theme.fg("muted", args.question);
@@ -290,7 +290,7 @@ export default function (pi: ExtensionAPI) {
       return new Text(text, 0, 0);
     },
 
-    renderResult(result, _options, theme) {
+    renderResult(result, _options, theme, _context) {
       const details = result.details as QuestionDetails | undefined;
       if (!details) {
         const text = result.content[0];
