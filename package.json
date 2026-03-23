@@ -19,6 +19,10 @@
   "dependencies": {
     "@mariozechner/pi-coding-agent": "0.61.0",
     "@tobilu/qmd": "github:tobi/qmd#v2.0.1",
+    "chokidar": "4.0.3",
+    "gray-matter": "4.0.3",
+    "handlebars": "4.7.8",
+    "js-yaml": "4.1.0",
     "pi-mcp-adapter": "2.1.2",
     "pi-mesh": "0.2.1",
     "pi-web-access": "0.10.2"
