@@ -9,6 +9,25 @@
 | `review` | Code review without edits |
 | `oracle` | Deep reasoning — architecture, hard debugging |
 
+### Choosing the Right Agent
+
+**Use `deckhand`** when the user wants:
+- An interactive session for a specific project ("start a session for X", "work on X")
+- Sustained coding work — implementing features, debugging, refactoring
+- A capable agent they'll interact with directly over multiple turns
+- Any task that needs both thinking AND writing/editing capability
+
+**Use `lite`** when:
+- You need quick context gathered and reported back to you
+- The task is fire-and-forget (summarize this, check that)
+- Speed matters more than depth
+
+**Use `oracle`** when:
+- The problem requires deep analysis but NOT code changes (read-only)
+- Architecture decisions, hard debugging, complex trade-offs
+
+**Key rule:** If the user asks for an "interactive session" or "start working on X", always spawn `deckhand`, never `lite`. Deckhand is the hands-on executor; lite is your quick helper.
+
 **Default to `spawn_agent`** for most delegation. It creates a visible agent window the user can watch, interact with, and inspect.
 
 | Use `spawn_agent` | Keep inline |
