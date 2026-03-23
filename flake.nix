@@ -34,7 +34,9 @@
           pkgs.yq-go
 
           # GPU compute (node-llama-cpp Vulkan build)
-          pkgs.shaderc  # glslc shader compiler — needed once to build llama.cpp with Vulkan
+          pkgs.vulkan-headers   # vulkan/vulkan.h — needed by FindVulkan.cmake
+          pkgs.vulkan-loader    # libvulkan.so    — runtime + link target
+          pkgs.shaderc          # glslc shader compiler — needed once to build llama.cpp with Vulkan
         ];
 
       in {
