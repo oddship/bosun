@@ -253,7 +253,9 @@ writeJson("pi-mesh.json", {
   contextMode: mesh.context_mode || "full",
   feedRetention: mesh.feed_retention ?? 50,
   autoStatus: mesh.auto_status ?? true,
-  hooksModule: "./packages/pi-agents/extensions/mesh-identity-sync.ts",
+  hooksModule: isDependencyMode
+    ? "./node_modules/bosun/packages/pi-agents/extensions/mesh-identity-sync.ts"
+    : "./packages/pi-agents/extensions/mesh-identity-sync.ts",
   identitySync: {
     enabled: meshIdentitySync.enabled ?? true,
     startupAlign: meshIdentitySync.startup_align ?? true,
