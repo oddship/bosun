@@ -23,7 +23,7 @@ Three Nix wrappers exist:
 | `BOSUN_ROOT/flake.nix` | Read-write | Explicit rw bind |
 | `/tmp` | Read-write | Temporary files |
 | `/etc/resolv.conf`, `/etc/ssl`, `/etc/passwd`, `/etc/group` | Read-only | Network/DNS, user info |
-| Docker socket | Read-write | If available on host |
+| Docker socket (`/var/run/docker.sock`) | Read-write | Opt-in: `docker_passthrough = true` in `[sandbox]`. Respects `DOCKER_HOST`. |
 | Tmux socket | Read-write | If running in tmux |
 
 Note: `BOSUN_ROOT` is bound read-write at the top level, with specific files like `flake.lock` overlaid as read-only. See `flake.nix` for the full bind hierarchy.
@@ -114,7 +114,7 @@ Defined in `flake.nix` `devTools`:
 **Git:** git, gh (GitHub CLI), gh (GitLab CLI), openssh
 **Build:** make, just, gcc (for cgo)
 **Utils:** jq, yq, curl, wget, neovim, file, strace, procps
-**Containers:** docker-client (connects to host daemon)
+**Containers:** docker-client (CLI only — connects to host daemon via socket)
 **Infra:** nomad, awscli2
 
 ## Sandbox Quirks

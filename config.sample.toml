@@ -78,6 +78,9 @@ enabled = true
 gpu_passthrough = true                    # Bind /dev/dri render nodes for GPU compute (Vulkan/OpenCL)
                                           # Enables hardware-accelerated embeddings in memory-embed workflow
                                           # Disable if you don't want agents accessing GPU devices
+# docker_passthrough = false              # Bind Docker socket into sandbox (opt-in)
+                                          # ⚠ Docker socket access ≈ root on the host
+                                          # Enable if agents need to build/run containers
 
 [sandbox.filesystem]
 deny_read = ["~/.ssh", "~/.aws", "~/.gnupg"]

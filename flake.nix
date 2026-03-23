@@ -26,6 +26,9 @@
           # Languages
           pkgs.go
 
+          # Containers (client only — connects to host daemon via socket)
+          pkgs.docker-client
+
           # Development
           pkgs.git
           pkgs.ripgrep

@@ -198,6 +198,33 @@ if [[ "$GPU_PASSTHROUGH" == "true" ]]; then
   fi
 fi
 
+# --- Docker socket passthrough (opt-in) ---
+# Binds the Docker socket into the sandbox. Off by default because Docker
+# socket access is effectively root on the host. Enable via config.toml:
+#   [sandbox]
+#   docker_passthrough = true
+DOCKER_BIND_ARGS=""
+DOCKER_PASSTHROUGH="false"
+if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
+  DOCKER_PASSTHROUGH=$(jq -r '.docker_passthrough // false' "$BWRAP_CONFIG" 2>/dev/null)
+fi
+if [[ "$DOCKER_PASSTHROUGH" == "true" ]]; then
+  DOCKER_HOST="${DOCKER_HOST:-}"
+  DOCKER_SOCK=""
+  if [[ -n "$DOCKER_HOST" ]] && [[ "$DOCKER_HOST" == unix://* ]]; then
+    DOCKER_SOCK="${DOCKER_HOST#unix://}"
+  elif [[ -S /var/run/docker.sock ]]; then
+    DOCKER_SOCK="/var/run/docker.sock"
+  fi
+  if [[ -n "$DOCKER_SOCK" ]] && [[ -S "$DOCKER_SOCK" ]]; then
+    DOCKER_BIND_ARGS="--bind $DOCKER_SOCK $DOCKER_SOCK"
+    # Preserve DOCKER_HOST if it was set
+    if [[ -n "$DOCKER_HOST" ]]; then
+      DOCKER_BIND_ARGS="$DOCKER_BIND_ARGS --setenv DOCKER_HOST $DOCKER_HOST"
+    fi
+  fi
+fi
+
 # --- Resolve workspace path ---
 WORKSPACE="workspace"
 if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
@@ -352,6 +379,7 @@ exec "$BWRAP" \
   $CMD_BIND_ARGS \
   $EXTRA_BIND_ARGS \
   $GPU_BIND_ARGS \
+  $DOCKER_BIND_ARGS \
   --bind "$BOSUN_ROOT" "$BOSUN_ROOT" \
   --bind "$BOSUN_ROOT/.bosun-home" "$BOSUN_ROOT/.bosun-home" \
   --bind "$BOSUN_ROOT/.pi" "$BOSUN_ROOT/.pi" \
