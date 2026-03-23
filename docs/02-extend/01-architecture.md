@@ -101,6 +101,28 @@ Pi extension that intercepts tool calls at runtime:
 
 Active even without bwrap. Configured in `.pi/sandbox.json`.
 
+### Sandbox indicator
+
+The footer bar shows a shield icon when sandboxing is active:
+
+| Footer indicator | Meaning |
+|-----------------|---------|
+| `🛡️ bwrap+tool` | Both process-level and tool-level sandbox active |
+| `🛡️ bwrap` | Process-level sandbox only (tool-level disabled in config) |
+| `🛡️ tool` | Tool-level sandbox only (no bwrap) |
+| *(no indicator)* | No sandboxing active |
+
+### How you start determines what's sandboxed
+
+| Command | Process sandbox (bwrap) | Tool sandbox (pi-sandbox) | Footer |
+|---------|------------------------|--------------------------|--------|
+| `just start` | ✅ | ✅ | `🛡️ bwrap+tool` |
+| `just run` | ✅ | ✅ | `🛡️ bwrap+tool` |
+| `just start-unsandboxed` | ❌ | ✅ | `🛡️ tool` |
+| `pi` (directly) | ❌ | depends on `.pi/sandbox.json` | `🛡️ tool` or nothing |
+
+Running `pi` directly in the repo folder skips process-level isolation entirely — there's no bwrap wrapper. Tool-level sandboxing depends on whether `.pi/sandbox.json` has `enabled: true` (set via `config.toml` and `just init`). Use `just start` for full isolation.
+
 ## Config flow
 
 ```

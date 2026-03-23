@@ -51,12 +51,17 @@ API keys are **not stored in config.toml** — they're environment variables on 
 ## Start
 
 ```bash
-just start              # sandboxed tmux session
+just start              # sandboxed tmux session (recommended)
 # or
 just start-unsandboxed  # no bwrap, if you don't have it
 ```
 
-You're now in a tmux session with bosun ready.
+You're now in a tmux session with bosun ready. Look for the **🛡️** indicator in the bottom bar — it shows which sandbox layers are active:
+
+- `🛡️ bwrap+tool` — full isolation (`just start`)
+- `🛡️ tool` — tool-level only (`just start-unsandboxed`, or `pi` with sandbox config enabled)
+
+If you run `pi` directly in the repo without the `just` wrapper, you skip process-level sandboxing (bwrap). This means the agent has full access to your filesystem and environment. Use `just start` for the full security model.
 
 ## First interaction
 

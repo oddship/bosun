@@ -15,7 +15,7 @@ An opinionated multi-agent coding environment built on [Pi](https://github.com/b
 
 **Background automation.** A daemon summarizes your sessions, generates builder's logs, fills in handoffs, and backs up your workspace — all on a schedule, without you thinking about it.
 
-**Sandboxed by default.** Process-level isolation via bubblewrap. Tool-level access control for reads, writes, and commands. Agents can only touch what you allow.
+**Sandboxed by default.** Process-level isolation via bubblewrap. Tool-level access control for reads, writes, and commands. Agents can only touch what you allow. A 🛡️ indicator in the footer shows which sandbox layers are active.
 
 **Extensible foundation.** Every piece is an independent Pi package. Use them standalone, or build your own multi-agent environment on top of bosun via `bun link`.
 
