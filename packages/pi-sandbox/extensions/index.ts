@@ -152,6 +152,19 @@ export default function (pi: ExtensionAPI) {
     return config;
   }
 
+  // Show sandbox indicator in the footer
+  pi.on("session_start", async (_event, ctx) => {
+    const processLevel = process.env.BOSUN_SANDBOX === "1";
+    const toolLevel = getConfig(ctx.cwd).enabled;
+
+    if (processLevel || toolLevel) {
+      const parts: string[] = [];
+      if (processLevel) parts.push("bwrap");
+      if (toolLevel) parts.push("tool");
+      ctx.ui.setStatus("sandbox", `🛡️ ${parts.join("+")}`);
+    }
+  });
+
   pi.on("tool_call", async (event, ctx) => {
     const cfg = getConfig(ctx.cwd);
     if (!cfg.enabled) return;
