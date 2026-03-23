@@ -11,6 +11,7 @@
         "gray-matter": "4.0.3",
         "handlebars": "4.7.8",
         "js-yaml": "4.1.0",
+        "pi-bash-readonly": "0.1.0",
         "pi-mcp-adapter": "2.1.2",
         "pi-mesh": "0.2.1",
         "pi-web-access": "0.10.2",
@@ -37,14 +38,6 @@
       "version": "0.1.0",
       "peerDependencies": {
         "@mariozechner/pi-coding-agent": "*",
-      },
-    },
-    "packages/pi-bash-readonly": {
-      "name": "pi-bash-readonly",
-      "version": "0.1.0",
-      "peerDependencies": {
-        "@mariozechner/pi-coding-agent": "*",
-        "@sinclair/typebox": "*",
       },
     },
     "packages/pi-bosun": {
@@ -924,7 +917,7 @@
 
     "pi-auto-resume": ["pi-auto-resume@workspace:packages/pi-auto-resume"],
 
-    "pi-bash-readonly": ["pi-bash-readonly@workspace:packages/pi-bash-readonly"],
+    "pi-bash-readonly": ["pi-bash-readonly@0.1.0", "", { "peerDependencies": { "@mariozechner/pi-coding-agent": "^0.62.0", "@sinclair/typebox": "^0.34.48" } }, "sha512-oYwy8haJvsugFlFNmm+PAEmVt0+6XSuOV4qUDvZKNJqhBo3QYdYLRJuhErttEF8353DCR7Ckk2NYvWLFQgFcvg=="],
 
     "pi-bosun": ["pi-bosun@workspace:packages/pi-bosun"],
 
