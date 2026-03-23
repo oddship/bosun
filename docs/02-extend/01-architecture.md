@@ -76,6 +76,7 @@ The sandbox:
 - Restricts filesystem access (explicit bind mounts from `.pi/bwrap.json`)
 - Filters environment variables via allowlist
 - Passes through tmux socket for agent spawning
+- Binds GPU render nodes and `/sys` for hardware-accelerated compute (configurable via `gpu_passthrough`)
 
 When `spawn_agent` calls `sandbox.sh` recursively, nested detection kicks in
 (`BOSUN_SANDBOX=1`) and the command runs directly — no double-wrapping.

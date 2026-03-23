@@ -75,6 +75,9 @@ rw_bind = []
 
 [sandbox]
 enabled = true
+gpu_passthrough = true                    # Bind /dev/dri render nodes for GPU compute (Vulkan/OpenCL)
+                                          # Enables hardware-accelerated embeddings in memory-embed workflow
+                                          # Disable if you don't want agents accessing GPU devices
 
 [sandbox.filesystem]
 deny_read = ["~/.ssh", "~/.aws", "~/.gnupg"]

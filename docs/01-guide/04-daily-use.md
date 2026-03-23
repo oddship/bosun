@@ -142,6 +142,7 @@ rw_bind = ["/path/to/writable/dir"]   # read-write access from sandbox
 
 [sandbox]
 enabled = true                         # tool-level sandboxing (independent of bwrap)
+gpu_passthrough = true                 # bind GPU render nodes + /sys into sandbox
 
 [daemon]
 enabled = true

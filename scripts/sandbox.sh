@@ -149,6 +149,55 @@ if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
   done < <(jq -r '.rw_bind[]? // empty' "$BWRAP_CONFIG" 2>/dev/null)
 fi
 
+# --- GPU passthrough (render nodes + sysfs for hardware detection) ---
+# Defaults to true — consistent with other bwrap.json fields that fail open without jq.
+# Disable via config.toml: [sandbox] gpu_passthrough = false
+GPU_BIND_ARGS=""
+GPU_PASSTHROUGH="true"
+if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
+  GPU_PASSTHROUGH=$(jq -r '.gpu_passthrough // true' "$BWRAP_CONFIG" 2>/dev/null)
+fi
+if [[ "$GPU_PASSTHROUGH" == "true" ]]; then
+  # Bind render nodes (Vulkan/OpenCL compute, not display/KMS)
+  if [[ -d /dev/dri ]]; then
+    for dev in /dev/dri/renderD*; do
+      if [[ -e "$dev" ]]; then
+        GPU_BIND_ARGS="$GPU_BIND_ARGS --dev-bind $dev $dev"
+      fi
+    done
+  fi
+  # Bind /sys GPU-relevant paths read-only for hardware detection
+  # Only expose DRM and PCI subsystems, not all of /sys
+  for sys_path in /sys/class/drm /sys/bus/pci /sys/devices; do
+    if [[ -d "$sys_path" ]]; then
+      GPU_BIND_ARGS="$GPU_BIND_ARGS --ro-bind $sys_path $sys_path"
+    fi
+  done
+  # Bind NixOS GPU driver paths (Vulkan ICD, OpenGL, Mesa)
+  for gpu_path in /run/opengl-driver /run/opengl-driver-32; do
+    if [[ -e "$gpu_path" ]]; then
+      GPU_BIND_ARGS="$GPU_BIND_ARGS --ro-bind $gpu_path $gpu_path"
+    fi
+  done
+  # Pass through GPU-related env vars for Vulkan/OpenGL discovery
+  # These may come from nix develop (flake.nix) or the host environment
+  GPU_LD_PATH="${LD_LIBRARY_PATH:-}"
+  # Also include NixOS GPU driver path if present
+  if [[ -d /run/opengl-driver/lib ]]; then
+    GPU_LD_PATH="/run/opengl-driver/lib${GPU_LD_PATH:+:$GPU_LD_PATH}"
+  fi
+  if [[ -d /run/opengl-driver-32/lib ]]; then
+    GPU_LD_PATH="/run/opengl-driver-32/lib${GPU_LD_PATH:+:$GPU_LD_PATH}"
+  fi
+  if [[ -n "$GPU_LD_PATH" ]]; then
+    GPU_BIND_ARGS="$GPU_BIND_ARGS --setenv LD_LIBRARY_PATH $GPU_LD_PATH"
+  fi
+  # Pass VULKAN_SDK if set (points cmake to Vulkan headers)
+  if [[ -n "${VULKAN_SDK:-}" ]]; then
+    GPU_BIND_ARGS="$GPU_BIND_ARGS --setenv VULKAN_SDK $VULKAN_SDK"
+  fi
+fi
+
 # --- Resolve workspace path ---
 WORKSPACE="workspace"
 if [[ -f "$BWRAP_CONFIG" ]] && command -v jq &>/dev/null; then
@@ -302,6 +351,7 @@ exec "$BWRAP" \
   $RW_BIND_ARGS \
   $CMD_BIND_ARGS \
   $EXTRA_BIND_ARGS \
+  $GPU_BIND_ARGS \
   --bind "$BOSUN_ROOT" "$BOSUN_ROOT" \
   --bind "$BOSUN_ROOT/.bosun-home" "$BOSUN_ROOT/.bosun-home" \
   --bind "$BOSUN_ROOT/.pi" "$BOSUN_ROOT/.pi" \

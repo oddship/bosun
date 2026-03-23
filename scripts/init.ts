@@ -240,6 +240,7 @@ writeJson("bwrap.json", {
   ],
   ro_bind: (paths.ro_bind as string[]) || [],
   rw_bind: (paths.rw_bind as string[]) || [],
+  gpu_passthrough: sandbox.gpu_passthrough ?? true,
   workspace: (config.workspace as Record<string, unknown>)?.path || "workspace",
 });
 
