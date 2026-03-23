@@ -19,21 +19,8 @@
   "dependencies": {
     "@mariozechner/pi-coding-agent": "0.61.0",
     "@tobilu/qmd": "github:tobi/qmd#v2.0.1",
-    "pi-agents": "workspace:*",
-    "pi-auto-resume": "workspace:*",
-    "pi-bash-readonly": "workspace:*",
-    "pi-bosun": "workspace:*",
-    "pi-daemon": "workspace:*",
-    "pi-exec": "workspace:*",
     "pi-mcp-adapter": "2.1.2",
-    "pi-memory": "workspace:*",
     "pi-mesh": "0.2.1",
-    "pi-meta-skills": "workspace:*",
-    "pi-q": "workspace:*",
-    "pi-question": "workspace:*",
-    "pi-sandbox": "workspace:*",
-    "pi-session-context": "workspace:*",
-    "pi-tmux": "workspace:*",
     "pi-web-access": "0.10.2"
   },
   "devDependencies": {
