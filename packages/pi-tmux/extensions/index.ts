@@ -2,31 +2,23 @@
  * pi-tmux — Terminal power tools for Pi.
  *
  * Provides tools for tmux manipulation: split panes, send keystrokes,
- * capture screen content, and list windows. Auto-detects tmux socket
- * from the $TMUX environment variable.
+ * capture screen content, list windows, and kill windows.
+ *
+ * All operations go through pi-tmux/core.ts which auto-detects the tmux
+ * socket from $TMUX and targets the correct session via $TMUX_PANE.
  */
 
-import { spawn } from "node:child_process";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-
-function isInTmux(): boolean {
-  return !!process.env.TMUX;
-}
-
-function tmuxExec(args: string[], cwd?: string): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve) => {
-    const proc = spawn("tmux", args, {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
-    proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? 1 }));
-  });
-}
+import {
+  isInTmux,
+  getTmuxContext,
+  splitPane,
+  sendKeys,
+  capturePane,
+  listWindowsDetailed,
+  killWindow,
+} from "../core.js";
 
 function notInTmux() {
   return {
@@ -50,17 +42,13 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params, _signal, _onUpdate, ctx) {
       if (!isInTmux()) return notInTmux();
 
-      const args = ["split-window"];
-      // Target the calling agent's pane, not the currently active one
-      const callerPane = process.env.TMUX_PANE;
-      if (callerPane) args.push("-t", callerPane);
-      if (params.vertical) args.push("-h");
-      if (params.size) args.push("-p", String(params.size));
-      // Wrap in interactive bash so aliases and .bashrc setup apply,
-      // matching the behavior of manually splitting with Ctrl-a + |
-      args.push("bash", "-ic", params.command);
+      const result = await splitPane({
+        command: params.command,
+        vertical: params.vertical,
+        size: params.size,
+        cwd: ctx.cwd,
+      });
 
-      const result = await tmuxExec(args, ctx.cwd);
       if (result.code !== 0) {
         return { content: [{ type: "text", text: `Error: ${result.stderr || result.stdout}` }], isError: true };
       }
@@ -82,37 +70,36 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) {
       if (!isInTmux()) return notInTmux();
 
-      // Detect tmux key names (C-c, C-d, C-z, Escape, etc.) vs literal text.
-      // Tmux send-keys without -l interprets key names; with -l sends literal text.
-      // Supports space-separated key sequences like "C-c C-c" or "Escape :q!"
+      const ctx = await getTmuxContext();
+
+      // Detect tmux key names vs literal text.
+      // Key names: C-c, M-a, Escape, Enter, Space, Tab, arrow keys, function keys.
       const tmuxKeyPattern = /^(C-[a-z]|M-[a-z]|Escape|Enter|Space|Tab|Up|Down|Left|Right|BSpace|DC|End|Home|IC|NPage|PPage|F[0-9]+)$/i;
       const tokens = params.text.trim().split(/\s+/);
       const isKeySequence = tokens.length > 0 && tokens.every(t => tmuxKeyPattern.test(t));
 
-      const args = ["send-keys", "-t", params.target];
       if (!isKeySequence) {
-        // Literal text mode — send exact text
-        args.push("-l", params.text);
-        if (!params.no_enter) {
-          // Send Enter as a separate key after the literal text
-          const result1 = await tmuxExec(args);
-          if (result1.code !== 0) {
-            return { content: [{ type: "text", text: `Error: ${result1.stderr}` }], isError: true };
-          }
-          const result2 = await tmuxExec(["send-keys", "-t", params.target, "Enter"]);
-          if (result2.code !== 0) {
-            return { content: [{ type: "text", text: `Error sending Enter: ${result2.stderr}` }], isError: true };
-          }
-          return { content: [{ type: "text", text: `Sent to '${params.target}': ${params.text}` }] };
+        // Literal text mode
+        const result = await sendKeys(params.target, params.text, { session: ctx.session, literal: true });
+        if (result.code !== 0) {
+          return { content: [{ type: "text", text: `Error: ${result.stderr}` }], isError: true };
         }
-      } else {
-        // Key sequence mode — send all keys as tmux key names (no -l)
-        args.push(...tokens);
+        if (!params.no_enter) {
+          const enterResult = await sendKeys(params.target, "Enter", { session: ctx.session, literal: false });
+          if (enterResult.code !== 0) {
+            return { content: [{ type: "text", text: `Error sending Enter: ${enterResult.stderr}` }], isError: true };
+          }
+        }
+        return { content: [{ type: "text", text: `Sent to '${params.target}': ${params.text}` }] };
       }
 
-      const result = await tmuxExec(args);
-      if (result.code !== 0) {
-        return { content: [{ type: "text", text: `Error: ${result.stderr}` }], isError: true };
+      // Key sequence mode — send all keys as tmux key names
+      // tmux send-keys accepts multiple key names as separate arguments
+      for (const key of tokens) {
+        const result = await sendKeys(params.target, key, { session: ctx.session, literal: false });
+        if (result.code !== 0) {
+          return { content: [{ type: "text", text: `Error: ${result.stderr}` }], isError: true };
+        }
       }
       return { content: [{ type: "text", text: `Sent to '${params.target}': ${params.text}` }] };
     },
@@ -131,11 +118,9 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) {
       if (!isInTmux()) return notInTmux();
 
-      const lines = params.lines ?? 50;
-      const args = ["capture-pane", "-t", params.target, "-p"];
-      if (lines > 0) args.push("-S", `-${lines}`);
+      const ctx = await getTmuxContext();
+      const result = await capturePane(params.target, { session: ctx.session, lines: params.lines ?? 50 });
 
-      const result = await tmuxExec(args);
       if (result.code !== 0) {
         return { content: [{ type: "text", text: `Error capturing '${params.target}': ${result.stderr}` }], isError: true };
       }
@@ -155,7 +140,9 @@ export default function (pi: ExtensionAPI) {
     async execute() {
       if (!isInTmux()) return notInTmux();
 
-      const result = await tmuxExec(["list-windows", "-F", "#{window_index}: #{window_name} #{window_active}"]);
+      const ctx = await getTmuxContext();
+      const result = await listWindowsDetailed({ session: ctx.session });
+
       if (result.code !== 0) {
         return { content: [{ type: "text", text: `Error: ${result.stderr}` }], isError: true };
       }
@@ -185,7 +172,9 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) {
       if (!isInTmux()) return notInTmux();
 
-      const result = await tmuxExec(["kill-window", "-t", params.target]);
+      const ctx = await getTmuxContext();
+      const result = await killWindow(params.target, { session: ctx.session });
+
       if (result.code !== 0) {
         return { content: [{ type: "text", text: `Error: ${result.stderr}` }], isError: true };
       }
