@@ -236,6 +236,38 @@ export async function newWindow(opts: {
 }
 
 /**
+ * Create a new tmux session with an initial window.
+ * `tmux new-session` creates a session AND its first window in one call.
+ */
+export async function newSession(opts: {
+  name: string;
+  windowName?: string;
+  command: string;
+  socket?: string | null;
+  env?: Record<string, string>;
+  cwd?: string;
+}): Promise<TmuxResult> {
+  const args = ["new-session", "-d", "-s", opts.name];
+  if (opts.windowName) args.push("-n", opts.windowName);
+  if (opts.env) {
+    for (const [k, v] of Object.entries(opts.env)) {
+      args.push("-e", `${k}=${v}`);
+    }
+  }
+  args.push(opts.command);
+
+  return tmuxExec(args, { socket: opts.socket, cwd: opts.cwd });
+}
+
+/**
+ * Check if a tmux session exists.
+ */
+export function sessionExists(name: string, opts?: { socket?: string | null }): boolean {
+  const result = tmuxExecSync(["has-session", "-t", name], { socket: opts?.socket });
+  return result !== null;
+}
+
+/**
  * Kill a tmux window by name or index.
  * Session-aware: targets `session:target` when session is provided.
  */

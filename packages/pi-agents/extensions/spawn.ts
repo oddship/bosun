@@ -17,7 +17,9 @@ import {
   getTmuxSocket,
   getTmuxSessionSync,
   windowExists,
+  sessionExists,
   newWindow,
+  newSession,
 } from "pi-tmux/core.js";
 
 /** Shell-escape a string by wrapping in single quotes. */
@@ -56,6 +58,14 @@ export function registerSpawnAgent(
           description: "Window/peer name (default: agent name)",
         }),
       ),
+      session: Type.Optional(
+        Type.Union([
+          Type.Boolean({ description: "true to create a new tmux session (auto-named)" }),
+          Type.String({ description: "Named tmux session to create" }),
+        ], {
+          description: "Create the agent in a new tmux session instead of a window. Pass true for auto-naming or a string for a specific session name.",
+        }),
+      ),
     }),
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -91,11 +101,25 @@ export function registerSpawnAgent(
 
       const agent = loadAgent(agentFile);
       const windowName = params.name || params.agent;
+      const wantsSession = params.session !== undefined && params.session !== false;
+      const targetSessionName = typeof params.session === "string" ? params.session : (wantsSession ? windowName : null);
 
-      // Check for duplicate tmux window names
       const socket = getTmuxSocket();
-      const sessionName = getTmuxSessionSync({ socket });
-      if (windowExists(windowName, { socket, session: sessionName })) {
+      const currentSession = getTmuxSessionSync({ socket });
+
+      // Check for conflicts
+      if (wantsSession && targetSessionName && sessionExists(targetSessionName, { socket })) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: Session '${targetSessionName}' already exists. Use a different name:\n  spawn_agent({ agent: "${params.agent}", session: "${targetSessionName}-2" })`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!wantsSession && windowExists(windowName, { socket, session: currentSession })) {
         return {
           content: [
             {
@@ -184,20 +208,31 @@ export function registerSpawnAgent(
       // PI_AGENT_NAME is the unique instance name (e.g. "bosun-2").
       const parentName = process.env.PI_AGENT_NAME || process.env.PI_AGENT || "agent";
 
-      const result = await newWindow({
-        name: windowName,
-        command,
-        socket,
-        session: sessionName,
-        background: true,
-        cwd: ctx.cwd,
-        env: {
-          PI_AGENT: params.agent,
-          PI_AGENT_NAME: windowName,
-          PI_PARENT_AGENT: parentName,
-          PI_AGENT_EMOJI: agent.emoji || "🤖",
-        },
-      });
+      const agentEnv = {
+        PI_AGENT: params.agent,
+        PI_AGENT_NAME: windowName,
+        PI_PARENT_AGENT: parentName,
+        PI_AGENT_EMOJI: agent.emoji || "🤖",
+      };
+
+      const result = wantsSession
+        ? await newSession({
+            name: targetSessionName!,
+            windowName,
+            command,
+            socket,
+            cwd: ctx.cwd,
+            env: agentEnv,
+          })
+        : await newWindow({
+            name: windowName,
+            command,
+            socket,
+            session: currentSession,
+            background: true,
+            cwd: ctx.cwd,
+            env: agentEnv,
+          });
 
       if (result.code !== 0) {
         return {
@@ -220,6 +255,7 @@ export function registerSpawnAgent(
           child: windowName,
           agent: params.agent,
           model: resolvedModel || null,
+          session: targetSessionName || undefined,
           ts: new Date().toISOString(),
         });
         fs.appendFileSync(treeFile, entry + "\n");
@@ -231,12 +267,15 @@ export function registerSpawnAgent(
       const skippedInfo = skippedExts.length
         ? `\nSkipped extensions (not installed): ${skippedExts.join(", ")}`
         : "";
+      const location = wantsSession
+        ? `session '${targetSessionName}'`
+        : `tmux window '${windowName}'`;
       return {
         content: [
           {
             type: "text",
             text: [
-              `Spawned '${params.agent}' agent in tmux window '${windowName}'${modelInfo}.${skippedInfo}`,
+              `Spawned '${params.agent}' agent in ${location}${modelInfo}.${skippedInfo}`,
               "",
               "The agent is running with its persona and extensions loaded.",
               "Use pi-mesh to communicate, or tmux to observe.",

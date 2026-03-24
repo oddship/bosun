@@ -8,6 +8,7 @@ import {
   getTmuxContext,
   listWindows,
   windowExists,
+  sessionExists,
   getWindowName,
 } from "../core.js";
 
@@ -145,6 +146,19 @@ describe.skipIf(!inTmux)("windowExists (live tmux)", () => {
 
   it("returns false for a nonexistent window", () => {
     expect(windowExists("__nonexistent_window_test_12345__")).toBe(false);
+  });
+});
+
+describe.skipIf(!inTmux)("sessionExists (live tmux)", () => {
+  it("returns true for the current session", () => {
+    const session = getTmuxSessionSync();
+    if (session) {
+      expect(sessionExists(session)).toBe(true);
+    }
+  });
+
+  it("returns false for a nonexistent session", () => {
+    expect(sessionExists("__nonexistent_session_test_12345__")).toBe(false);
   });
 });
 
