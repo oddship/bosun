@@ -22,8 +22,7 @@
   },
   "dependencies": {
     "gray-matter": "4.0.3",
-    "handlebars": "4.7.8",
-    "pi-tmux": "workspace:*"
+    "handlebars": "4.7.8"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",

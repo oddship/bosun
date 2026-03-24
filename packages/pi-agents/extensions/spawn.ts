@@ -20,7 +20,7 @@ import {
   sessionExists,
   newWindow,
   newSession,
-} from "pi-tmux/core.js";
+} from "../../pi-tmux/core.ts";
 
 /** Shell-escape a string by wrapping in single quotes. */
 function shellEscape(s: string): string {

@@ -33,7 +33,7 @@ import {
   isInTmux,
   getWindowName,
   renameWindow,
-} from "pi-tmux/core.js";
+} from "../../pi-tmux/core.ts";
 
 // =============================================================================
 // Identity Sync Config
