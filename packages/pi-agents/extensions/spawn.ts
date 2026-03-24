@@ -187,15 +187,26 @@ export function registerSpawnAgent(
         }
       }
 
+      // Resolve the monorepo packages/ directory from this file's location.
+      // spawn.ts lives at {root}/packages/pi-agents/extensions/spawn.ts,
+      // so going up 2 levels reaches {root}/packages/.
+      // This is needed when ctx.cwd is a downstream project that doesn't
+      // have pi-agents/pi-sandbox in its own packages/ or node_modules/.
+      const ownPackagesDir = path.resolve(import.meta.dirname, "..", "..");
+
       const skippedExts: string[] = [];
       for (const ext of extList.filter(Boolean)) {
         // Check if it's a local package (exists under packages/ or node_modules/)
         const localPath = path.join(ctx.cwd, "packages", ext);
         const nmPath = path.join(ctx.cwd, "node_modules", ext);
+        const ownSiblingPath = path.join(ownPackagesDir, ext);
         if (fs.existsSync(path.join(localPath, "package.json"))) {
           extensionFlags.push("-e", localPath);
         } else if (fs.existsSync(path.join(nmPath, "package.json"))) {
           extensionFlags.push("-e", nmPath);
+        } else if (fs.existsSync(path.join(ownSiblingPath, "package.json"))) {
+          // Found as a sibling package in the same monorepo as pi-agents
+          extensionFlags.push("-e", ownSiblingPath);
         } else {
           // Extension not found locally — skip gracefully instead of
           // trying npm: which would fail if the user removed the package.
