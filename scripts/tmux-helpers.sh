@@ -29,11 +29,17 @@ check_inside_tmux() {
 }
 
 # Set standard tmux global environment variables for bosun.
+# Optional: BOSUN_DEFAULT_AGENT — override the agent used by prefix+n/N keybindings.
+# Defaults to "bosun" if not set. Downstream projects should set this to their orchestrator name.
 set_tmux_env() {
   $TMUX_CMD set-environment -g BOSUN_ROOT "$BOSUN_ROOT"
   $TMUX_CMD set-environment -g BOSUN_PI_PATH "$(command -v pi)"
   $TMUX_CMD set-environment -g BOSUN_BUN_PATH "$(command -v bun)"
   $TMUX_CMD set-environment -g BOSUN_BWRAP_PATH "$(command -v bwrap)"
+  # Set default agent for prefix+n/N keybindings if provided by caller
+  if [[ -n "${BOSUN_DEFAULT_AGENT:-}" ]]; then
+    $TMUX_CMD set-environment -g BOSUN_DEFAULT_AGENT "$BOSUN_DEFAULT_AGENT"
+  fi
 }
 
 # Ensure workspace directories exist.

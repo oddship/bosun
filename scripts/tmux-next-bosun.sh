@@ -1,17 +1,32 @@
 #!/usr/bin/env bash
-# Find the next available bosun-N name.
+# Find the next available <prefix>-N name.
 # Checks tmux windows, tmux sessions, AND mesh registry (live PIDs).
 # Prints the number to stdout.
+#
+# Usage: tmux-next-bosun.sh [prefix]
+#   prefix defaults to the current tmux session name, or "bosun" if not in tmux.
 #
 # Used by tmux keybindings (prefix+n, prefix+N) in config/tmux.conf.
 # Requires $BOSUN_ROOT to be set (via tmux global env).
 
 set -euo pipefail
 
+# Determine the agent/session prefix:
+# 1. Explicit argument
+# 2. Current tmux session name
+# 3. Fallback to "bosun"
+if [ -n "${1:-}" ]; then
+  PREFIX="$1"
+elif [ -n "${TMUX:-}" ]; then
+  PREFIX=$(tmux display-message -p '#{session_name}' 2>/dev/null || echo "bosun")
+else
+  PREFIX="bosun"
+fi
+
 MESH_DIR="${BOSUN_ROOT:-.}/.pi/mesh/registry"
 
 name_taken() {
-  local name="bosun-$1"
+  local name="${PREFIX}-$1"  # uses $PREFIX from outer scope
 
   # Check all tmux windows and sessions
   tmux list-windows -a -F '#W' 2>/dev/null | grep -q "^${name}$" && return 0

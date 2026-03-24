@@ -219,7 +219,7 @@ start:
       exec {{{{tmux_cmd}}}} attach -t {{PROJECT_NAME}}
     fi
     {{{{tmux_cmd}}}} -f "{{{{{{PROJECT_NAME}}}}_root}}/config/tmux.conf" new-session -d -s {{PROJECT_NAME}} -n {{ORCHESTRATOR_NAME}}
-    set_tmux_env
+    BOSUN_DEFAULT_AGENT={{ORCHESTRATOR_NAME}} set_tmux_env
     {{{{tmux_cmd}}}} send-keys -t {{PROJECT_NAME}}:{{ORCHESTRATOR_NAME}} "cd {{{{{{PROJECT_NAME}}}}_root}} && PI_AGENT={{ORCHESTRATOR_NAME}} PI_AGENT_NAME={{ORCHESTRATOR_NAME}} upstream/scripts/sandbox.sh pi" Enter
     just _ensure-daemon
     {{{{tmux_cmd}}}} attach -t {{PROJECT_NAME}}
@@ -233,7 +233,7 @@ start-unsandboxed:
       exec {{{{tmux_cmd}}}} attach -t {{PROJECT_NAME}}
     fi
     {{{{tmux_cmd}}}} -f "{{{{{{PROJECT_NAME}}}}_root}}/config/tmux.conf" new-session -d -s {{PROJECT_NAME}} -n {{ORCHESTRATOR_NAME}}
-    set_tmux_env
+    BOSUN_DEFAULT_AGENT={{ORCHESTRATOR_NAME}} set_tmux_env
     {{{{tmux_cmd}}}} send-keys -t {{PROJECT_NAME}}:{{ORCHESTRATOR_NAME}} "cd {{{{{{PROJECT_NAME}}}}_root}} && BOSUN_ROOT={{{{{{PROJECT_NAME}}}}_root}} PI_AGENT={{ORCHESTRATOR_NAME}} PI_AGENT_NAME={{ORCHESTRATOR_NAME}} pi" Enter
     {{{{tmux_cmd}}}} attach -t {{PROJECT_NAME}}
 

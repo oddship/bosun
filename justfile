@@ -87,7 +87,7 @@ start:
         "/bin/sh -c 'cd {{project_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
       {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
     fi
-    set_tmux_env
+    BOSUN_DEFAULT_AGENT=bosun set_tmux_env
     just _ensure-daemon
     {{tmux_cmd}} attach -t bosun
 
@@ -108,7 +108,7 @@ start-unsandboxed:
     echo "Creating new session 'bosun'..."
     {{tmux_cmd}} -f "{{bosun_pkg}}/config/tmux.conf" new-session -d -s bosun -n bosun
     {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "1"
-    set_tmux_env
+    BOSUN_DEFAULT_AGENT=bosun set_tmux_env
     {{tmux_cmd}} send-keys -t bosun:bosun "cd {{project_root}} && BOSUN_ROOT={{project_root}} BOSUN_WORKSPACE={{project_root}}/workspace PI_CODING_AGENT_DIR={{project_root}}/.bosun-home/.pi/agent PI_AGENT=bosun PI_AGENT_NAME=bosun pi" Enter
     {{tmux_cmd}} attach -t bosun
 
@@ -145,7 +145,7 @@ run *args:
         "/bin/sh -c 'cd {{project_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
       {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
     fi
-    set_tmux_env
+    BOSUN_DEFAULT_AGENT=bosun set_tmux_env
     {{tmux_cmd}} attach -t "$SESSION"
 
 # Attach to running session (auto-detects available sessions)
