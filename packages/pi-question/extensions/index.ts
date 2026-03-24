@@ -13,7 +13,7 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Editor, type EditorTheme, Key, matchesKey, Text, truncateToWidth } from "@mariozechner/pi-tui";
+import { Editor, type EditorTheme, Key, matchesKey, Text, truncateToWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 interface OptionWithDesc {
@@ -179,10 +179,28 @@ export default function (pi: ExtensionAPI) {
 
             const lines: string[] = [];
             const add = (s: string) => lines.push(truncateToWidth(s, width));
+            const addWrapped = (s: string, indent: string, indentWidth: number) => {
+              // First line renders at full width; continuation lines are indented
+              const contentWidth = Math.max(1, width - indentWidth);
+              const wrapped = wrapTextWithAnsi(s, width);
+              if (wrapped.length <= 1) {
+                lines.push(truncateToWidth(wrapped[0] ?? s, width));
+                return;
+              }
+              lines.push(truncateToWidth(wrapped[0], width));
+              // Re-wrap the remaining text at the narrower width, then indent
+              const remaining = wrapped.slice(1).join(" ");
+              for (const line of wrapTextWithAnsi(remaining, contentWidth)) {
+                lines.push(truncateToWidth(indent + line, width));
+              }
+            };
 
             add(theme.fg("accent", "─".repeat(width)));
             if (params.header) add(theme.fg("accent", theme.bold(` [${params.header}]`)));
-            add(theme.fg("text", ` ${params.question}`));
+            // Wrap question text instead of truncating
+            for (const line of wrapTextWithAnsi(theme.fg("text", ` ${params.question}`), width)) {
+              lines.push(line);
+            }
             lines.push("");
 
             for (let i = 0; i < allOptions.length; i++) {
@@ -192,26 +210,38 @@ export default function (pi: ExtensionAPI) {
               const isOther = opt.isOther === true;
 
               let prefix: string;
+              let prefixIndent: string;
+              let prefixIndentWidth: number;
               if (isMultiple) {
                 const checkbox = isSelected ? "[x]" : "[ ]";
                 prefix = isCursor ? theme.fg("accent", `> ${checkbox} `) : `  ${checkbox} `;
+                prefixIndent = "         "; // visual width of "> [x] " + number padding
+                prefixIndentWidth = 9;
               } else {
                 prefix = isCursor ? theme.fg("accent", "> ") : "  ";
+                prefixIndent = "     "; // visual width of "> " + number padding
+                prefixIndentWidth = 5;
               }
 
               if (isOther && editMode) {
-                add(prefix + theme.fg("accent", `${i + 1}. ${opt.label} ✎`));
+                addWrapped(prefix + theme.fg("accent", `${i + 1}. ${opt.label} ✎`), prefixIndent, prefixIndentWidth);
               } else if (isCursor) {
-                add(prefix + theme.fg("accent", `${i + 1}. ${opt.label}`));
+                addWrapped(prefix + theme.fg("accent", `${i + 1}. ${opt.label}`), prefixIndent, prefixIndentWidth);
               } else if (isSelected) {
-                add(prefix + theme.fg("success", `${i + 1}. ${opt.label}`));
+                addWrapped(prefix + theme.fg("success", `${i + 1}. ${opt.label}`), prefixIndent, prefixIndentWidth);
               } else {
-                add(prefix + theme.fg("text", `${i + 1}. ${opt.label}`));
+                addWrapped(prefix + theme.fg("text", `${i + 1}. ${opt.label}`), prefixIndent, prefixIndentWidth);
               }
 
               if (opt.description) {
                 const indent = isMultiple ? "       " : "     ";
-                add(`${indent}${theme.fg("muted", opt.description)}`);
+                const indentWidth = isMultiple ? 7 : 5;
+                // Wrap description text with consistent indentation on continuation lines
+                const descContentWidth = Math.max(1, width - indentWidth);
+                const descWrapped = wrapTextWithAnsi(theme.fg("muted", opt.description), descContentWidth);
+                for (const line of descWrapped) {
+                  lines.push(truncateToWidth(`${indent}${line}`, width));
+                }
               }
             }
 
