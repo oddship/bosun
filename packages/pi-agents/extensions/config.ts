@@ -12,8 +12,6 @@ import * as path from "node:path";
 export interface BackendConfig {
   /** Terminal multiplexer type. Only "tmux" supported today. */
   type: "tmux";
-  /** Tmux socket path (for `tmux -S`). Relative to cwd. Omit to auto-detect from $TMUX. */
-  socket?: string;
   /** Command prefix that wraps spawned pi processes (e.g., "scripts/sandbox.sh"). */
   command_prefix?: string;
 }
@@ -57,7 +55,6 @@ export function loadConfig(cwd: string): AgentsConfig {
       agentPaths: Array.isArray(raw.agentPaths) ? raw.agentPaths : DEFAULTS.agentPaths,
       backend: {
         type: raw.backend?.type === "tmux" ? "tmux" : DEFAULTS.backend.type,
-        socket: typeof raw.backend?.socket === "string" ? raw.backend.socket : undefined,
         command_prefix: typeof raw.backend?.command_prefix === "string" ? raw.backend.command_prefix : undefined,
       },
     };

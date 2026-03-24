@@ -21,7 +21,6 @@ describe("loadConfig", () => {
     expect(config.defaultAgent).toBe("bosun");
     expect(config.agentPaths).toEqual([]);
     expect(config.backend.type).toBe("tmux");
-    expect(config.backend.socket).toBeUndefined();
     expect(config.backend.command_prefix).toBeUndefined();
   });
 
@@ -36,7 +35,7 @@ describe("loadConfig", () => {
         agentPaths: ["extra/agents"],
         backend: {
           type: "tmux",
-          socket: ".home/tmux.sock",
+          socket: ".home/tmux.sock", // ignored — kept for backward compat test
           command_prefix: "scripts/sandbox.sh",
         },
       }),
@@ -47,7 +46,8 @@ describe("loadConfig", () => {
     expect(config.defaultAgent).toBe("myagent");
     expect(config.agentPaths).toEqual(["extra/agents"]);
     expect(config.backend.type).toBe("tmux");
-    expect(config.backend.socket).toBe(".home/tmux.sock");
+    // socket field is silently ignored (tmux concern, auto-detected from $TMUX)
+    expect((config.backend as any).socket).toBeUndefined();
     expect(config.backend.command_prefix).toBe("scripts/sandbox.sh");
   });
 
