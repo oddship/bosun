@@ -8,67 +8,21 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { spawn, execFileSync } from "node:child_process";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { AgentsConfig } from "./config.js";
 import { discoverAgents, findAgentFile, loadAgent } from "./agents.js";
+import {
+  isInTmux,
+  getTmuxSocket,
+  getTmuxSessionSync,
+  windowExists,
+  newWindow,
+} from "pi-tmux/core.js";
 
 /** Shell-escape a string by wrapping in single quotes. */
 function shellEscape(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
-}
-
-/**
- * Extract the tmux socket path from $TMUX env var or config.
- * $TMUX format: "/path/to/socket,pid,index"
- *
- * Priority: $TMUX env var first (the live, running socket), then config
- * fallback. The config socket may point to a different tmux server
- * (e.g. a stale .bosun-home/tmux.sock hosting "bosun-dev") while the
- * agent is actually running in a different server entirely.
- */
-function getTmuxSocket(config: AgentsConfig, cwd: string): string | null {
-  // Prefer the live socket from the environment — this is always correct
-  // for the current process's tmux context.
-  const tmuxEnv = process.env.TMUX;
-  if (tmuxEnv) {
-    const parts = tmuxEnv.split(",");
-    if (parts[0]) return parts[0];
-  }
-
-  // Fall back to config socket (useful when $TMUX is unavailable,
-  // e.g. processes started outside tmux that need to target a server).
-  if (config.backend.socket) {
-    const sock = config.backend.socket;
-    return sock.startsWith("/") ? sock : `${cwd}/${sock}`;
-  }
-
-  return null;
-}
-
-/**
- * Get the tmux session name for the current process.
- * Uses `tmux display-message` which resolves the session from $TMUX_PANE or
- * the attached client. This is critical when multiple sessions share a socket
- * (e.g. "bosun" and "bosun-daemon") — without targeting the correct session,
- * new-window may create windows in the wrong session.
- */
-function getTmuxSession(socket: string | null): string | null {
-  try {
-    const pane = process.env.TMUX_PANE;
-    const args: string[] = [];
-    if (socket) args.push("-S", socket);
-    // Use -t $TMUX_PANE to anchor the lookup to the spawner's pane.
-    // Without this, display-message resolves via "current client" which is
-    // ambiguous from a child process and may pick the wrong session.
-    args.push("display-message");
-    if (pane) args.push("-t", pane);
-    args.push("-p", "#{session_name}");
-    return execFileSync("tmux", args, { encoding: "utf-8" }).trim() || null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -106,7 +60,7 @@ export function registerSpawnAgent(
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       // Must be inside tmux
-      if (!process.env.TMUX) {
+      if (!isInTmux()) {
         return {
           content: [
             {
@@ -139,29 +93,18 @@ export function registerSpawnAgent(
       const windowName = params.name || params.agent;
 
       // Check for duplicate tmux window names
-      const checkSocket = getTmuxSocket(config, ctx.cwd);
-      const sessionName = getTmuxSession(checkSocket);
-      const listArgs: string[] = [];
-      if (checkSocket) listArgs.push("-S", checkSocket);
-      listArgs.push("list-windows");
-      if (sessionName) listArgs.push("-t", sessionName);
-      listArgs.push("-F", "#{window_name}");
-      try {
-        const { execFileSync } = await import("node:child_process");
-        const existing = execFileSync("tmux", listArgs, { encoding: "utf-8" }).trim().split("\n");
-        if (existing.includes(windowName)) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error: Window '${windowName}' already exists. Use a different name:\n  spawn_agent({ agent: "${params.agent}", name: "${windowName}-2" })`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      } catch {
-        // tmux list failed — proceed anyway
+      const socket = getTmuxSocket();
+      const sessionName = getTmuxSessionSync({ socket });
+      if (windowExists(windowName, { socket, session: sessionName })) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: Window '${windowName}' already exists. Use a different name:\n  spawn_agent({ agent: "${params.agent}", name: "${windowName}-2" })`,
+            },
+          ],
+          isError: true,
+        };
       }
 
       // Resolve model tier → actual model string
@@ -237,101 +180,70 @@ export function registerSpawnAgent(
       // Wrap command so failures keep the window open for debugging
       const command = `${rawCommand}; EXIT=$?; if [ $EXIT -ne 0 ]; then echo "=== AGENT EXITED ($EXIT) ==="; sleep 30; fi`;
 
-      // Build tmux arguments (reuse socket from duplicate check above)
-      const socket = checkSocket;
-      const tmuxBaseArgs: string[] = [];
-      if (socket) {
-        tmuxBaseArgs.push("-S", socket);
-      }
-
       // Pass the spawning agent's identity so the child knows who to report to.
       // PI_AGENT_NAME is the unique instance name (e.g. "bosun-2").
       const parentName = process.env.PI_AGENT_NAME || process.env.PI_AGENT || "agent";
 
-      const tmuxArgs = [
-        ...tmuxBaseArgs,
-        "new-window",
-        "-d", // Don't switch to the new window
-        // Target the correct session — critical when multiple sessions share
-        // a socket (e.g. "bosun" + "bosun-daemon"). Without this, tmux may
-        // create the window in whichever session was most recently active.
-        ...(sessionName ? ["-t", `${sessionName}:`] : []),
-        "-n",
-        windowName,
-        "-e",
-        `PI_AGENT=${params.agent}`,
-        "-e",
-        `PI_AGENT_NAME=${windowName}`,
-        "-e",
-        `PI_PARENT_AGENT=${parentName}`,
-        "-e",
-        `PI_AGENT_EMOJI=${agent.emoji || "🤖"}`,
+      const result = await newWindow({
+        name: windowName,
         command,
-      ];
-
-      return new Promise((resolve) => {
-        const proc = spawn("tmux", tmuxArgs, {
-          cwd: ctx.cwd,
-          stdio: ["ignore", "pipe", "pipe"],
-        });
-
-        let stdout = "";
-        let stderr = "";
-        proc.stdout.on("data", (d: Buffer) => {
-          stdout += d.toString();
-        });
-        proc.stderr.on("data", (d: Buffer) => {
-          stderr += d.toString();
-        });
-
-        proc.on("close", (code) => {
-          if (code !== 0) {
-            resolve({
-              content: [
-                {
-                  type: "text",
-                  text: `Error spawning agent: ${stderr || stdout}`,
-                },
-              ],
-              isError: true,
-            });
-          } else {
-            // Record the spawn in .pi/spawn-tree.jsonl so tools like the
-            // session sidebar can display parent→child relationships.
-            try {
-              const treeFile = path.join(ctx.cwd, ".pi", "spawn-tree.jsonl");
-              const entry = JSON.stringify({
-                parent: parentName,
-                child: windowName,
-                agent: params.agent,
-                model: resolvedModel || null,
-                ts: new Date().toISOString(),
-              });
-              fs.appendFileSync(treeFile, entry + "\n");
-            } catch {
-              // Best-effort — don't fail the spawn if logging fails
-            }
-
-            const modelInfo = resolvedModel ? ` (model: ${resolvedModel})` : "";
-            const skippedInfo = skippedExts.length
-              ? `\nSkipped extensions (not installed): ${skippedExts.join(", ")}`
-              : "";
-            resolve({
-              content: [
-                {
-                  type: "text",
-                  text: [
-                    `Spawned '${params.agent}' agent in tmux window '${windowName}'${modelInfo}.${skippedInfo}`,
-                    "",
-                    "The agent is running with its persona and extensions loaded.",
-                    "Use pi-mesh to communicate, or tmux to observe.",
-                  ].join("\n"),
-                },
-              ],
-            });
-          }
-        });
+        socket,
+        session: sessionName,
+        background: true,
+        cwd: ctx.cwd,
+        env: {
+          PI_AGENT: params.agent,
+          PI_AGENT_NAME: windowName,
+          PI_PARENT_AGENT: parentName,
+          PI_AGENT_EMOJI: agent.emoji || "🤖",
+        },
       });
+
+      if (result.code !== 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error spawning agent: ${result.stderr || result.stdout}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Record the spawn in .pi/spawn-tree.jsonl so tools like the
+      // session sidebar can display parent→child relationships.
+      try {
+        const treeFile = path.join(ctx.cwd, ".pi", "spawn-tree.jsonl");
+        const entry = JSON.stringify({
+          parent: parentName,
+          child: windowName,
+          agent: params.agent,
+          model: resolvedModel || null,
+          ts: new Date().toISOString(),
+        });
+        fs.appendFileSync(treeFile, entry + "\n");
+      } catch {
+        // Best-effort — don't fail the spawn if logging fails
+      }
+
+      const modelInfo = resolvedModel ? ` (model: ${resolvedModel})` : "";
+      const skippedInfo = skippedExts.length
+        ? `\nSkipped extensions (not installed): ${skippedExts.join(", ")}`
+        : "";
+      return {
+        content: [
+          {
+            type: "text",
+            text: [
+              `Spawned '${params.agent}' agent in tmux window '${windowName}'${modelInfo}.${skippedInfo}`,
+              "",
+              "The agent is running with its persona and extensions loaded.",
+              "Use pi-mesh to communicate, or tmux to observe.",
+            ].join("\n"),
+          },
+        ],
+      };
     },
   });
 }
