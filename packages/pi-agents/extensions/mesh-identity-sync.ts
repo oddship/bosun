@@ -19,10 +19,8 @@
  * Loaded by pi-mesh via hooksModule in the same config file.
  */
 
-import { execFile } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { promisify } from "node:util";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type {
   MeshConfig,
@@ -31,8 +29,11 @@ import type {
   HookActions,
 } from "pi-mesh/types.js";
 import type { RenameResult } from "pi-mesh/registry.js";
-
-const execFileAsync = promisify(execFile);
+import {
+  isInTmux,
+  getWindowName,
+  renameWindow,
+} from "pi-tmux/core.js";
 
 // =============================================================================
 // Identity Sync Config
@@ -88,56 +89,6 @@ function loadIdentitySyncConfig(): IdentitySyncConfig {
 }
 
 // =============================================================================
-// Tmux Helpers (pane-targeted)
-// =============================================================================
-
-function getTmuxSocket(): string | null {
-  const tmuxEnv = process.env.TMUX;
-  if (!tmuxEnv) return null;
-  const [socket] = tmuxEnv.split(",");
-  return socket || null;
-}
-
-async function execTmux(args: string[]): Promise<string | null> {
-  const socket = getTmuxSocket();
-  if (!socket) return null;
-  try {
-    const result = await execFileAsync("tmux", ["-S", socket, ...args], {
-      encoding: "utf-8",
-      timeout: 2000,
-    });
-    return result.stdout.trim();
-  } catch {
-    return null;
-  }
-}
-
-function getTmuxPaneTarget(): string | null {
-  return process.env.TMUX_PANE || null;
-}
-
-function hasTmux(): boolean {
-  return getTmuxSocket() !== null;
-}
-
-async function getCurrentTmuxWindowName(): Promise<string | null> {
-  const target = getTmuxPaneTarget();
-  const args = target
-    ? ["display-message", "-p", "-t", target, "#W"]
-    : ["display-message", "-p", "#W"];
-  return execTmux(args);
-}
-
-async function renameCurrentTmuxWindow(name: string): Promise<boolean> {
-  const target = getTmuxPaneTarget();
-  const args = target
-    ? ["rename-window", "-t", target, name]
-    : ["rename-window", name];
-  const result = await execTmux(args);
-  return result !== null;
-}
-
-// =============================================================================
 // Runtime Identity Helpers
 // =============================================================================
 
@@ -187,12 +138,12 @@ async function syncTmuxWindowToAgentName(
   syncConfig: IdentitySyncConfig,
   name: string,
 ): Promise<void> {
-  if (!syncConfig.meshToTmux || !hasTmux()) return;
+  if (!syncConfig.meshToTmux || !isInTmux()) return;
 
-  const renamed = await renameCurrentTmuxWindow(name);
+  const renamed = await renameWindow(name);
   if (!renamed) return;
 
-  const observedWindowName = await getCurrentTmuxWindowName();
+  const observedWindowName = await getWindowName();
   syncState.lastObservedTmuxWindowName = observedWindowName ?? name;
   syncState.suppressTmuxRenameUntil = Date.now() + syncConfig.pollIntervalMs * 2;
 }
@@ -235,10 +186,10 @@ export function createHooks(_meshConfig: MeshConfig): MeshLifecycleHooks {
     async onRegistered(state, ctx, actions) {
       refreshRuntimeIdentity(state, ctx);
 
-      if (!hasTmux()) return;
+      if (!isInTmux()) return;
 
       const syncState = getSyncState(state);
-      const currentWindowName = await getCurrentTmuxWindowName();
+      const currentWindowName = await getWindowName();
       syncState.lastObservedTmuxWindowName = currentWindowName ?? state.agentName;
 
       // Startup alignment: make tmux match the mesh name.
@@ -266,19 +217,19 @@ export function createHooks(_meshConfig: MeshConfig): MeshLifecycleHooks {
         );
       }
 
-      if (!hasTmux()) return;
+      if (!isInTmux()) return;
 
       const syncState = getSyncState(state);
       await syncTmuxWindowToAgentName(state, syncState, syncConfig, state.agentName);
     },
 
     async onPollTick(state, ctx, actions) {
-      if (!syncConfig.tmuxToMesh || !hasTmux() || !state.registered) return;
+      if (!syncConfig.tmuxToMesh || !isInTmux() || !state.registered) return;
 
       const syncState = getSyncState(state);
       if (Date.now() < syncState.suppressTmuxRenameUntil) return;
 
-      const windowName = await getCurrentTmuxWindowName();
+      const windowName = await getWindowName();
       if (!windowName) return;
       if (windowName === syncState.lastObservedTmuxWindowName) return;
 
