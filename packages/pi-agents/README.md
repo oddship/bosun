@@ -67,7 +67,6 @@ Create `.pi/agents.json`:
   "agentPaths": [],
   "backend": {
     "type": "tmux",
-    "socket": ".bosun-home/tmux.sock",
     "command_prefix": "scripts/sandbox.sh"
   }
 }

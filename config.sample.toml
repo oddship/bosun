@@ -33,7 +33,7 @@ default_agent = "bosun"
 
 [backend]
 type = "tmux"
-socket = ".bosun-home/tmux.sock"
+# socket is auto-detected from $TMUX env or computed by scripts/tmux-socket.sh
 command_prefix = "scripts/sandbox.sh"
 
 # =============================================================================

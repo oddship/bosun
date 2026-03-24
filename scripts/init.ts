@@ -178,7 +178,7 @@ writeJson("agents.json", {
   ],
   backend: {
     type: backend.type || "tmux",
-    socket: backend.socket || ".bosun-home/tmux.sock",
+    ...(backend.socket ? { socket: backend.socket } : {}),
     command_prefix: backend.command_prefix || "scripts/sandbox.sh",
   },
 });

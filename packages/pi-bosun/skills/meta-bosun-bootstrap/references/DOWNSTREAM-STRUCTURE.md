@@ -76,8 +76,7 @@ Complete directory layout for a project built on bosun.
 ├── .bosun-home/                     # Sandboxed HOME (gitignored)
 │   ├── .pi/agent/                   #   Pi's auth, sessions, keybindings
 │   ├── .ssh -> ~/.ssh               #   Symlink to host SSH
-│   ├── .gitconfig                   #   Merged git config
-│   └── tmux.sock                    #   Tmux socket
+│   └── .gitconfig                   #   Merged git config
 │
 ├── .bosun-daemon/                   # Daemon state (gitignored)
 │   ├── daemon.log
@@ -115,7 +114,7 @@ They're discovered via `.pi/settings.json` package paths.
 ## What's Gitignored
 
 ```
-.bosun-home/          # Sandboxed HOME (auth, sessions, tmux socket)
+.bosun-home/          # Sandboxed HOME (auth, sessions)
 .bosun-daemon/        # Daemon state
 workspace/            # User data
 config.toml           # API keys

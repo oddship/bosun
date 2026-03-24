@@ -85,7 +85,6 @@ writeJson("agents.json", {
   ],
   backend: {
     type: "tmux",
-    socket: ".bosun-home/tmux.sock",
     command_prefix: "upstream/scripts/sandbox.sh",  // CHANGE: was "scripts/sandbox.sh"
   },
 });

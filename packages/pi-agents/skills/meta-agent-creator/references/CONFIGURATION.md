@@ -128,12 +128,11 @@ The spawn backend is configured in `.pi/agents.json`:
 {
   "backend": {
     "type": "tmux",
-    "socket": ".bosun-home/tmux.sock",
     "command_prefix": "scripts/sandbox.sh"
   }
 }
 ```
 
 - `type`: Terminal multiplexer (only `"tmux"` today)
-- `socket`: Tmux socket path. Omit to auto-detect from `$TMUX` env
+- `socket`: Tmux socket path (optional). Auto-detected from `$TMUX` env when omitted
 - `command_prefix`: Wraps each spawned pi process (e.g., sandbox script)
