@@ -6,6 +6,8 @@ tools: read, grep, find, ls, bash
 model: lite
 thinking: off
 output: context.md
+bash-readonly: true
+bash-readonly-locked: true
 extensions:
   - pi-question
   - pi-mesh

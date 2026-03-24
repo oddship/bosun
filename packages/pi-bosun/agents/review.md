@@ -6,6 +6,8 @@ tools: read, grep, find, ls, bash
 model: medium
 thinking: medium
 skill: git
+bash-readonly: true
+bash-readonly-locked: true
 extensions:
   - pi-question
   - pi-mesh

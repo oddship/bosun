@@ -5,6 +5,8 @@ description: Deep reasoning agent for architecture, hard debugging, complex trad
 tools: read, grep, find, ls, bash
 model: oracle
 thinking: high
+bash-readonly: true
+bash-readonly-locked: true
 extensions:
   - pi-question
   - pi-mesh

@@ -6,6 +6,7 @@ tools: read, grep, find, ls, bash, write, edit
 model: high
 thinking: medium
 skill: git, context-management
+bash-readonly: false
 extensions:
   - pi-agents
   - pi-tmux

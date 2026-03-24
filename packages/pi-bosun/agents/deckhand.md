@@ -6,6 +6,7 @@ tools: read, grep, find, ls, bash, write, edit
 model: high
 thinking: medium
 skill: git
+bash-readonly: false
 extensions:
   - pi-agents
   - pi-question

@@ -5,6 +5,7 @@ description: Fast helper agent for quick tasks — summaries, context gathering,
 tools: read, grep, find, ls, bash, write, edit
 model: lite
 thinking: off
+bash-readonly: false
 extensions:
   - pi-agents
   - pi-question
