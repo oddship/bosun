@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Terminal power tools for Pi \u2014 split_pane, send_keys, capture_pane, list_windows",
+  "exports": {
+    "./core.js": "./core.ts",
+    "./core": "./core.ts",
+    ".": "./extensions/index.ts"
+  },
   "keywords": [
     "pi-package"
   ],
