@@ -193,6 +193,11 @@ export function registerSpawnAgent(
       // This is needed when ctx.cwd is a downstream project that doesn't
       // have pi-agents/pi-sandbox in its own packages/ or node_modules/.
       const ownPackagesDir = path.resolve(import.meta.dirname, "..", "..");
+      // Sanity-check: if we can't find ourselves, the depth assumption is wrong
+      // (e.g., spawn.ts was moved). Disable the fallback rather than resolve junk.
+      const ownPackagesValid = fs.existsSync(
+        path.join(ownPackagesDir, "pi-agents", "package.json"),
+      );
 
       const skippedExts: string[] = [];
       for (const ext of extList.filter(Boolean)) {
@@ -204,7 +209,7 @@ export function registerSpawnAgent(
           extensionFlags.push("-e", localPath);
         } else if (fs.existsSync(path.join(nmPath, "package.json"))) {
           extensionFlags.push("-e", nmPath);
-        } else if (fs.existsSync(path.join(ownSiblingPath, "package.json"))) {
+        } else if (ownPackagesValid && fs.existsSync(path.join(ownSiblingPath, "package.json"))) {
           // Found as a sibling package in the same monorepo as pi-agents
           extensionFlags.push("-e", ownSiblingPath);
         } else {
