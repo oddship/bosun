@@ -18,10 +18,10 @@ Run via bash from project root:
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `list.ts` | List documents | `bun .pi/skills/context-management/scripts/list.ts [all\|plans\|handoffs\|forks\|pending]` |
-| `create-handoff.ts` | Create handoff | `bun .pi/skills/context-management/scripts/create-handoff.ts <sessionID> [focus]` |
-| `create-fork.ts` | Create fork | `bun .pi/skills/context-management/scripts/create-fork.ts <sessionID> <reason>` |
-| `load.ts` | Load & mark picked_up | `bun .pi/skills/context-management/scripts/load.ts <path>` |
+| `list.ts` | List documents | `bun scripts/list.ts [all\|plans\|handoffs\|forks\|pending]` |
+| `create-handoff.ts` | Create handoff | `bun scripts/create-handoff.ts <sessionID> [focus]` |
+| `create-fork.ts` | Create fork | `bun scripts/create-fork.ts <sessionID> <reason>` |
+| `load.ts` | Load & mark picked_up | `bun scripts/load.ts <path>` |
 
 ## Workspace Structure
 

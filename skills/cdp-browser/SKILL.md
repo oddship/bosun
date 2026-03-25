@@ -27,7 +27,7 @@ Browser automation and visual review via Chrome DevTools Protocol.
 The headline capability. Run against any local site from any repo — bosun handles everything:
 
 ```bash
-bun .pi/skills/cdp-browser/scripts/visual-review.ts \
+bun scripts/visual-review.ts \
   --base http://localhost:8080 \
   --crawl \
   --out workspace/scratch/review
@@ -42,7 +42,7 @@ This will:
 Or specify pages explicitly:
 
 ```bash
-bun .pi/skills/cdp-browser/scripts/visual-review.ts \
+bun scripts/visual-review.ts \
   --base http://localhost:3000 \
   --pages / /about /docs/getting-started \
   --out workspace/scratch/review
@@ -55,7 +55,7 @@ Use `--json` for machine-readable output.
 ## CLI — one-shot commands
 
 ```bash
-CDP=".pi/skills/cdp-browser/scripts/cdp.ts"
+CDP="scripts/cdp.ts"
 
 bun $CDP navigate "https://example.com"
 bun $CDP screenshot workspace/scratch/page.png
@@ -69,7 +69,7 @@ bun $CDP inlinestyles
 For workflows the visual-review script doesn't cover, write a Bun script that imports the library:
 
 ```typescript
-import { run } from ".pi/skills/cdp-browser/scripts/cdp-client";
+import { run } from "scripts/cdp-client";
 
 await run(async (b) => {
   await b.navigate("http://localhost:8080");
@@ -169,7 +169,7 @@ Devices: `iphone-se`, `iphone-14`, `iphone-14-pro-max`, `pixel-7`, `ipad`, `ipad
 ## Workflow: Quick Check
 
 ```bash
-CDP=".pi/skills/cdp-browser/scripts/cdp.ts"
+CDP="scripts/cdp.ts"
 
 bun $CDP navigate "http://localhost:8080"
 bun $CDP snapshot | grep -i "button\|link"
@@ -181,7 +181,7 @@ bun $CDP screenshot workspace/scratch/result.png
 ## Workflow: Visual Review (scripted)
 
 ```typescript
-import { run } from "../../.pi/skills/cdp-browser/scripts/cdp-client";
+import { run } from "../../scripts/cdp-client";
 
 await run(async (b) => {
   // Multi-viewport screenshots
