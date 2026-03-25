@@ -67,7 +67,7 @@ const PROJECT_ARCHIVE_RETENTION_DAYS = 60;
 
 function getTasksDir(): string {
   const user = process.env.USER || process.env.LOGNAME || "unknown";
-  const base = process.env.BESON_ROOT || process.cwd();
+  const base = process.env.BOSUN_ROOT || process.cwd();
   return join(base, "workspace", "users", user, "tasks");
 }
 
@@ -909,7 +909,7 @@ async function cmdPublish(args: string[]): Promise<void> {
   }
   
   const user = process.env.USER || process.env.LOGNAME || "unknown";
-  const base = process.env.BESON_ROOT || process.cwd();
+  const base = process.env.BOSUN_ROOT || process.cwd();
   const publicTasksDir = join(base, "workspace", "users", user, "public", "tasks");
   await ensureDir(publicTasksDir);
   
@@ -937,7 +937,7 @@ async function cmdUnpublish(args: string[]): Promise<void> {
   }
   
   const user = process.env.USER || process.env.LOGNAME || "unknown";
-  const base = process.env.BESON_ROOT || process.cwd();
+  const base = process.env.BOSUN_ROOT || process.cwd();
   const publicPath = join(base, "workspace", "users", user, "public", "tasks", `${id}.md`);
   
   if (!existsSync(publicPath)) {

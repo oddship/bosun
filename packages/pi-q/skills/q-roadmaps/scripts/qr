@@ -50,7 +50,7 @@ type Roadmap = z.infer<typeof RoadmapSchema>;
 
 function getRoadmapsDir(): string {
   const user = process.env.USER || process.env.LOGNAME || "unknown";
-  const base = process.env.BESON_ROOT || process.cwd();
+  const base = process.env.BOSUN_ROOT || process.cwd();
   return join(base, "workspace", "users", user, "roadmaps");
 }
 
@@ -59,7 +59,7 @@ function getUpdateLogPath(): string {
 }
 
 function getQpPath(): string {
-  const base = process.env.BESON_ROOT || process.cwd();
+  const base = process.env.BOSUN_ROOT || process.cwd();
   return join(base, ".pi", "skills", "q-projects", "scripts", "qp");
 }
 
@@ -607,7 +607,7 @@ async function cmdPublish(args: string[]): Promise<void> {
   }
   
   const user = process.env.USER || process.env.LOGNAME || "unknown";
-  const base = process.env.BESON_ROOT || process.cwd();
+  const base = process.env.BOSUN_ROOT || process.cwd();
   const publicRoadmapsDir = join(base, "workspace", "users", user, "public", "roadmaps");
   await ensureDir(publicRoadmapsDir);
   

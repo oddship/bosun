@@ -31,16 +31,16 @@ Do NOT use for:
 
 The `qp` CLI script is located at:
 ```
-.pi/skills/q-projects/scripts/qp
+scripts/qp
 ```
 
-Run with full path: `.pi/skills/q-projects/scripts/qp <command>`
+Run with full path: `scripts/qp <command>`
 
 ## Quick Start
 
 ```bash
 # Create a project
-.pi/skills/q-projects/scripts/qp new "GTT v2 Migration" -p P0 --repo github/myorg/myrepo -t infra,trading
+scripts/qp new "GTT v2 Migration" -p P0 --repo github/myorg/myrepo -t infra,trading
 
 # List active projects
 qp list

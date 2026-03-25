@@ -32,10 +32,10 @@ Do NOT use for:
 
 The `qt` CLI script is located at:
 ```
-.pi/skills/q-tasks/scripts/qt
+scripts/qt
 ```
 
-Run with full path: `.pi/skills/q-tasks/scripts/qt <command>`
+Run with full path: `scripts/qt <command>`
 
 ## Finding Tasks
 
@@ -58,7 +58,7 @@ mcp_grep pattern="chart" path="workspace/users/$USER/tasks"
 
 ```bash
 # Add a task
-.pi/skills/q-tasks/scripts/qt add "Deploy GTT v2" -p P0 -d 2026-01-15 -t deploy,uat --project tsl-myproject
+scripts/qt add "Deploy GTT v2" -p P0 -d 2026-01-15 -t deploy,uat --project tsl-myproject
 
 # List active tasks
 qt list --status active

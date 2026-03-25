@@ -31,16 +31,16 @@ Do NOT use for:
 
 The `qr` CLI script is located at:
 ```
-.pi/skills/q-roadmaps/scripts/qr
+scripts/qr
 ```
 
-Run with full path: `.pi/skills/q-roadmaps/scripts/qr <command>`
+Run with full path: `scripts/qr <command>`
 
 ## Quick Start
 
 ```bash
 # Create a roadmap
-.pi/skills/q-roadmaps/scripts/qr new "Q1 2026" --teams frontend,backend
+scripts/qr new "Q1 2026" --teams frontend,backend
 
 # List roadmaps
 qr list
