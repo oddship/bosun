@@ -29,8 +29,6 @@ export interface RuleConfig {
 export interface DaemonConfig {
   /** Whether the daemon is enabled. */
   enabled: boolean;
-  /** Directory containing handler .ts files (relative to cwd). */
-  handlers_dir: string;
   /** Heartbeat interval in seconds. */
   heartbeat_interval_seconds: number;
   /** Directory for daemon state files (relative to cwd). */
@@ -100,9 +98,6 @@ export interface HandlerContext {
   /** Arbitrary context from rule evaluation. */
   [key: string]: unknown;
 }
-
-/** Handler function signature. Exported by handler .ts files as default. */
-export type HandlerFn = (context: HandlerContext) => Promise<void>;
 
 export interface DaemonStatus {
   running: boolean;

@@ -2,17 +2,13 @@
 /**
  * pi-daemon — Background automation engine for Pi.
  *
- * Workflow-first architecture:
+ * Workflow-based architecture:
  * - Discovers workflows from packages, .pi/workflows, workspace/workflows
  * - Triggers: file watchers, schedules, startup, manual
  * - Pipeline: validate input → spawn agent/script → validate output → retry
- *
- * Supports two modes:
- * - "workflows" (default): discovers workflow directories
- * - "legacy": loads TypeScript handlers from handlers_dir (backward compat)
  */
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync, renameSync, readdirSync } from "node:fs";
+import { mkdirSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 import { loadDaemonConfig } from "./config.js";
@@ -21,7 +17,6 @@ import { setLogLevel, setLogFile, info, error, debug } from "./logger.js";
 import { initTriggers } from "./triggers.js";
 import { initRulesState, evaluateRules, catchUpRules } from "./rules.js";
 import { initQueue, setHandlerRunner, enqueueTasks, processQueue } from "./queue.js";
-import { initHandlers, runHandler } from "./handlers.js";
 import { setupWatchers, closeWatchers } from "./watcher.js";
 import { initControl, startControl, stopControl } from "./control.js";
 import { discoverWorkflows, deriveWatchers, type WorkflowConfig } from "./workflows.js";
@@ -161,28 +156,6 @@ function startWorkflowMode(config: ReturnType<typeof loadDaemonConfig>, stateDir
   return rules;
 }
 
-// --- Legacy mode ---
-
-function startLegacyMode(config: ReturnType<typeof loadDaemonConfig>): RuleConfig[] {
-  info("Running in legacy mode (handlers_dir)");
-  initHandlers(config.handlers_dir, ROOT);
-
-  setHandlerRunner(async (handler, context) => {
-    status.stats.handlers_run++;
-    await runHandler(handler, context);
-  });
-
-  setupWatchers(config.watchers, ROOT);
-  status.watchers = config.watchers.map((w) => ({
-    name: w.name,
-    pattern: w.pattern,
-    enabled: true,
-    last_triggered: null,
-  }));
-
-  return config.rules;
-}
-
 // --- Main ---
 
 async function main(): Promise<void> {
@@ -219,30 +192,7 @@ async function main(): Promise<void> {
   initControl(stateDir, logFile, getStatus);
   startControl();
 
-  // Choose mode: workflow-first or legacy
-  // Legacy mode activates when handlers_dir exists and no workflows are found
-  let rules: RuleConfig[];
-
-  // Check for workflow directories in any of the three discovery locations
-  let hasWorkflows =
-    existsSync(join(ROOT, ".pi", "workflows")) ||
-    existsSync(join(ROOT, "workspace", "workflows"));
-
-  // Also check packages/*/workflows/
-  if (!hasWorkflows && existsSync(join(ROOT, "packages"))) {
-    try {
-      const pkgs = readdirSync(join(ROOT, "packages"));
-      hasWorkflows = pkgs.some(pkg =>
-        existsSync(join(ROOT, "packages", pkg, "workflows"))
-      );
-    } catch {}
-  }
-
-  if (hasWorkflows || !config.handlers_dir) {
-    rules = startWorkflowMode(config, stateDir);
-  } else {
-    rules = startLegacyMode(config);
-  }
+  const rules = startWorkflowMode(config, stateDir);
 
   status.running = true;
   info(`Daemon started (PID: ${process.pid})`);

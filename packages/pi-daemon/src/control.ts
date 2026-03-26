@@ -10,8 +10,7 @@ import { watch, type FSWatcher } from "chokidar";
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { info, error } from "./logger.js";
-import { runHandler, clearHandlerCache } from "./handlers.js";
-import { getQueueStatus } from "./queue.js";
+import { getQueueStatus, enqueueTasks } from "./queue.js";
 import type { DaemonStatus } from "./types.js";
 
 let controlDir: string;
@@ -76,14 +75,16 @@ async function handleCommand(
 
     case "trigger": {
       if (typeof command.handler !== "string") {
-        return { success: false, error: "handler name required" };
+        return { success: false, error: "handler (workflow name) required" };
       }
-      try {
-        await runHandler(command.handler, (command.context as Record<string, unknown>) || {});
-        return { success: true, message: `Triggered ${command.handler}` };
-      } catch (err) {
-        return { success: false, error: String(err) };
-      }
+      enqueueTasks([{
+        id: `${command.handler}-manual-${Date.now()}`,
+        rule: command.handler,
+        handler: command.handler,
+        context: (command.context as Record<string, unknown>) || {},
+        priority: "normal",
+      }]);
+      return { success: true, message: `Enqueued ${command.handler}` };
     }
 
     case "logs": {
@@ -98,8 +99,8 @@ async function handleCommand(
     }
 
     case "reload": {
-      clearHandlerCache();
-      return { success: true, message: "Handler cache cleared" };
+      // No-op — workflows are discovered fresh on each run
+      return { success: true, message: "Reload acknowledged (workflows are stateless)" };
     }
 
     case "stop": {

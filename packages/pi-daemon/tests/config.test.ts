@@ -18,7 +18,6 @@ describe("loadDaemonConfig", () => {
   it("returns defaults when no config file exists", () => {
     const config = loadDaemonConfig(tmpDir);
     expect(config.enabled).toBe(false);
-    expect(config.handlers_dir).toBe("scripts/daemon/handlers");
     expect(config.heartbeat_interval_seconds).toBe(60);
     expect(config.state_dir).toBe(".bosun-daemon");
     expect(config.log_level).toBe("info");
@@ -33,7 +32,6 @@ describe("loadDaemonConfig", () => {
       path.join(piDir, "daemon.json"),
       JSON.stringify({
         enabled: true,
-        handlers_dir: "my/handlers",
         heartbeat_interval_seconds: 30,
         state_dir: ".my-daemon",
         log_level: "debug",
@@ -49,7 +47,6 @@ describe("loadDaemonConfig", () => {
 
     const config = loadDaemonConfig(tmpDir);
     expect(config.enabled).toBe(true);
-    expect(config.handlers_dir).toBe("my/handlers");
     expect(config.heartbeat_interval_seconds).toBe(30);
     expect(config.state_dir).toBe(".my-daemon");
     expect(config.log_level).toBe("debug");

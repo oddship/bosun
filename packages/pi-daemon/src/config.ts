@@ -8,7 +8,6 @@ import type { DaemonConfig, WatcherConfig, RuleConfig } from "./types.js";
 
 const DEFAULTS: DaemonConfig = {
   enabled: false,
-  handlers_dir: "scripts/daemon/handlers",
   heartbeat_interval_seconds: 60,
   state_dir: ".bosun-daemon",
   log_level: "info",
@@ -27,7 +26,6 @@ export function loadDaemonConfig(cwd: string): DaemonConfig {
     const raw = JSON.parse(readFileSync(configPath, "utf-8"));
     return {
       enabled: typeof raw.enabled === "boolean" ? raw.enabled : DEFAULTS.enabled,
-      handlers_dir: typeof raw.handlers_dir === "string" ? raw.handlers_dir : DEFAULTS.handlers_dir,
       heartbeat_interval_seconds:
         typeof raw.heartbeat_interval_seconds === "number"
           ? raw.heartbeat_interval_seconds
