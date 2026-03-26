@@ -75,6 +75,14 @@ function calculateBackoff(attempts: number): string {
 // --- Public API ---
 
 /** Add tasks to queue (deduplicates by rule name). */
+/** Check if a rule is already queued or running. */
+export function isQueued(rule: string): boolean {
+  const queue = loadQueue();
+  return queue.tasks.some(
+    (t) => t.rule === rule && (t.status === "queued" || t.status === "running"),
+  );
+}
+
 export function enqueueTasks(tasks: QueuedTask[]): void {
   if (tasks.length === 0) return;
 

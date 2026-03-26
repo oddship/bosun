@@ -10,7 +10,7 @@ import { watch, type FSWatcher } from "chokidar";
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { info, error } from "./logger.js";
-import { getQueueStatus, enqueueTasks } from "./queue.js";
+import { getQueueStatus, enqueueTasks, isQueued } from "./queue.js";
 import type { DaemonStatus } from "./types.js";
 
 let controlDir: string;
@@ -77,14 +77,19 @@ async function handleCommand(
       if (typeof command.handler !== "string") {
         return { success: false, error: "handler (workflow name) required" };
       }
+      // Fire-and-forget: enqueues the workflow for async processing
+      const name = command.handler;
+      if (isQueued(name)) {
+        return { success: true, message: `${name} already queued — skipped` };
+      }
       enqueueTasks([{
-        id: `${command.handler}-manual-${Date.now()}`,
-        rule: command.handler,
-        handler: command.handler,
+        id: `${name}-manual-${Date.now()}`,
+        rule: name,
+        handler: name,
         context: (command.context as Record<string, unknown>) || {},
         priority: "normal",
       }]);
-      return { success: true, message: `Enqueued ${command.handler}` };
+      return { success: true, message: `Enqueued ${name}` };
     }
 
     case "logs": {

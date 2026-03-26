@@ -30,7 +30,7 @@ adapts them. This document describes exactly what changes in each file and why.
 | `settings.json` generation | Change paths to `../upstream/packages/` | Packages live in submodule |
 | `agents.json` → `agentPaths` | Add `"./upstream/.pi/agents"` | Discover upstream stock agents |
 | `agents.json` → `defaultAgent` | `"bosun"` → `"{{ORCHESTRATOR}}"` | Your orchestrator |
-| `daemon.json` → `handlers_dir` | Point to your handlers or upstream's | `"upstream/scripts/daemon/handlers"` or `"scripts/daemon/handlers"` |
+| `daemon.json` → `enabled` | Enable the daemon for your project | `true` |
 
 **Key detail for settings.json paths:**
 Settings paths are resolved relative to `.pi/` (where settings.json lives).

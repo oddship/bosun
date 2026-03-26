@@ -432,10 +432,10 @@ a `"pi"` key. See upstream's packages for the pattern.
 **Warning:** Don't name your packages the same as upstream packages (e.g., don't
 create `packages/pi-agents/`). This causes workspace resolution conflicts.
 
-### Adding a Daemon Handler
+### Adding a Daemon Workflow
 
-Either point `handlers_dir` in `config.toml` to `upstream/scripts/daemon/handlers`
-(reuse stock handlers) or create your own `scripts/daemon/handlers/` directory.
+Create workflow directories in `.pi/workflows/` or `workspace/workflows/`.
+Each workflow needs a `config.toml` and an `agent.md`. See the `bosun-daemon` skill for details.
 
 ### Overriding an Upstream Agent
 
