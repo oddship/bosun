@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { discoverAgents, findAgentFile, loadAgent } from "../extensions/agents.js";
+import { discoverAgents, findAgentFile, loadAgent } from "../src/agents.js";
 
 describe("discoverAgents", () => {
   let tmpDir: string;

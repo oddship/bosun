@@ -10,10 +10,10 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { loadConfig, type AgentsConfig } from "./config.js";
-import { findAgentFile, loadAgent } from "./agents.js";
-import { registerSpawnAgent } from "./spawn.js";
-import { processTemplate } from "./template.js";
+import { loadConfig, type AgentsConfig } from "../src/config.js";
+import { findAgentFile, loadAgent } from "../src/agents.js";
+import { registerSpawnAgent } from "./spawn-tool.js";
+import { processTemplate } from "../src/template.js";
 
 export default function (pi: ExtensionAPI) {
   const agentName = process.env.PI_AGENT || "none";

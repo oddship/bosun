@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { loadConfig } from "../extensions/config.js";
+import { loadConfig } from "../src/config.js";
 
 describe("loadConfig", () => {
   let tmpDir: string;

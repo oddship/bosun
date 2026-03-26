@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { processTemplate } from "../extensions/template.js";
+import { processTemplate } from "../src/template.js";
 
 describe("processTemplate", () => {
   let tmpDir: string;
