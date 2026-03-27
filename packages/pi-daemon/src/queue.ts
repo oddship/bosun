@@ -20,12 +20,12 @@ const STALE_RUNNING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 let queueFile: string;
 let isProcessing = false;
 
-/** Update the PID of the currently running task. Called by agent-runner when spawning. */
-export function setCurrentTaskPid(pid: number): void {
+/** Update the PID of a specific running task. Called by agent-runner when spawning. */
+export function setTaskPid(taskId: string, pid: number): void {
   const queue = loadQueue();
-  const running = queue.tasks.find((t) => t.status === "running");
-  if (running) {
-    running.pid = pid;
+  const task = queue.tasks.find((t) => t.id === taskId && t.status === "running");
+  if (task) {
+    task.pid = pid;
     saveQueue(queue);
   }
 }

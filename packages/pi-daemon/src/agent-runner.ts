@@ -12,7 +12,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, createWriteStream } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { info, error, debug } from "./logger.js";
-import { setCurrentTaskPid } from "./queue.js";
+import { setTaskPid } from "./queue.js";
 import { loadConfig as loadAgentsConfig } from "../../pi-agents/src/config.js";
 import { resolveModel } from "../../pi-agents/src/models.js";
 import { buildAgentEnv } from "../../pi-agents/src/env.js";
@@ -184,11 +184,13 @@ async function spawnAgent(
   const timeoutMs = workflow.timeout_minutes * 60 * 1000;
 
   const logFile = workflowLogPath(workflow.name);
+  const taskId = context._task_id as string | undefined;
   return spawnProcess(PI_PATH, args, {
     cwd: process.cwd(),
     env,
     timeoutMs,
     logFile,
+    taskId,
   });
 }
 
@@ -221,11 +223,13 @@ async function runScript(
   const timeoutMs = workflow.timeout_minutes * 60 * 1000;
 
   const logFile = workflowLogPath(workflow.name);
+  const taskId = context._task_id as string | undefined;
   return spawnProcess("bun", [command], {
     cwd: process.cwd(),
     env,
     timeoutMs,
     logFile,
+    taskId,
   });
 }
 
@@ -235,7 +239,7 @@ async function runScript(
 function spawnProcess(
   cmd: string,
   args: string[],
-  opts: { cwd: string; env: Record<string, string>; timeoutMs: number; logFile?: string },
+  opts: { cwd: string; env: Record<string, string>; timeoutMs: number; logFile?: string; taskId?: string },
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const proc = spawn(cmd, args, {
@@ -244,9 +248,9 @@ function spawnProcess(
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    // Track PID in queue for liveness checks
-    if (proc.pid) {
-      setCurrentTaskPid(proc.pid);
+    // Track PID in queue for liveness checks (scoped to specific task)
+    if (proc.pid && opts.taskId) {
+      setTaskPid(opts.taskId, proc.pid);
     }
 
     let stdout = "";
