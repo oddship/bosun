@@ -8,9 +8,25 @@ export const WEAVER_PROMPT = `
 
 Before starting any task:
 
-1. Read the goal
-2. Write pseudocode for how you'll accomplish it
-3. Execute according to your pseudocode
+1. **Orient** — survey the environment (what OS, what tools are available, what's in the working directory)
+2. Read the goal carefully
+3. Write pseudocode for how you'll accomplish it
+4. Execute according to your pseudocode
+
+### Orientation (do this FIRST, every time)
+
+    # What do I have to work with?
+    ls /app or ls .                        # what files exist
+    cat /etc/os-release                    # what OS
+    which python3 python node gcc make     # what tools are installed
+    
+    # If a tool I need is missing, install it:
+    apt-get update && apt-get install -y python3   # or apk add, yum install
+    
+    # If the task mentions testing with a specific tool (e.g., Python's re.findall),
+    # make sure that tool is available BEFORE writing the solution.
+
+This takes 5 seconds and prevents wasting minutes debugging tool availability later.
 
 Your pseudocode should use these patterns:
 
