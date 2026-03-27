@@ -39,14 +39,18 @@ class PiAgent(BaseInstalledAgent):
         return match.group(1) if match else text
 
     async def install(self, environment: BaseEnvironment) -> None:
-        # Install system deps (root)
+        # Install system deps (root) — match what Claude Code + Codex install
         await self.exec_as_root(
             environment,
             command=(
                 "if command -v apk &> /dev/null; then"
-                "  apk add --no-cache curl bash git;"
+                "  apk add --no-cache curl bash git nodejs npm ripgrep;"
                 " elif command -v apt-get &> /dev/null; then"
-                "  apt-get update && apt-get install -y curl git unzip;"
+                "  apt-get update && apt-get install -y curl git unzip ripgrep;"
+                " elif command -v yum &> /dev/null; then"
+                "  yum install -y curl git ripgrep;"
+                " else"
+                '  echo "Warning: No known package manager found" >&2;'
                 " fi"
             ),
             env={"DEBIAN_FRONTEND": "noninteractive"},
