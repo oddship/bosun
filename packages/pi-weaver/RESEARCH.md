@@ -124,6 +124,18 @@ The time_lapse tool uses `ctx.abort()` to stop the current agent loop, then `pi.
 5. Analyze and iterate: when does time_lapse fire, does it help
 6. Leaderboard submission if competitive
 
+## Auth & Cost
+
+We're using a ChatGPT Plus subscription ($20/mo), not pay-per-token API. Pi authenticates
+via OAuth token stored in auth.json. For Harbor containers, we copy the OAuth entry into
+the container's `~/.pi/agent/auth.json`. No per-token costs — just rate limits.
+
+Available models via `openai-codex` provider: gpt-5.1 through gpt-5.4, plus mini/codex variants.
+Primary eval model: `gpt-5.4-mini` (weakest — most interesting test for whether weaver helps).
+
+Rate limits on Plus: ~80-100 messages/3h. With 89 tasks × 2 agents, may need to run
+sequentially over several hours. Not a cost problem, just a patience problem.
+
 ## References
 
 - antirez thread: https://x.com/antirez/status/2037488794379653620
