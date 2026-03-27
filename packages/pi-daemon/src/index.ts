@@ -12,7 +12,6 @@ import { mkdirSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 import { loadDaemonConfig } from "./config.js";
-import { loadModelConfig } from "./models.js";
 import { setLogLevel, setLogFile, info, error, debug } from "./logger.js";
 import { initTriggers } from "./triggers.js";
 import { initRulesState, evaluateRules, catchUpRules } from "./rules.js";
@@ -169,8 +168,7 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Load model config
-  loadModelConfig(ROOT);
+  // Model config loaded by agent-runner via pi-agents loadConfig()
 
   // Setup state directory
   const stateDir = join(ROOT, config.state_dir);
