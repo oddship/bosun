@@ -7,7 +7,7 @@
  * - done: gated completion with harness verification
  *
  * Usage:
- *   pi -e ./packages/pi-weaver/extension/index.ts "your goal here"
+ *   pi -e ./packages/pi-weaver/extension/index.ts
  *   pi --no-session -p -e ./packages/pi-weaver/extension/index.ts "your goal here"
  */
 
@@ -22,10 +22,23 @@ interface CheckpointData {
 	timestamp: number;
 }
 
+interface TimeLapseIntent {
+	nonce: string;
+	targetEntryId: string;
+	checkpointLabel: string;
+	steering: string;
+	checkpointState: Record<string, unknown>;
+	timestamp: number;
+}
+
 export default function weaver(pi: ExtensionAPI) {
 	const checkpoints = new Map<string, CheckpointData>();
 	let doneCallCount = 0;
 	let isWeaverMode = false;
+	let activeIntent: TimeLapseIntent | null = null;
+
+	// Intent storage — tool writes, command reads
+	const pendingIntents = new Map<string, TimeLapseIntent>();
 
 	// -----------------------------------------------------------------------
 	// Restore state on session start/resume
@@ -33,20 +46,17 @@ export default function weaver(pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		checkpoints.clear();
+		pendingIntents.clear();
+		activeIntent = null;
 		doneCallCount = 0;
 
 		for (const entry of ctx.sessionManager.getEntries()) {
-			if (
-				entry.type === "custom" &&
-				(entry as any).customType === "weaver-checkpoint"
-			) {
-				const data = (entry as any).data as CheckpointData;
+			const e = entry as any;
+			if (e.type === "custom" && e.customType === "weaver-checkpoint") {
+				const data = e.data as CheckpointData;
 				checkpoints.set(data.label, data);
 			}
-			if (
-				entry.type === "custom" &&
-				(entry as any).customType === "weaver-active"
-			) {
+			if (e.type === "custom" && e.customType === "weaver-active") {
 				isWeaverMode = true;
 			}
 		}
@@ -57,11 +67,46 @@ export default function weaver(pi: ExtensionAPI) {
 	});
 
 	// -----------------------------------------------------------------------
+	// Rebuild checkpoint cache after tree navigation
+	// -----------------------------------------------------------------------
+
+	pi.on("session_tree", async (_event, ctx) => {
+		// After navigateTree, the branch may have changed.
+		// Rebuild checkpoint map from the new branch's entries.
+		checkpoints.clear();
+		for (const entry of ctx.sessionManager.getEntries()) {
+			const e = entry as any;
+			if (e.type === "custom" && e.customType === "weaver-checkpoint") {
+				const data = e.data as CheckpointData;
+				checkpoints.set(data.label, data);
+			}
+		}
+		updateStatus(ctx);
+	});
+
+	// -----------------------------------------------------------------------
+	// Custom branch summary for weaver-initiated tree navigation
+	// -----------------------------------------------------------------------
+
+	pi.on("session_before_tree", async (event) => {
+		if (!activeIntent) return; // Not a weaver-initiated navigation
+
+		// Override the summary prompt to focus on what was tried and why
+		return {
+			customInstructions:
+				"Summarize the abandoned branch focusing on: " +
+				"what approach was tried, what happened, why it's being abandoned, " +
+				"and any constraints or knowledge learned. Be concise — this will be " +
+				"injected as context for the next attempt.",
+			label: `🕸 time_lapse → ${activeIntent.checkpointLabel}`,
+		};
+	});
+
+	// -----------------------------------------------------------------------
 	// Inject weaver system prompt
 	// -----------------------------------------------------------------------
 
 	pi.on("before_agent_start", async (event) => {
-		// Always inject — the tools are available, the prompt teaches usage
 		isWeaverMode = true;
 		pi.appendEntry("weaver-active", { timestamp: Date.now() });
 		return {
@@ -100,7 +145,8 @@ export default function weaver(pi: ExtensionAPI) {
 		promptSnippet: "Save named checkpoint with structured state for time_lapse",
 		parameters: Type.Object({
 			label: Type.String({
-				description: "Short name for this checkpoint (e.g., 'map', 'batch_1_done', 'before_fix')",
+				description:
+					"Short name for this checkpoint (e.g., 'map', 'batch_1_done', 'before_fix')",
 			}),
 			state: Type.Record(Type.String(), Type.Unknown(), {
 				description:
@@ -139,7 +185,7 @@ export default function weaver(pi: ExtensionAPI) {
 	});
 
 	// -----------------------------------------------------------------------
-	// Tool: time_lapse
+	// Tool: time_lapse (phase 1 — store intent, queue command)
 	// -----------------------------------------------------------------------
 
 	pi.registerTool({
@@ -171,65 +217,117 @@ export default function weaver(pi: ExtensionAPI) {
 				);
 			}
 
-			// Build summary of what we're abandoning
-			const currentLeaf = ctx.sessionManager.getLeafId();
-			const abandonedSummary = buildAbandonedSummary(ctx, cp.entryId, currentLeaf);
+			// Generate a unique nonce for this intent
+			const nonce = `tl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-			// Record the time_lapse event
-			pi.appendEntry("weaver-time-lapse", {
-				from: currentLeaf,
-				to: cp.entryId,
-				target: params.target,
+			const intent: TimeLapseIntent = {
+				nonce,
+				targetEntryId: cp.entryId,
+				checkpointLabel: params.target,
 				steering: params.steering,
+				checkpointState: cp.state,
 				timestamp: Date.now(),
-			});
+			};
 
-			// Abort current agent loop — this stops the model from continuing
+			// Store intent for the command to pick up
+			pendingIntents.set(nonce, intent);
+
+			// Persist the intent to session (survives crashes)
+			pi.appendEntry("weaver-time-lapse-intent", intent);
+
+			// Abort current agent loop — stop burning context on wrong path
 			ctx.abort();
 
-			// Inject the branch summary + steering + checkpoint state as a follow-up
-			// that triggers a new turn. The model starts fresh with:
-			// 1. The conversation up to the checkpoint
-			// 2. A summary of the abandoned branch
-			// 3. The steering text
-			// 4. The checkpoint's structured state
-			const stateJson = JSON.stringify(cp.state, null, 2);
-			const content = [
-				`## Time Lapse → "${params.target}"`,
-				"",
-				"### What was tried (abandoned branch)",
-				abandonedSummary,
-				"",
-				"### New direction",
-				params.steering,
-				"",
-				"### Checkpoint state",
-				"```json",
-				stateJson,
-				"```",
-				"",
-				"Continue from this checkpoint. Follow the new direction above.",
-				"Your pseudocode plan is still in context — refer to it.",
-			].join("\n");
-
-			pi.sendMessage(
-				{
-					customType: "weaver-time-lapse-context",
-					content,
-					display: true,
-				},
-				{ deliverAs: "followUp", triggerTurn: true },
-			);
+			// Queue the rewind command as followUp — runs after agent is idle
+			pi.sendUserMessage(`/weaver-time-lapse ${nonce}`, {
+				deliverAs: "followUp",
+			});
 
 			return {
 				content: [
 					{
 						type: "text",
-						text: `Time lapsing to "${params.target}"... Branch summary injected.`,
+						text: `⏪ Time lapsing to "${params.target}"... Rewind queued.`,
 					},
 				],
-				details: { target: params.target, steering: params.steering },
+				details: { nonce, target: params.target },
 			};
+		},
+	});
+
+	// -----------------------------------------------------------------------
+	// Command: /weaver-time-lapse (phase 2 — perform the actual rewind)
+	// -----------------------------------------------------------------------
+
+	pi.registerCommand("weaver-time-lapse", {
+		description: "Internal: perform time_lapse rewind (called by time_lapse tool)",
+		handler: async (args, ctx) => {
+			const nonce = args.trim();
+			const intent = pendingIntents.get(nonce);
+
+			if (!intent) {
+				ctx.ui.notify(`Time lapse intent ${nonce} not found`, "error");
+				return;
+			}
+
+			pendingIntents.delete(nonce);
+
+			// Set active intent so session_before_tree can customize the summary
+			activeIntent = intent;
+
+			try {
+				// Wait for everything to settle
+				await ctx.waitForIdle();
+
+				// Perform the actual tree navigation — this is the real rewind.
+				// navigateTree handles:
+				// - finding common ancestor
+				// - generating branch summary (customized by our session_before_tree hook)
+				// - calling branch/branchWithSummary on SessionManager
+				// - rebuilding agent context via agent.replaceMessages()
+				// - emitting session_before_tree / session_tree events
+				const result = await ctx.navigateTree(intent.targetEntryId, {
+					summarize: true,
+					customInstructions:
+						"Summarize what was tried on the abandoned branch, " +
+						"why it's being abandoned, and key constraints learned.",
+					label: `🕸 time_lapse → ${intent.checkpointLabel}`,
+				});
+
+				if (result.cancelled) {
+					ctx.ui.notify("Time lapse was cancelled", "warning");
+					return;
+				}
+
+				// Persist the completed rewind
+				pi.appendEntry("weaver-time-lapse-done", {
+					nonce: intent.nonce,
+					checkpointLabel: intent.checkpointLabel,
+					timestamp: Date.now(),
+				});
+
+				// Inject steering + checkpoint state as the next message.
+				// This kicks off a new turn from the rewound position.
+				const stateJson = JSON.stringify(intent.checkpointState, null, 2);
+				const steeringMessage = [
+					`## Time Lapse → "${intent.checkpointLabel}"`,
+					"",
+					"### New direction",
+					intent.steering,
+					"",
+					"### Checkpoint state",
+					"```json",
+					stateJson,
+					"```",
+					"",
+					"Continue from this checkpoint following the new direction above.",
+					"Your pseudocode plan is still in context — refer to it.",
+				].join("\n");
+
+				pi.sendUserMessage(steeringMessage);
+			} finally {
+				activeIntent = null;
+			}
 		},
 	});
 
@@ -244,7 +342,8 @@ export default function weaver(pi: ExtensionAPI) {
 			"Signal task completion. First call triggers harness verification — " +
 			"the harness checks your work and reports back. Fix any issues found. " +
 			"Second call confirms completion.",
-		promptSnippet: "Signal completion — first call triggers verification, second confirms",
+		promptSnippet:
+			"Signal completion — first call triggers verification, second confirms",
 		parameters: Type.Object({
 			summary: Type.String({
 				description: "What you accomplished",
@@ -263,7 +362,6 @@ export default function weaver(pi: ExtensionAPI) {
 				const issues = await runVerification(ctx, params.summary);
 
 				if (issues.length === 0) {
-					// Clean — accept immediately
 					pi.appendEntry("weaver-done", {
 						summary: params.summary,
 						state: params.state,
@@ -275,14 +373,19 @@ export default function weaver(pi: ExtensionAPI) {
 						content: [
 							{
 								type: "text",
-								text: "✅ Verification passed. Task complete.\n\nSummary: " + params.summary,
+								text:
+									"✅ Verification passed. Task complete.\n\nSummary: " +
+									params.summary,
 							},
 						],
-						details: { summary: params.summary, state: params.state, verified: true },
+						details: {
+							summary: params.summary,
+							state: params.state,
+							verified: true,
+						},
 					};
 				}
 
-				// Issues found — report back
 				const issueList = issues.map((i) => `- ${i}`).join("\n");
 				return {
 					content: [
@@ -313,7 +416,11 @@ export default function weaver(pi: ExtensionAPI) {
 						text: "✅ Task complete.\n\nSummary: " + params.summary,
 					},
 				],
-				details: { summary: params.summary, state: params.state, verified: true },
+				details: {
+					summary: params.summary,
+					state: params.state,
+					verified: true,
+				},
 			};
 		},
 	});
@@ -323,72 +430,16 @@ export default function weaver(pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 
 	/**
-	 * Build a text summary of the work being abandoned (entries between
-	 * checkpoint and current leaf). This is a simple version — extracts
-	 * tool calls and assistant text. A production version would use an LLM.
-	 */
-	function buildAbandonedSummary(
-		ctx: ExtensionContext,
-		checkpointEntryId: string,
-		currentLeafId: string | null,
-	): string {
-		const entries = ctx.sessionManager.getBranch();
-
-		// Find the range of entries to summarize
-		let inRange = false;
-		const toolCalls: string[] = [];
-		const textSnippets: string[] = [];
-
-		for (const entry of entries) {
-			if (entry.id === checkpointEntryId) {
-				inRange = true;
-				continue;
-			}
-			if (!inRange) continue;
-
-			if (entry.type === "message") {
-				const msg = (entry as any).message;
-				if (msg?.role === "assistant" && Array.isArray(msg.content)) {
-					for (const block of msg.content) {
-						if (block.type === "toolCall") {
-							const args = typeof block.arguments === "object"
-								? Object.keys(block.arguments).map((k) => `${k}=${JSON.stringify((block.arguments as any)[k]).slice(0, 50)}`).join(", ")
-								: "";
-							toolCalls.push(`${block.name}(${args})`);
-						}
-						if (block.type === "text" && block.text) {
-							const snippet = block.text.slice(0, 200);
-							if (snippet.trim()) textSnippets.push(snippet);
-						}
-					}
-				}
-			}
-		}
-
-		const parts: string[] = [];
-		if (toolCalls.length > 0) {
-			parts.push(`Tool calls: ${toolCalls.join(", ")}`);
-		}
-		if (textSnippets.length > 0) {
-			parts.push(`Key text: ${textSnippets.slice(0, 3).join(" | ")}`);
-		}
-
-		return parts.length > 0
-			? parts.join("\n")
-			: "No significant work to summarize.";
-	}
-
-	/**
 	 * Run verification checks when done() is called.
-	 * For now: basic checks. The eval harness can inject custom verifiers.
+	 * Basic checks for now — Harbor's verifier handles real test verification.
 	 */
 	async function runVerification(
-		ctx: ExtensionContext,
+		_ctx: ExtensionContext,
 		_summary: string,
 	): Promise<string[]> {
 		const issues: string[] = [];
 
-		// Check if any checkpoints have "remaining" work in their state
+		// Check if any checkpoints have remaining work
 		for (const [label, cp] of checkpoints) {
 			const remaining = cp.state.remaining;
 			if (remaining && Array.isArray(remaining) && remaining.length > 0) {
