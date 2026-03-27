@@ -4,16 +4,14 @@
  * Runs as a daemon script workflow. Loads the pi-memory config, opens the QMD
  * store, runs update() to sync documents, then embed() to generate vectors.
  *
- * GPU acceleration is auto-detected via setup-gpu.ts (must import before qmd).
+ * GPU acceleration is opt-in via `gpu: true` in config. setupGpu() must run
+ * before qmd is imported so env vars are set before llama.cpp build detection.
+ * We use a dynamic import for qmd to guarantee this ordering.
  */
-
-// Must run before qmd import — configures env vars for Vulkan build detection
-import { setupGpu } from "./setup-gpu.js";
-setupGpu();
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve, isAbsolute } from "node:path";
-import { createStore, type QMDStore, type EmbedProgress, type UpdateProgress } from "@tobilu/qmd";
+import { setupGpu } from "./setup-gpu.js";
 
 const BOSUN_ROOT = process.env.BOSUN_ROOT || process.cwd();
 
@@ -26,14 +24,16 @@ interface MemoryCollectionConfig {
 
 interface MemoryFileConfig {
   enabled?: boolean;
+  gpu?: boolean;
   dbPath?: string;
   collections?: Record<string, MemoryCollectionConfig>;
 }
 
-function loadConfig(): { dbPath: string; collections: Record<string, MemoryCollectionConfig> } {
+function loadConfig(): { gpu: boolean; dbPath: string; collections: Record<string, MemoryCollectionConfig> } {
   const configPath = join(BOSUN_ROOT, ".pi", "pi-memory.json");
 
   const defaults = {
+    gpu: false,
     dbPath: ".bosun-home/.cache/qmd/index.sqlite",
     collections: {
       sessions: { path: "workspace/users", pattern: "**/*.md", includeByDefault: true },
@@ -52,6 +52,7 @@ function loadConfig(): { dbPath: string; collections: Record<string, MemoryColle
       process.exit(0);
     }
     return {
+      gpu: raw.gpu === true,
       dbPath: raw.dbPath || defaults.dbPath,
       collections: raw.collections || defaults.collections,
     };
@@ -66,7 +67,16 @@ function resolvePath(input: string): string {
 }
 
 async function main() {
+  // Step 0: Load config and configure GPU env vars BEFORE importing qmd.
+  // qmd triggers llama.cpp build detection at import time, so Vulkan env
+  // vars must be set first.
   const config = loadConfig();
+  setupGpu(config.gpu);
+
+  // Dynamic import guarantees qmd loads AFTER setupGpu has set Vulkan env vars
+  const { createStore } = await import("@tobilu/qmd");
+  type QMDStore = Awaited<ReturnType<typeof createStore>>;
+
   const dbPath = resolvePath(config.dbPath);
 
   console.log(`[memory-embed] DB: ${dbPath}`);
@@ -91,7 +101,7 @@ async function main() {
     // Step 1: Update document index
     console.log("[memory-embed] Updating document index...");
     const updateResult = await store.update({
-      onProgress: (info: UpdateProgress) => {
+      onProgress: (info: { current: number; total: number; collection: string }) => {
         if (info.current % 50 === 0 || info.current === info.total) {
           console.log(`[memory-embed] Indexing: ${info.current}/${info.total} (${info.collection})`);
         }
@@ -115,7 +125,7 @@ async function main() {
     // Step 3: Generate embeddings
     console.log("[memory-embed] Generating embeddings (this may take a while on first run)...");
     const embedResult = await store.embed({
-      onProgress: (info: EmbedProgress) => {
+      onProgress: (info: { chunksEmbedded: number; totalChunks: number; bytesProcessed: number; totalBytes: number; errors: number }) => {
         if (info.chunksEmbedded % 10 === 0 || info.chunksEmbedded === info.totalChunks) {
           console.log(
             `[memory-embed] Embedding: ${info.chunksEmbedded}/${info.totalChunks} chunks ` +

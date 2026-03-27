@@ -21,6 +21,7 @@ export interface MemoryFormattingConfig {
 
 export interface MemoryConfig {
   enabled: boolean;
+  gpu: boolean;
   dbPath: string;
   autoUpdateOnOpen: boolean;
   defaultMode: "keyword" | "hybrid";
@@ -123,6 +124,7 @@ export interface MemoryMultiGetResult {
 
 export interface MemoryStatusResult {
   enabled: boolean;
+  gpu: boolean;
   autoUpdateOnOpen: boolean;
   dbPath: string;
   defaultMode: "keyword" | "hybrid";

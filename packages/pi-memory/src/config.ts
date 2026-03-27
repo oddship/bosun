@@ -92,6 +92,7 @@ export function loadMemoryConfig(cwd: string): LoadedMemoryConfig {
 
   const config: MemoryConfig = {
     enabled: asBoolean(raw.enabled, DEFAULT_MEMORY_CONFIG.enabled),
+    gpu: asBoolean(raw.gpu, DEFAULT_MEMORY_CONFIG.gpu),
     dbPath: asString(raw.dbPath, DEFAULT_MEMORY_CONFIG.dbPath) || DEFAULT_MEMORY_CONFIG.dbPath,
     autoUpdateOnOpen: asBoolean(raw.autoUpdateOnOpen, DEFAULT_MEMORY_CONFIG.autoUpdateOnOpen),
     defaultMode: raw.defaultMode === "hybrid" ? "hybrid" : DEFAULT_MEMORY_CONFIG.defaultMode,

@@ -25,6 +25,7 @@ export const DEFAULT_MEMORY_COLLECTIONS: Record<string, MemoryCollectionConfig> 
 
 export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   enabled: true,
+  gpu: false,
   dbPath: ".bosun-home/.cache/qmd/index.sqlite",
   autoUpdateOnOpen: true,
   defaultMode: "keyword",

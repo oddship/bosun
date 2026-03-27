@@ -44,10 +44,17 @@ function findNixPkg(entries: string[], prefix: string): string | null {
 
 /**
  * Probe for Vulkan SDK components in the nix store and configure env vars
- * for cmake/node-llama-cpp. No-op if VULKAN_SDK is already set or if not
- * running on NixOS.
+ * for cmake/node-llama-cpp. No-op unless explicitly enabled via config.
+ *
+ * GPU is opt-in: set `gpu: true` in `[memory]` section of config.toml
+ * (or `"gpu": true` in `.pi/pi-memory.json`).
  */
-export function setupGpu(): void {
+export function setupGpu(enabled: boolean): void {
+  if (!enabled) {
+    console.log("[memory-embed] GPU disabled (set gpu=true in [memory] config to enable)");
+    return;
+  }
+
   if (process.env.VULKAN_SDK) {
     console.log(`[memory-embed] Vulkan SDK: ${process.env.VULKAN_SDK} (from env)`);
     return;

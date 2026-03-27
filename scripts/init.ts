@@ -303,6 +303,7 @@ const mergedMemoryCollections = {
 
 writeJson("pi-memory.json", {
   enabled: memory.enabled ?? DEFAULT_MEMORY_CONFIG.enabled,
+  gpu: memory.gpu ?? DEFAULT_MEMORY_CONFIG.gpu,
   dbPath: memory.db_path || DEFAULT_MEMORY_CONFIG.dbPath,
   autoUpdateOnOpen: memory.auto_update_on_open ?? DEFAULT_MEMORY_CONFIG.autoUpdateOnOpen,
   defaultMode: memory.default_mode === "hybrid" ? "hybrid" : DEFAULT_MEMORY_CONFIG.defaultMode,

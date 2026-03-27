@@ -145,6 +145,7 @@ export function formatStatusResult(
 
   return {
     enabled: config.enabled,
+    gpu: config.gpu,
     autoUpdateOnOpen: config.autoUpdateOnOpen,
     dbPath: config.resolvedDbPath,
     defaultMode: config.defaultMode,
