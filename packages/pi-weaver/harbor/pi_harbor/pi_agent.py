@@ -66,29 +66,30 @@ class PiAgent(BaseInstalledAgent):
             ),
         )
 
-        # Write auth.json from env
+        # Write auth.json + settings.json
         auth_json = os.environ.get("PI_AUTH_JSON", "")
+        provider, model = self._parse_model_name()
+        settings = {"defaultProvider": provider, "defaultModel": model}
+        settings_json = json.dumps(settings)
+
         if auth_json:
             await self.exec_as_agent(
                 environment,
                 command=(
                     "mkdir -p ~/.pi/agent && "
                     f"echo {shlex.quote(auth_json)} > ~/.pi/agent/auth.json && "
-                    "chmod 600 ~/.pi/agent/auth.json"
+                    "chmod 600 ~/.pi/agent/auth.json && "
+                    f"echo {shlex.quote(settings_json)} > ~/.pi/agent/settings.json"
                 ),
             )
-
-        # Write settings.json with model config
-        provider, model = self._parse_model_name()
-        settings = {"defaultProvider": provider, "defaultModel": model}
-        settings_json = json.dumps(settings)
-        await self.exec_as_agent(
-            environment,
-            command=(
-                "mkdir -p ~/.pi/agent && "
-                f"echo {shlex.quote(settings_json)} > ~/.pi/agent/settings.json"
-            ),
-        )
+        else:
+            await self.exec_as_agent(
+                environment,
+                command=(
+                    "mkdir -p ~/.pi/agent && "
+                    f"echo {shlex.quote(settings_json)} > ~/.pi/agent/settings.json"
+                ),
+            )
 
     def _parse_model_name(self) -> tuple[str, str]:
         """Parse 'provider/model' into (provider, model). Default to openai-codex."""
@@ -117,13 +118,15 @@ class PiAgent(BaseInstalledAgent):
                 env[key] = val
 
         # NOTE: Don't set PATH in env dict — Docker -e doesn't expand $HOME/$PATH.
-        # Set it inside the command string instead.
+        # Pi writes sessions to ~/.pi/agent/sessions/<cwd-slug>/.
+        # Copy them to /logs/agent/ after run so Harbor downloads them.
         await self.exec_as_agent(
             environment,
             command=(
                 'export PATH="$HOME/.bun/bin:$PATH"; '
-                f"pi --no-session -p -- {escaped_instruction} "
-                f"2>&1 | tee /logs/agent/pi.txt"
+                f"pi -p -- {escaped_instruction} "
+                f"2>&1 | tee /logs/agent/pi.txt; "
+                "cp -r ~/.pi/agent/sessions/ /logs/agent/sessions/ 2>/dev/null || true"
             ),
             env=env,
         )

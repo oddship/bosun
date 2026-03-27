@@ -76,10 +76,11 @@ class PiWeaverAgent(PiAgent):
             environment,
             command=(
                 'export PATH="$HOME/.bun/bin:$PATH"; '
-                "pi --no-session -p "
+                "pi -p "
                 "-e /installed-agent/weaver/index.ts "
                 f"-- {escaped_instruction} "
-                f"2>&1 | tee /logs/agent/pi-weaver.txt"
+                f"2>&1 | tee /logs/agent/pi-weaver.txt; "
+                "cp -r ~/.pi/agent/sessions/ /logs/agent/sessions/ 2>/dev/null || true"
             ),
             env=env,
         )
