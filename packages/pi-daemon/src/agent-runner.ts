@@ -12,7 +12,9 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { info, error, debug } from "./logger.js";
-import { loadConfig as loadAgentsConfig, resolveModel, buildAgentEnv } from "pi-agents";
+import { loadConfig as loadAgentsConfig } from "../../pi-agents/src/config.js";
+import { resolveModel } from "../../pi-agents/src/models.js";
+import { buildAgentEnv } from "../../pi-agents/src/env.js";
 import { runValidators } from "./validators.js";
 import type { WorkflowConfig } from "./workflows.js";
 

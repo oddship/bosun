@@ -21,8 +21,7 @@
     ]
   },
   "dependencies": {
-    "chokidar": "4.0.0",
-    "pi-agents": "*"
+    "chokidar": "4.0.0"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
