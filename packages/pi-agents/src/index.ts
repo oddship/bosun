@@ -16,5 +16,7 @@ export type { AgentsConfig, BackendConfig } from "./config.js";
 export { processTemplate } from "./template.js";
 export type { TemplateContext } from "./template.js";
 
+export { resolveModel } from "./models.js";
+
 export { spawnAgent } from "./spawn.js";
 export type { SpawnAgentOptions, SpawnAgentResult } from "./spawn.js";

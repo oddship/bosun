@@ -10,6 +10,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadConfig, type AgentsConfig } from "./config.js";
 import { discoverAgents, findAgentFile, loadAgent, type AgentDef } from "./agents.js";
+import { resolveModel } from "./models.js";
 import {
   isInTmux,
   getTmuxSocket,
@@ -198,7 +199,7 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
 
   // Resolve model tier → actual model string
   const resolvedModel = agent.model
-    ? config.models[agent.model] ?? agent.model
+    ? resolveModel(agent.model, config.models)
     : undefined;
 
   // Build extension flags
