@@ -13,8 +13,8 @@ describe("resolveModel", () => {
     expect(resolveModel(undefined, {})).toBe("claude-haiku-4-5");
   });
 
-  it("returns fallback when unknown tier and no default", () => {
-    expect(resolveModel("nonexistent", {})).toBe("claude-haiku-4-5");
+  it("passes through unknown tier when no default", () => {
+    expect(resolveModel("nonexistent", {})).toBe("nonexistent");
   });
 
   it("resolves tier names from models map", () => {
@@ -46,7 +46,15 @@ describe("resolveModel", () => {
     expect(resolveModel(undefined, {}, "gpt-4o-mini")).toBe("gpt-4o-mini");
   });
 
-  it("falls back to hardcoded default when defaultModel tier also not found", () => {
-    expect(resolveModel(undefined, {}, "missing-tier")).toBe("missing-tier");
+  it("passes through defaultModel as-is when it is also not in map", () => {
+    // "missingtier" has no hyphens/slashes, not in map — returned as passthrough
+    expect(resolveModel(undefined, {}, "missingtier")).toBe("missingtier");
+  });
+
+  it("passes through unknown tier verbatim (no silent substitution)", () => {
+    // Matches old spawn.ts behavior: config.models[agent.model] ?? agent.model
+    // An unknown tier should NOT silently become claude-haiku-4-5
+    expect(resolveModel("custom", models)).toBe("custom");
+    expect(resolveModel("experimental", {})).toBe("experimental");
   });
 });

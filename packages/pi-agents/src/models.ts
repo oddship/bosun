@@ -52,5 +52,7 @@ export function resolveModel(
     return resolveModel(defaultModel, models);
   }
 
-  return FALLBACK_MODEL;
+  // Unknown tier with no default — pass through as-is rather than
+  // silently substituting a fallback (caller may intend a raw model name)
+  return tierOrId;
 }
