@@ -80,6 +80,8 @@ export interface QueueEntry extends QueuedTask {
   max_attempts: number;
   last_error?: string;
   backoff_until?: string;
+  /** PID of the spawned process (agent or script). Set when running, cleared on completion. */
+  pid?: number;
 }
 
 export interface Queue {

@@ -20,6 +20,26 @@ const STALE_RUNNING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 let queueFile: string;
 let isProcessing = false;
 
+/** Update the PID of the currently running task. Called by agent-runner when spawning. */
+export function setCurrentTaskPid(pid: number): void {
+  const queue = loadQueue();
+  const running = queue.tasks.find((t) => t.status === "running");
+  if (running) {
+    running.pid = pid;
+    saveQueue(queue);
+  }
+}
+
+/** Check if a process is still alive by sending signal 0. */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Handler runner — set from outside to break circular dependency. */
 let runHandlerFn: ((handler: string, context: Record<string, unknown>) => Promise<void>) | null =
   null;
@@ -126,24 +146,33 @@ export async function processQueue(): Promise<void> {
   try {
     const queue = loadQueue();
 
-    // Recover stale "running" tasks from previous daemon lifecycle
+    // Recover stale "running" tasks — check PID liveness first, fall back to timeout
     const now = new Date();
     for (const task of queue.tasks) {
       if (task.status === "running" && task.started_at) {
         const elapsed = now.getTime() - new Date(task.started_at).getTime();
-        if (elapsed > STALE_RUNNING_TIMEOUT_MS) {
-          const msg = `Stale running task: ${task.rule} (${Math.round(elapsed / 60_000)}m). Resetting.`;
-          info(msg);
+        const processAlive = task.pid ? isProcessAlive(task.pid) : false;
+
+        // Ghost: has PID but process is dead, OR no PID and exceeded timeout
+        const isGhost = task.pid ? !processAlive : elapsed > STALE_RUNNING_TIMEOUT_MS;
+
+        if (isGhost) {
+          const reason = task.pid
+            ? `Process dead (PID ${task.pid}, ran ${Math.round(elapsed / 60_000)}m)`
+            : `Stale running task (${Math.round(elapsed / 60_000)}m, no PID)`;
+          info(`${reason}: ${task.rule}. Resetting.`);
+
+          task.pid = undefined;
           if (task.attempts >= task.max_attempts) {
             task.status = "failed";
             task.completed_at = now.toISOString();
-            task.last_error = msg;
-            updateRuleState(task.rule, "failed", msg);
+            task.last_error = reason;
+            updateRuleState(task.rule, "failed", reason);
             moveToHistory(queue, task);
           } else {
             task.status = "queued";
             task.backoff_until = undefined;
-            updateRuleState(task.rule, "failed", msg);
+            updateRuleState(task.rule, "failed", reason);
           }
           saveQueue(queue);
         }
@@ -187,6 +216,7 @@ export async function processQueue(): Promise<void> {
       // Success
       task.status = "completed";
       task.completed_at = new Date().toISOString();
+      task.pid = undefined;
       updateRuleState(task.rule, "success");
 
       // Clear processed triggers
@@ -201,6 +231,7 @@ export async function processQueue(): Promise<void> {
       task.last_error = errorMsg;
       error(`Task failed: ${task.rule} — ${errorMsg}`);
 
+      task.pid = undefined;
       if (task.attempts >= task.max_attempts) {
         task.status = "failed";
         task.completed_at = new Date().toISOString();
