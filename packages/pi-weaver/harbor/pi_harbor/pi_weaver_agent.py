@@ -20,8 +20,8 @@ from harbor.models.agent.context import AgentContext
 from .pi_agent import PiAgent
 
 
-# Path to the weaver extension relative to the bosun repo root
-WEAVER_EXTENSION_DIR = Path(__file__).parent.parent / "extension"
+# Path to the weaver extension — go up from pi_harbor/ to harbor/ to pi-weaver/
+WEAVER_EXTENSION_DIR = Path(__file__).parent.parent.parent / "extension"
 
 
 class PiWeaverAgent(PiAgent):
@@ -63,7 +63,6 @@ class PiWeaverAgent(PiAgent):
         escaped_instruction = shlex.quote(instruction)
 
         env = {
-            "PATH": "$HOME/.bun/bin:$PATH",
             "CI": "1",
         }
 
@@ -72,6 +71,7 @@ class PiWeaverAgent(PiAgent):
             if val:
                 env[key] = val
 
+        # NOTE: Don't set PATH in env dict — Docker -e doesn't expand $HOME/$PATH.
         await self.exec_as_agent(
             environment,
             command=(
@@ -90,11 +90,8 @@ class PiWeaverAgent(PiAgent):
             log_file = self.logs_dir / log_name
             if log_file.exists():
                 content = log_file.read_text()
-                context.extra = context.extra or {}
-                context.extra["pi_output_length"] = len(content)
-
-                # Count weaver-specific events
-                context.extra["checkpoints"] = content.count("📌")
-                context.extra["time_lapses"] = content.count("⏪")
-                context.extra["done_calls"] = content.count("✅")
+                print(f"Pi-weaver output: {len(content)} bytes")
+                print(f"  Checkpoints: {content.count('📌')}")
+                print(f"  Time lapses: {content.count('⏪')}")
+                print(f"  Done calls: {content.count('✅')}")
                 break
