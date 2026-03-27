@@ -39,6 +39,8 @@ export default function weaver(pi: ExtensionAPI) {
 
 	// Intent storage — tool writes, command reads
 	const pendingIntents = new Map<string, TimeLapseIntent>();
+	// Consumed nonces — prevents replay on session resume
+	const consumedNonces = new Set<string>();
 
 	// -----------------------------------------------------------------------
 	// Restore state on session start/resume
@@ -47,6 +49,7 @@ export default function weaver(pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		checkpoints.clear();
 		pendingIntents.clear();
+		consumedNonces.clear();
 		activeIntent = null;
 		doneCallCount = 0;
 
@@ -58,6 +61,10 @@ export default function weaver(pi: ExtensionAPI) {
 			}
 			if (e.type === "custom" && e.customType === "weaver-active") {
 				isWeaverMode = true;
+			}
+			// Track already-consumed rewinds so we don't replay on resume
+			if (e.type === "custom" && e.customType === "weaver-time-lapse-done") {
+				consumedNonces.add(e.data?.nonce);
 			}
 		}
 
@@ -263,14 +270,20 @@ export default function weaver(pi: ExtensionAPI) {
 		description: "Internal: perform time_lapse rewind (called by time_lapse tool)",
 		handler: async (args, ctx) => {
 			const nonce = args.trim();
-			const intent = pendingIntents.get(nonce);
 
+			// Idempotency: skip if already consumed (session resume/replay)
+			if (consumedNonces.has(nonce)) {
+				return;
+			}
+
+			const intent = pendingIntents.get(nonce);
 			if (!intent) {
 				ctx.ui.notify(`Time lapse intent ${nonce} not found`, "error");
 				return;
 			}
 
 			pendingIntents.delete(nonce);
+			consumedNonces.add(nonce);
 
 			// Set active intent so session_before_tree can customize the summary
 			activeIntent = intent;
