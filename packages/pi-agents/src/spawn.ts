@@ -11,6 +11,7 @@ import * as path from "node:path";
 import { loadConfig, type AgentsConfig } from "./config.js";
 import { discoverAgents, findAgentFile, loadAgent, type AgentDef } from "./agents.js";
 import { resolveModel } from "./models.js";
+import { buildAgentEnv } from "./env.js";
 import {
   isInTmux,
   getTmuxSocket,
@@ -222,18 +223,12 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
   // Keep window open on failure for debugging
   const command = `${rawCommand}; EXIT=$?; if [ $EXIT -ne 0 ]; then echo "=== AGENT EXITED ($EXIT) ==="; sleep 30; fi`;
 
-  // Determine parent agent name
-  const parentName = options.parentAgent
-    || process.env.PI_AGENT_NAME
-    || process.env.PI_AGENT
-    || "agent";
-
-  const agentEnv = {
-    PI_AGENT: agentName,
-    PI_AGENT_NAME: windowName,
-    PI_PARENT_AGENT: parentName,
-    PI_AGENT_EMOJI: agent.emoji || "🤖",
-  };
+  const agentEnv = buildAgentEnv({
+    agent: agentName,
+    name: windowName,
+    parentAgent: options.parentAgent,
+    emoji: agent.emoji,
+  });
 
   // Spawn via tmux
   const result = wantsSession
@@ -270,7 +265,7 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
   try {
     const treeFile = path.join(cwd, ".pi", "spawn-tree.jsonl");
     const entry = JSON.stringify({
-      parent: parentName,
+      parent: agentEnv.PI_PARENT_AGENT,
       child: windowName,
       agent: agentName,
       model: resolvedModel || null,

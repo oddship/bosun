@@ -18,5 +18,8 @@ export type { TemplateContext } from "./template.js";
 
 export { resolveModel } from "./models.js";
 
+export { buildAgentEnv } from "./env.js";
+export type { AgentEnvOptions } from "./env.js";
+
 export { spawnAgent } from "./spawn.js";
 export type { SpawnAgentOptions, SpawnAgentResult } from "./spawn.js";
