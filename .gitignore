@@ -42,3 +42,4 @@ Thumbs.db
 .vscode/
 workspace/
 .vulkan-sdk
+packages/pi-weaver/harbor/pi_harbor/__pycache__/
