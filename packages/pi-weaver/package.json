@@ -1,0 +1,21 @@
+{
+  "name": "pi-weaver",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Time Lapse execution extension for Pi — checkpoint, rewind, and self-correct",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-weaver"
+  },
+  "main": "./extension/index.ts",
+  "exports": {
+    ".": "./extension/index.ts"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": ">=0.61.0",
+    "@sinclair/typebox": "*"
+  }
+}
