@@ -39,6 +39,7 @@ _site/
 *.swp
 Thumbs.db
 # User config (contains secrets)
+secrets.env
 .vscode/
 workspace/
 .vulkan-sdk

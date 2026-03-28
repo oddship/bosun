@@ -55,6 +55,13 @@ allowed = [
   "TZ",
 ]
 
+# Secret values — written to secrets.env (gitignored) by `just init`.
+# Use this for API keys so they stay in config.toml (also gitignored) and
+# never end up in tracked files or shell history.
+# [env.values]
+# ZAI_API_KEY = "your-key-here"
+# OPENAI_API_KEY = "sk-..."
+
 # =============================================================================
 # Sandbox Paths (process-level, bwrap)
 # =============================================================================
