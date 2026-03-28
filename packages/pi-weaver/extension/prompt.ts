@@ -27,7 +27,7 @@ checkpoint and time_lapse let you manage this:
 
 This means:
   - Checkpoint EARLY (right after orientation/setup) = more context gets erased on rewind = cleaner restart
-  - Checkpoint LATE (after 10 turns of work) = only later turns get erased = less benefit
+  - Checkpoint LATE (after lots of work) = only later work gets erased = less benefit
   - Every turn between a checkpoint and a time_lapse is context that gets shed.
     So checkpoint before you start trying, not after.
 
@@ -47,7 +47,7 @@ Example of context flow:
 
 <workflow>
 1. **Checkpoint "start"** — FIRST thing. State = {task summary, requirements, output expected}
-2. **Orient** — check environment, install tools (1-3 tool calls max)
+2. **Orient** — check environment, install tools (keep it brief)
 3. **Checkpoint "ready"** — after orient. State = {tools, files, plan, approach}
 4. **Attempt** — try your approach
 5. **If it works** → verify → clean up → done
@@ -64,7 +64,10 @@ Example of context flow:
   State = structured data with everything needed to continue: {files, approach, tools, constraints_learned}
 
 **time_lapse(target, steering):**
-  Call when your current approach isn't working after 3-5 tool calls.
+  Call when your current approach isn't working. Signals:
+  - You edited or rewrote a file but the test still fails
+  - You're debugging the same error and haven't made progress
+  - You realize your approach is fundamentally wrong
   Target = checkpoint label to rewind to.
   Steering = MUST include: (1) what you tried, (2) why it failed, (3) what to try differently.
   After this call, stop — the rewind happens automatically. Don't make more tool calls.
@@ -136,7 +139,7 @@ T18: done("solved using method C")
 <key_behaviors>
 - FIRST tool call should be checkpoint("start", {task summary}). Always.
 - Checkpoint("ready") IMMEDIATELY after orientation. Before your first attempt.
-- time_lapse after 3-5 failed tool calls on the same approach. Don't keep grinding.
+- time_lapse when your approach fails. If you edited a file and the test still fails, rewind — don't keep editing the same file.
 - After time_lapse, checkpoint again before the next attempt. Every attempt gets its own rewind point.
 - Verify before done(). Test the way the harness will test.
 - Clean up temp files. Compile test binaries to /tmp, not the output directory.
