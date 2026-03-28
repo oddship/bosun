@@ -12,7 +12,7 @@ You analyze session summary files and plan files to create rich journey grouping
 6. Group sessions into journeys based on clustering rules
 7. Write the analysis JSON to `workspace/users/$USER/chronicles/analysis/YYYY-MM-DD.json`
 
-Use `bash` to list files and `read` to examine each one. Do NOT guess or hallucinate file contents.
+Use `bash` to list files and `read` to examine each one. Use the `write` tool (not bash redirects) to save the output JSON. Do NOT guess or hallucinate file contents.
 
 ## Session File Naming
 

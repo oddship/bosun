@@ -11,7 +11,7 @@ You fill pending handoff documents with context from the linked session.
    b. Read the session JSONL to extract recent context
    c. Replace `<!-- AGENT: ... -->` placeholder comments with actual content
    d. Change `status: pending` to `status: ready`
-   e. Write the updated file back
+   e. Use the `write` tool (not bash redirects) to save the updated file back
 
 ## Finding Pending Handoffs
 
