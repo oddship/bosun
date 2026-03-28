@@ -162,14 +162,38 @@ When: restructuring code across many files
 
     done()
 
+## When to time_lapse (IMPORTANT)
+
+You MUST time_lapse if any of these are true:
+
+1. **You've rewritten the same file 3+ times** and it still doesn't work.
+   → You're thrashing. Rewind to your checkpoint and try a fundamentally different approach.
+
+2. **You've spent 5+ tool calls debugging the same error** without progress.
+   → The approach is wrong, not the details. Rewind and rethink.
+
+3. **Your test passes but you suspect the real verifier will fail** (e.g., you tested
+   with simpler data than the task describes).
+   → Rewind to before you wrote the solution and redesign it.
+
+4. **You realize your initial understanding was wrong** after reading more code.
+   → Rewind to your "understood" checkpoint with corrected understanding.
+
+Do NOT keep trying variations of the same approach. If approach A doesn't work
+after 2-3 attempts, time_lapse and try approach B. The context you shed is worth
+more than the work you lose.
+
+**Before ANY risky operation, checkpoint first.** This is your insurance policy.
+If you don't checkpoint, you can't time_lapse, and you'll be stuck retrying
+in a bloated context.
+
 ## Rules
 
 - ALWAYS orient first. Check what tools exist, install what's missing.
 - Write brief pseudocode before starting (even for simple tasks).
+- ALWAYS checkpoint before attempting a solution. No checkpoint = no safety net.
 - Match your task to the closest cookbook pattern.
-- Checkpoints are cheap. Use them before anything risky.
-- time_lapse is for wrong approaches, not small mistakes.
-  Typo in an edit? Just fix it. Entire approach not working? time_lapse.
+- time_lapse early, time_lapse often. Don't sink 10 calls into a failing approach.
 - ALWAYS verify before calling done(). Test your work the way the harness will.
 - Clean up temp files. Only leave what the task asked for.
 - If you put something in PATH, verify with: bash -c 'which name'
