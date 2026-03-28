@@ -32,14 +32,18 @@ The insight: this is just try/except for the model's reasoning. checkpoint = try
 
 `packages/pi-weaver/extension/index.ts` — Pi extension that registers the three tools plus a hidden `/weaver-time-lapse` command.
 
-**Architecture (command delegation pattern):**
-- Tool `time_lapse` stores intent, queues internal `/weaver-time-lapse` command via `sendUserMessage({ deliverAs: "followUp" })`
-- Command handler has `ExtensionCommandContext` with `navigateTree()` for true session tree rewind
-- `session_before_tree` hook customizes abandoned-branch summaries
-- `session_tree` hook rebuilds checkpoint cache after navigation
-- Idempotent nonce tracking prevents replay on session resume
+**Architecture (context-event pruning):**
+- Tool `time_lapse` sets a `pendingRewind` flag with checkpoint label + steering
+- `tool_call` hook blocks all subsequent tool calls in the same batch
+- `context` event (fires before each LLM call) prunes the message array to the checkpoint, appends steering as a user message
+- The model sees a clean context on its next turn — no explicit rewind needed
 
-This was designed with oracle's analysis — `ReadonlySessionManager` is a hard constraint on tool execute context, so direct `branchWithSummary()` calls from tools are unsafe.
+**Previous architecture (abandoned):** Two-phase command delegation — tool stored intent, queued `/weaver-time-lapse` command via `sendUserMessage({ deliverAs: "followUp" })`, command handler called `navigateTree()`. This failed because:
+1. `followUp` delivers after ALL tool calls finish — but blocking tools created new turns, preventing the idle state followUp needs (infinite loop)
+2. `steer` delivers the raw text as a user message — model treated `/weaver-time-lapse nonce` as text, not a command
+3. `ctx.abort()` in print mode killed pi before followUp ran
+
+The context-event approach is simpler (404 vs 498 lines) and works in all modes.
 
 ### System Prompt (~5KB)
 
@@ -74,17 +78,27 @@ This was designed with oracle's analysis — `ReadonlySessionManager` is a hard 
 - Session files go to `~/.pi/agent/sessions/<cwd-slug>/` — copy to `/logs/agent/` for Harbor download
 - Install same system deps as Claude Code + Codex adapters (curl, git, unzip, ripgrep)
 
-## Critical Bug: ctx.abort() Kills Print Mode
+## Critical Bugs: Three Architecture Iterations
 
-**The biggest finding.** time_lapse never fired in any eval run — zero invocations across 30+ task attempts on Haiku and Sonnet.
+### Bug 1: ctx.abort() kills print mode
 
-Root cause: the original implementation called `ctx.abort()` to stop the agent loop before queuing the followUp command. In interactive mode, pi stays alive and processes the followUp. **In print mode (`pi -p`), abort = exit.** The followUp command never runs.
+Original implementation called `ctx.abort()` to stop the agent loop before queuing the followUp command. In print mode (`pi -p`), abort = exit. The followUp command never ran. Zero time_lapse invocations across 30+ eval task attempts.
 
-This was the exact blocker oracle warned about: "followUp timing in print mode is the one area I'd test carefully."
+**Fix:** Remove `ctx.abort()`. Let the turn finish, followUp runs after.
 
-**Fix:** Remove `ctx.abort()`. Let the turn finish naturally. The tool returns a message telling the model to stop, and the followUp command runs after the turn ends.
+### Bug 2: followUp timing deadlock
 
-After the fix, time_lapse fired on the very first hard task (polyglot-c-py): checkpoint at T10, time_lapse at T38, rewind executed, context rebuilt, model continued with new approach.
+After removing abort, added `tool_call` blocking to prevent batched tools from executing after time_lapse. But blocked tools generated new turns (model kept retrying), preventing the "idle" state that `followUp` needs. Result: infinite loop of blocked tool calls ($0.23 wasted in one run, 64 blocked edits).
+
+Tried `steer` instead of `followUp` — but `sendUserMessage` with steer delivers raw text that the model interprets as user input, not a command.
+
+**Fix:** Abandon two-phase command delegation entirely.
+
+### Bug 3 (final fix): Context-event pruning
+
+Replaced the entire command delegation architecture with a `context` event handler. The `context` event fires before each LLM call and can modify the message array. When time_lapse sets a pending rewind, the next context event prunes messages to the checkpoint and injects steering. No sendUserMessage, no commands, no timing issues.
+
+This is the current architecture — 404 lines, works in all modes (interactive, print, RPC).
 
 ## Eval Results: Terminal-Bench Sample (10 tasks)
 
