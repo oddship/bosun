@@ -4,7 +4,7 @@ description = "Scan for unsummarized session JSONL files and generate summaries"
 type = "agent"
 
 [trigger]
-schedule = "hourly"
+schedule = "every:5"
 startup = true
 
 [agent]

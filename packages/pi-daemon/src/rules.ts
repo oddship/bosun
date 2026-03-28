@@ -78,6 +78,15 @@ function checkScheduleCondition(rule: RuleConfig, state: RulesState): boolean {
     return msSinceLast >= 3_600_000; // 1 hour
   }
 
+  // "every:N" format (e.g., "every:5" = every 5 minutes)
+  const everyMatch = rule.schedule.match(/^every:(\d+)$/);
+  if (everyMatch) {
+    const minutes = parseInt(everyMatch[1], 10);
+    if (!lastRun) return true;
+    const msSinceLast = now.getTime() - lastRun.getTime();
+    return msSinceLast >= minutes * 60_000;
+  }
+
   // "daily:HH" format (e.g., "daily:02" = 2 AM)
   const dailyMatch = rule.schedule.match(/^daily:(\d{1,2})$/);
   if (dailyMatch) {

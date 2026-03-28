@@ -1,7 +1,10 @@
 /**
  * Input validator for catchup-sessions.
  *
- * Checks: are there session JSONL files without corresponding summaries?
+ * Checks:
+ * 1. No other catchup-sessions process is already running (skip if so)
+ * 2. Are there session JSONL files without corresponding summaries?
+ *
  * Summaries use slug-based filenames, so we grep frontmatter for session_file
  * rather than matching by filename.
  *
@@ -10,6 +13,29 @@
 
 import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
+
+// Skip if a previous catchup-sessions run is still alive (check PID in queue.json)
+try {
+  const bosunRoot = process.env.BOSUN_ROOT || process.cwd();
+  const queuePath = join(bosunRoot, ".bosun-daemon", "queue.json");
+  if (existsSync(queuePath)) {
+    const queue = JSON.parse(readFileSync(queuePath, "utf-8"));
+    const running = queue.tasks?.find(
+      (t: any) => t.rule === "catchup-sessions" && t.status === "running" && t.pid,
+    );
+    if (running) {
+      // Check if the process is actually alive
+      try {
+        process.kill(running.pid, 0);
+        console.error(`Previous run still active (PID ${running.pid}), skipping this turn`);
+        process.exit(1);
+      } catch {
+        // Process dead — ghost entry, proceed
+      }
+    }
+  }
+} catch {}
 
 const user = process.env.USER || process.env.LOGNAME || "unknown";
 const bosunRoot = process.env.BOSUN_ROOT || process.cwd();
