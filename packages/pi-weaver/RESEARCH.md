@@ -195,6 +195,10 @@ The flow: checkpoint("start") → orient → checkpoint("ready") → time_lapse 
 
 We haven't re-run the full eval since fixing ctx.abort(). The previous 3/10 vs 4/10 comparison is meaningless because time_lapse was broken. Need fresh numbers.
 
+### System reminders: do they force time_lapse?
+
+Added a `tool_result` hook that tracks `lastTestFailed` and `editsSinceCheckpoint`. When both are true, the `context` event injects a reminder: "Your last test failed after N edits. Rule: edit → test → fail → time_lapse. Do NOT edit again." Inspired by plan-mode's context injection pattern. Haven't triggered it yet on local tests — Haiku solves small tasks on first edit.
+
 ### Does aggressive time_lapsing (after every phase) help or hurt?
 
 Shedding orientation context means the model can't refer back to file listings or code it read during orient. The checkpoint state must capture everything needed. If the state is incomplete, the model loses information.
