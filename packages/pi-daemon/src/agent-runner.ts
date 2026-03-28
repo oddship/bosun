@@ -152,7 +152,10 @@ async function spawnAgent(
   validatorFeedback: string,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const model = resolveModel(workflow.agent?.model, getModels());
-  const args: string[] = ["--print", "--model", model];
+  // --no-extensions disables all extensions including pi-sandbox.
+  // Daemon workflows are trusted system tasks — sandboxing blocks
+  // filesystem writes that workflow agents need (e.g., writing analysis JSON).
+  const args: string[] = ["--print", "--no-extensions", "--model", model];
 
   // Agent system prompt
   if (workflow.agent?.systemPromptFile && existsSync(workflow.agent.systemPromptFile)) {
