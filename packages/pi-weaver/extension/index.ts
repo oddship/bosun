@@ -37,7 +37,6 @@ interface PendingRewind {
 
 export default function weaver(pi: ExtensionAPI) {
 	const checkpoints = new Map<string, CheckpointData>();
-	let doneCallCount = 0;
 	let isWeaverMode = false;
 
 	// When set, the next `context` event will prune messages and inject steering
@@ -54,7 +53,6 @@ export default function weaver(pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		checkpoints.clear();
-		doneCallCount = 0;
 		pendingRewind = null;
 		lastTestFailed = false;
 		editsSinceCheckpoint = 0;
@@ -125,26 +123,22 @@ export default function weaver(pi: ExtensionAPI) {
 		// We don't need to do this for the context event since we're operating
 		// on the messages array, but we should rebuild the map for future tools.
 
-		// Find the checkpoint message in the array.
-		// We look for the checkpoint tool result by scanning for our checkpoint label.
+		// Find the checkpoint's toolResult in the message array by matching
+		// on structured details (not content text — that's fragile).
+		// The checkpoint tool sets details = { label, state, entryId, timestamp }.
 		const messages = event.messages;
 		let cutIndex = -1;
 
 		for (let i = 0; i < messages.length; i++) {
 			const msg = messages[i];
-			// Look for the toolResult from our checkpoint call
 			if (
 				msg.role === "toolResult" &&
-				msg.toolName === "checkpoint"
+				msg.toolName === "checkpoint" &&
+				(msg as any).details?.label === rewind.checkpointLabel
 			) {
-				const content = Array.isArray(msg.content)
-					? msg.content.map((c: any) => c.text || "").join("")
-					: String(msg.content || "");
-				if (content.includes(`"${rewind.checkpointLabel}"`)) {
-					cutIndex = i;
-					// Don't break — take the LAST matching checkpoint with this label
-					// (in case of re-checkpointing with the same name)
-				}
+				cutIndex = i;
+				// Don't break — take the LAST matching checkpoint with this label
+				// (in case of re-checkpointing with the same name)
 			}
 		}
 
@@ -222,7 +216,7 @@ export default function weaver(pi: ExtensionAPI) {
 		if (event.toolName === "time_lapse") {
 			editsSinceCheckpoint = 0;
 			lastTestFailed = false;
-			doneCallCount = 0; // Reset verification gate after rewind
+
 		}
 	});
 
@@ -381,11 +375,9 @@ export default function weaver(pi: ExtensionAPI) {
 		name: "done",
 		label: "Done",
 		description:
-			"Signal task completion. First call triggers harness verification — " +
-			"the harness checks your work and reports back. Fix any issues found. " +
-			"Second call confirms completion.",
-		promptSnippet:
-			"Signal completion — first call triggers verification, second confirms",
+			"Signal task completion. Call after verifying your work passes all tests. " +
+			"Include a summary of what you accomplished.",
+		promptSnippet: "Signal task completion with summary",
 		parameters: Type.Object({
 			summary: Type.String({
 				description: "What you accomplished",
@@ -397,55 +389,9 @@ export default function weaver(pi: ExtensionAPI) {
 			),
 		}),
 		async execute(_toolCallId, params) {
-			doneCallCount++;
-
-			if (doneCallCount === 1) {
-				const issues = await runVerification(params.summary);
-
-				if (issues.length === 0) {
-					pi.appendEntry("weaver-done", {
-						summary: params.summary,
-						state: params.state,
-						verified: true,
-						timestamp: Date.now(),
-					});
-
-					return {
-						content: [
-							{
-								type: "text",
-								text:
-									"✅ Verification passed. Task complete.\n\nSummary: " +
-									params.summary,
-							},
-						],
-						details: {
-							summary: params.summary,
-							state: params.state,
-							verified: true,
-						},
-					};
-				}
-
-				const issueList = issues.map((i) => `- ${i}`).join("\n");
-				return {
-					content: [
-						{
-							type: "text",
-							text:
-								`⚠️ Verification found issues:\n${issueList}\n\n` +
-								"Fix these issues, then call done() again.",
-						},
-					],
-					details: { issues, verified: false },
-				};
-			}
-
 			pi.appendEntry("weaver-done", {
 				summary: params.summary,
 				state: params.state,
-				verified: true,
-				attempt: doneCallCount,
 				timestamp: Date.now(),
 			});
 
@@ -459,28 +405,8 @@ export default function weaver(pi: ExtensionAPI) {
 				details: {
 					summary: params.summary,
 					state: params.state,
-					verified: true,
 				},
 			};
 		},
 	});
-
-	// -----------------------------------------------------------------------
-	// Helpers
-	// -----------------------------------------------------------------------
-
-	async function runVerification(_summary: string): Promise<string[]> {
-		const issues: string[] = [];
-
-		for (const [label, cp] of checkpoints) {
-			const remaining = cp.state.remaining;
-			if (remaining && Array.isArray(remaining) && remaining.length > 0) {
-				issues.push(
-					`Checkpoint "${label}" still has remaining items: ${remaining.join(", ")}`,
-				);
-			}
-		}
-
-		return issues;
-	}
 }
