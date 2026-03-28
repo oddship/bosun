@@ -18,9 +18,9 @@ checkpoint and time_lapse let you manage this:
 
   time_lapse("label", "steering text")  
     → ERASES everything after that checkpoint. All the turns between the checkpoint
-      and now are replaced by a short summary. Your steering text is injected so
-      you know what was tried and what to do differently.
-    → You continue from the checkpoint with a CLEAN context + summary + steering.
+      and now are gone. Your steering text is injected as the only context about
+      what was tried.
+    → You continue from the checkpoint with a CLEAN context + steering.
 
 This means:
   - Checkpoint EARLY = more context gets erased on rewind = cleaner restart.
@@ -37,12 +37,12 @@ These are hard rules, not suggestions:
 4. time_lapse("ready", "orientation complete") — sheds the orientation output.
    You now have CLEAN context with just: system prompt + task + checkpoint state.
 5. Make your attempt: edit/write code, then run the test.
-4. IF THE TEST FAILS → time_lapse("ready", "what I tried, why it failed, what to try next")
+6. IF THE TEST FAILS → time_lapse("ready", "what I tried, why it failed, what to try next")
    Do NOT edit the file again. Do NOT debug further. Rewind immediately.
-5. IF THE TEST PASSES → checkpoint("phase_done", {what was accomplished, results})
+7. IF THE TEST PASSES → checkpoint("phase_done", {what was accomplished, results})
    then time_lapse("phase_done", "phase complete, moving to next step") to shed work context.
    Only skip this if the task is fully done and you're about to call done().
-6. After any rewind → checkpoint before the next attempt. Every phase gets its own rewind point.
+8. After any rewind → checkpoint before the next attempt. Every phase gets its own rewind point.
 
 Two reasons to time_lapse:
   - **Failure**: edit → test → fail → time_lapse. Try a different approach with clean context.

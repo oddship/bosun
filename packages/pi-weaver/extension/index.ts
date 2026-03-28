@@ -26,8 +26,6 @@ interface CheckpointData {
 	label: string;
 	state: Record<string, unknown>;
 	entryId: string;
-	/** Index in the message array where this checkpoint's tool result lives */
-	messageIndex: number;
 	timestamp: number;
 }
 
@@ -35,8 +33,6 @@ interface PendingRewind {
 	checkpointLabel: string;
 	steering: string;
 	checkpointState: Record<string, unknown>;
-	/** Message index to truncate to (keep messages 0..targetIndex) */
-	targetIndex: number;
 }
 
 export default function weaver(pi: ExtensionAPI) {
@@ -51,6 +47,31 @@ export default function weaver(pi: ExtensionAPI) {
 	let lastTestFailed = false;
 	// Track how many edits happened since last checkpoint or time_lapse
 	let editsSinceCheckpoint = 0;
+
+	// -----------------------------------------------------------------------
+	// Restore state on session start/resume
+	// -----------------------------------------------------------------------
+
+	pi.on("session_start", async (_event, ctx) => {
+		checkpoints.clear();
+		doneCallCount = 0;
+		pendingRewind = null;
+		lastTestFailed = false;
+		editsSinceCheckpoint = 0;
+
+		for (const entry of ctx.sessionManager.getEntries()) {
+			const e = entry as any;
+			if (e.type === "custom" && e.customType === "weaver-checkpoint") {
+				const data = e.data as CheckpointData;
+				checkpoints.set(data.label, data);
+			}
+			if (e.type === "custom" && e.customType === "weaver-active") {
+				isWeaverMode = true;
+			}
+		}
+
+		if (isWeaverMode) updateStatus(ctx);
+	});
 
 	// -----------------------------------------------------------------------
 	// Inject weaver system prompt
@@ -181,22 +202,16 @@ export default function weaver(pi: ExtensionAPI) {
 			editsSinceCheckpoint++;
 		}
 
-		// Track bash failures (test runs)
+		// Track bash failures — only count as test failure if we've made edits
+		// (orientation failures like "apt-get not found" shouldn't trigger reminders)
 		if (event.toolName === "bash") {
 			const details = event.details as { exitCode?: number } | undefined;
-			const content = Array.isArray(event.content)
-				? event.content.map((c: any) => c.text || "").join("")
-				: String(event.content || "");
-			const isFail =
-				(details?.exitCode && details.exitCode !== 0) ||
-				content.includes("FAIL") ||
-				content.includes("Error") ||
-				content.includes("error:");
-			if (isFail) {
+			if (details?.exitCode && details.exitCode !== 0 && editsSinceCheckpoint > 0) {
 				lastTestFailed = true;
-			} else {
-				lastTestFailed = false;
 			}
+			// Don't clear lastTestFailed on success — only checkpoint/time_lapse clear it.
+			// This prevents `echo "test"` between a failure and the next LLM call
+			// from clearing the flag.
 		}
 
 		// Reset counters on checkpoint or time_lapse
@@ -207,6 +222,7 @@ export default function weaver(pi: ExtensionAPI) {
 		if (event.toolName === "time_lapse") {
 			editsSinceCheckpoint = 0;
 			lastTestFailed = false;
+			doneCallCount = 0; // Reset verification gate after rewind
 		}
 	});
 
@@ -279,7 +295,6 @@ export default function weaver(pi: ExtensionAPI) {
 				label: params.label,
 				state: params.state,
 				entryId: leafId,
-				messageIndex: -1, // Will be resolved in context event if needed
 				timestamp: Date.now(),
 			};
 
@@ -336,7 +351,6 @@ export default function weaver(pi: ExtensionAPI) {
 				checkpointLabel: params.target,
 				steering: params.steering,
 				checkpointState: cp.state,
-				targetIndex: -1, // Resolved in context event by scanning messages
 			};
 
 			pi.appendEntry("weaver-time-lapse-intent", {
