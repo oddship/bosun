@@ -7,7 +7,7 @@ type = "agent"
 schedule = "hourly"
 
 [agent]
-model = "lite"
+model = "medium"
 prompt = "Analyze today's session summaries and generate a journey analysis. Check the current date, find session summaries, group them into journeys, and write the analysis JSON output."
 
 [retry]
