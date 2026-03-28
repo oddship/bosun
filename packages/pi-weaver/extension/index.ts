@@ -198,11 +198,10 @@ export default function weaver(pi: ExtensionAPI) {
 
 		// Track bash failures — only count as test failure if we've made edits
 		// (orientation failures like "apt-get not found" shouldn't trigger reminders)
-		if (event.toolName === "bash") {
-			const details = event.details as { exitCode?: number } | undefined;
-			if (details?.exitCode && details.exitCode !== 0 && editsSinceCheckpoint > 0) {
-				lastTestFailed = true;
-			}
+		// Bash signals failure via isError (thrown error sets isError: true on result),
+		// not via details.exitCode (BashToolDetails only has truncation info).
+		if (event.toolName === "bash" && event.isError && editsSinceCheckpoint > 0) {
+			lastTestFailed = true;
 			// Don't clear lastTestFailed on success — only checkpoint/time_lapse clear it.
 			// This prevents `echo "test"` between a failure and the next LLM call
 			// from clearing the flag.
