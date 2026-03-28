@@ -1,17 +1,24 @@
 /**
  * pi-weaver — Time Lapse execution extension for Pi.
  *
- * Transforms pi into an autonomous executor with:
- * - checkpoint: save named progress points
- * - time_lapse: rewind to a checkpoint with steering (like Weaver's ultimate)
+ * Gives the model 3 tools for managing its own conversation context:
+ * - checkpoint: save named progress points with structured state
+ * - time_lapse: rewind to a checkpoint (prunes context via context event)
  * - done: gated completion with harness verification
+ *
+ * Architecture: time_lapse works by pruning the message array in the
+ * `context` event (fires before each LLM call). No sendUserMessage,
+ * no command delegation, no followUp timing issues.
  *
  * Usage:
  *   pi -e ./packages/pi-weaver/extension/index.ts
- *   pi --no-session -p -e ./packages/pi-weaver/extension/index.ts "your goal here"
+ *   pi -p -e ./packages/pi-weaver/extension/index.ts "your goal here"
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+} from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { WEAVER_PROMPT } from "./prompt.js";
 
@@ -19,95 +26,26 @@ interface CheckpointData {
 	label: string;
 	state: Record<string, unknown>;
 	entryId: string;
+	/** Index in the message array where this checkpoint's tool result lives */
+	messageIndex: number;
 	timestamp: number;
 }
 
-interface TimeLapseIntent {
-	nonce: string;
-	targetEntryId: string;
+interface PendingRewind {
 	checkpointLabel: string;
 	steering: string;
 	checkpointState: Record<string, unknown>;
-	timestamp: number;
+	/** Message index to truncate to (keep messages 0..targetIndex) */
+	targetIndex: number;
 }
 
 export default function weaver(pi: ExtensionAPI) {
 	const checkpoints = new Map<string, CheckpointData>();
 	let doneCallCount = 0;
 	let isWeaverMode = false;
-	let activeIntent: TimeLapseIntent | null = null;
 
-	// Intent storage — tool writes, command reads
-	const pendingIntents = new Map<string, TimeLapseIntent>();
-	// Consumed nonces — prevents replay on session resume
-	const consumedNonces = new Set<string>();
-
-	// -----------------------------------------------------------------------
-	// Restore state on session start/resume
-	// -----------------------------------------------------------------------
-
-	pi.on("session_start", async (_event, ctx) => {
-		checkpoints.clear();
-		pendingIntents.clear();
-		consumedNonces.clear();
-		activeIntent = null;
-		doneCallCount = 0;
-
-		for (const entry of ctx.sessionManager.getEntries()) {
-			const e = entry as any;
-			if (e.type === "custom" && e.customType === "weaver-checkpoint") {
-				const data = e.data as CheckpointData;
-				checkpoints.set(data.label, data);
-			}
-			if (e.type === "custom" && e.customType === "weaver-active") {
-				isWeaverMode = true;
-			}
-			// Track already-consumed rewinds so we don't replay on resume
-			if (e.type === "custom" && e.customType === "weaver-time-lapse-done") {
-				consumedNonces.add(e.data?.nonce);
-			}
-		}
-
-		if (isWeaverMode) {
-			updateStatus(ctx);
-		}
-	});
-
-	// -----------------------------------------------------------------------
-	// Rebuild checkpoint cache after tree navigation
-	// -----------------------------------------------------------------------
-
-	pi.on("session_tree", async (_event, ctx) => {
-		// After navigateTree, the branch may have changed.
-		// Rebuild checkpoint map from the new branch's entries.
-		checkpoints.clear();
-		for (const entry of ctx.sessionManager.getEntries()) {
-			const e = entry as any;
-			if (e.type === "custom" && e.customType === "weaver-checkpoint") {
-				const data = e.data as CheckpointData;
-				checkpoints.set(data.label, data);
-			}
-		}
-		updateStatus(ctx);
-	});
-
-	// -----------------------------------------------------------------------
-	// Custom branch summary for weaver-initiated tree navigation
-	// -----------------------------------------------------------------------
-
-	pi.on("session_before_tree", async (event) => {
-		if (!activeIntent) return; // Not a weaver-initiated navigation
-
-		// Override the summary prompt to focus on what was tried and why
-		return {
-			customInstructions:
-				"Summarize the abandoned branch focusing on: " +
-				"what approach was tried, what happened, why it's being abandoned, " +
-				"and any constraints or knowledge learned. Be concise — this will be " +
-				"injected as context for the next attempt.",
-			label: `🕸 time_lapse → ${activeIntent.checkpointLabel}`,
-		};
-	});
+	// When set, the next `context` event will prune messages and inject steering
+	let pendingRewind: PendingRewind | null = null;
 
 	// -----------------------------------------------------------------------
 	// Inject weaver system prompt
@@ -118,6 +56,107 @@ export default function weaver(pi: ExtensionAPI) {
 		pi.appendEntry("weaver-active", { timestamp: Date.now() });
 		return {
 			systemPrompt: event.systemPrompt + "\n\n" + WEAVER_PROMPT,
+		};
+	});
+
+	// -----------------------------------------------------------------------
+	// Context event: perform the actual rewind by pruning messages
+	// -----------------------------------------------------------------------
+	// Fires before each LLM call. If a rewind is pending, we:
+	// 1. Keep messages up to and including the checkpoint
+	// 2. Append a user message with the steering text + checkpoint state
+	// The model sees a clean context and continues from the checkpoint.
+
+	pi.on("context", async (event) => {
+		if (!pendingRewind) return;
+
+		const rewind = pendingRewind;
+		pendingRewind = null;
+
+		// Rebuild checkpoint map from entries (some may have been pruned)
+		// We don't need to do this for the context event since we're operating
+		// on the messages array, but we should rebuild the map for future tools.
+
+		// Find the checkpoint message in the array.
+		// We look for the checkpoint tool result by scanning for our checkpoint label.
+		const messages = event.messages;
+		let cutIndex = -1;
+
+		for (let i = 0; i < messages.length; i++) {
+			const msg = messages[i];
+			// Look for the toolResult from our checkpoint call
+			if (
+				msg.role === "toolResult" &&
+				msg.toolName === "checkpoint"
+			) {
+				const content = Array.isArray(msg.content)
+					? msg.content.map((c: any) => c.text || "").join("")
+					: String(msg.content || "");
+				if (content.includes(`"${rewind.checkpointLabel}"`)) {
+					cutIndex = i;
+					// Don't break — take the LAST matching checkpoint with this label
+					// (in case of re-checkpointing with the same name)
+				}
+			}
+		}
+
+		if (cutIndex === -1) {
+			// Checkpoint not found in messages — can't rewind, continue normally
+			return;
+		}
+
+		// Keep messages 0..cutIndex, then append steering
+		const pruned = messages.slice(0, cutIndex + 1);
+
+		const stateJson = JSON.stringify(rewind.checkpointState, null, 2);
+		pruned.push({
+			role: "user" as const,
+			content: [
+				{
+					type: "text" as const,
+					text: [
+						`## ⏪ Time Lapse → "${rewind.checkpointLabel}"`,
+						"",
+						"Everything after this checkpoint has been erased. Here's what was tried:",
+						"",
+						"### Steering",
+						rewind.steering,
+						"",
+						"### Checkpoint state",
+						"```json",
+						stateJson,
+						"```",
+						"",
+						"Continue from this checkpoint using the steering above.",
+					].join("\n"),
+				},
+			],
+			timestamp: Date.now(),
+		});
+
+		pi.appendEntry("weaver-time-lapse-done", {
+			checkpointLabel: rewind.checkpointLabel,
+			timestamp: Date.now(),
+		});
+
+		return { messages: pruned };
+	});
+
+	// -----------------------------------------------------------------------
+	// Block tool calls after time_lapse fires
+	// -----------------------------------------------------------------------
+	// When time_lapse is called, the model may have batched other tool calls
+	// in the same response. Block them — the context pruning on the next
+	// LLM call will erase their results anyway.
+
+	pi.on("tool_call", async () => {
+		if (!pendingRewind) return;
+
+		return {
+			block: true,
+			reason:
+				"Blocked: time_lapse rewind is pending. " +
+				"This tool call will be discarded by the rewind.",
 		};
 	});
 
@@ -149,11 +188,12 @@ export default function weaver(pi: ExtensionAPI) {
 		description:
 			"Save a named checkpoint with structured state. Use before risky operations " +
 			"or to mark progress that you might want to return to via time_lapse.",
-		promptSnippet: "Save named checkpoint with structured state for time_lapse",
+		promptSnippet:
+			"Save named checkpoint with structured state for time_lapse",
 		parameters: Type.Object({
 			label: Type.String({
 				description:
-					"Short name for this checkpoint (e.g., 'map', 'batch_1_done', 'before_fix')",
+					"Short name for this checkpoint (e.g., 'ready', 'attempt_2', 'phase_done')",
 			}),
 			state: Type.Record(Type.String(), Type.Unknown(), {
 				description:
@@ -171,12 +211,12 @@ export default function weaver(pi: ExtensionAPI) {
 				label: params.label,
 				state: params.state,
 				entryId: leafId,
+				messageIndex: -1, // Will be resolved in context event if needed
 				timestamp: Date.now(),
 			};
 
 			checkpoints.set(params.label, data);
 			pi.appendEntry("weaver-checkpoint", data);
-			pi.setLabel(leafId, `📌 ${params.label}`);
 			updateStatus(ctx);
 
 			return {
@@ -192,30 +232,29 @@ export default function weaver(pi: ExtensionAPI) {
 	});
 
 	// -----------------------------------------------------------------------
-	// Tool: time_lapse (phase 1 — store intent, queue command)
+	// Tool: time_lapse
 	// -----------------------------------------------------------------------
 
 	pi.registerTool({
 		name: "time_lapse",
 		label: "Time Lapse",
 		description:
-			"Rewind to a named checkpoint, abandoning the current approach. " +
-			"Everything after the checkpoint is summarized and injected as context. " +
-			"Use when: wrong approach, context is bloated, or you need to try differently. " +
-			"The steering text should explain WHAT you tried, WHY it failed, and WHAT to do next.",
+			"Rewind to a named checkpoint, erasing everything after it from context. " +
+			"A steering message is injected so you know what was tried and what to do next. " +
+			"Use when: test fails after edit, approach is wrong, or phase is complete.",
 		promptSnippet:
-			"Rewind to checkpoint — abandons current approach, injects summary + steering",
+			"Rewind to checkpoint — erases context after it, injects steering",
 		parameters: Type.Object({
 			target: Type.String({
 				description: "Checkpoint label to rewind to",
 			}),
 			steering: Type.String({
 				description:
-					"Steering text: what you tried, why it failed, what to do differently. " +
-					"This becomes your context after rewinding.",
+					"What you tried, why it failed (or succeeded), what to do next. " +
+					"This becomes your context after the rewind.",
 			}),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+		async execute(_toolCallId, params) {
 			const cp = checkpoints.get(params.target);
 			if (!cp) {
 				const available = [...checkpoints.keys()].join(", ") || "(none)";
@@ -224,30 +263,18 @@ export default function weaver(pi: ExtensionAPI) {
 				);
 			}
 
-			// Generate a unique nonce for this intent
-			const nonce = `tl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-			const intent: TimeLapseIntent = {
-				nonce,
-				targetEntryId: cp.entryId,
+			// Queue the rewind — will be performed in the next `context` event
+			pendingRewind = {
 				checkpointLabel: params.target,
 				steering: params.steering,
 				checkpointState: cp.state,
-				timestamp: Date.now(),
+				targetIndex: -1, // Resolved in context event by scanning messages
 			};
 
-			// Store intent for the command to pick up
-			pendingIntents.set(nonce, intent);
-
-			// Persist the intent to session (survives crashes)
-			pi.appendEntry("weaver-time-lapse-intent", intent);
-
-			// Queue the rewind command as followUp — runs after current turn ends.
-			// NOTE: Do NOT call ctx.abort() — in print mode (-p), abort kills the
-			// process before the followUp can execute. Let the turn finish naturally.
-			// The model will see the "rewind queued" message and stop on its own.
-			pi.sendUserMessage(`/weaver-time-lapse ${nonce}`, {
-				deliverAs: "followUp",
+			pi.appendEntry("weaver-time-lapse-intent", {
+				checkpointLabel: params.target,
+				steering: params.steering,
+				timestamp: Date.now(),
 			});
 
 			return {
@@ -255,95 +282,12 @@ export default function weaver(pi: ExtensionAPI) {
 					{
 						type: "text",
 						text:
-							`⏪ Time lapsing to "${params.target}"... Rewind queued. ` +
-							`Do NOT make any more edits — the rewind will discard everything after the checkpoint. ` +
-							`Just acknowledge this message and stop.`,
+							`⏪ Rewinding to "${params.target}". Context will be pruned on the next turn. ` +
+							`Do NOT make any more tool calls — they will be blocked and discarded.`,
 					},
 				],
-				details: { nonce, target: params.target },
+				details: { target: params.target },
 			};
-		},
-	});
-
-	// -----------------------------------------------------------------------
-	// Command: /weaver-time-lapse (phase 2 — perform the actual rewind)
-	// -----------------------------------------------------------------------
-
-	pi.registerCommand("weaver-time-lapse", {
-		description: "Internal: perform time_lapse rewind (called by time_lapse tool)",
-		handler: async (args, ctx) => {
-			const nonce = args.trim();
-
-			// Idempotency: skip if already consumed (session resume/replay)
-			if (consumedNonces.has(nonce)) {
-				return;
-			}
-
-			const intent = pendingIntents.get(nonce);
-			if (!intent) {
-				ctx.ui.notify(`Time lapse intent ${nonce} not found`, "error");
-				return;
-			}
-
-			pendingIntents.delete(nonce);
-			consumedNonces.add(nonce);
-
-			// Set active intent so session_before_tree can customize the summary
-			activeIntent = intent;
-
-			try {
-				// Wait for everything to settle
-				await ctx.waitForIdle();
-
-				// Perform the actual tree navigation — this is the real rewind.
-				// navigateTree handles:
-				// - finding common ancestor
-				// - generating branch summary (customized by our session_before_tree hook)
-				// - calling branch/branchWithSummary on SessionManager
-				// - rebuilding agent context via agent.replaceMessages()
-				// - emitting session_before_tree / session_tree events
-				const result = await ctx.navigateTree(intent.targetEntryId, {
-					summarize: true,
-					customInstructions:
-						"Summarize what was tried on the abandoned branch, " +
-						"why it's being abandoned, and key constraints learned.",
-					label: `🕸 time_lapse → ${intent.checkpointLabel}`,
-				});
-
-				if (result.cancelled) {
-					ctx.ui.notify("Time lapse was cancelled", "warning");
-					return;
-				}
-
-				// Persist the completed rewind
-				pi.appendEntry("weaver-time-lapse-done", {
-					nonce: intent.nonce,
-					checkpointLabel: intent.checkpointLabel,
-					timestamp: Date.now(),
-				});
-
-				// Inject steering + checkpoint state as the next message.
-				// This kicks off a new turn from the rewound position.
-				const stateJson = JSON.stringify(intent.checkpointState, null, 2);
-				const steeringMessage = [
-					`## Time Lapse → "${intent.checkpointLabel}"`,
-					"",
-					"### New direction",
-					intent.steering,
-					"",
-					"### Checkpoint state",
-					"```json",
-					stateJson,
-					"```",
-					"",
-					"Continue from this checkpoint following the new direction above.",
-					"Your pseudocode plan is still in context — refer to it.",
-				].join("\n");
-
-				pi.sendUserMessage(steeringMessage);
-			} finally {
-				activeIntent = null;
-			}
 		},
 	});
 
@@ -370,12 +314,11 @@ export default function weaver(pi: ExtensionAPI) {
 				}),
 			),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+		async execute(_toolCallId, params) {
 			doneCallCount++;
 
 			if (doneCallCount === 1) {
-				// First done() — run verification
-				const issues = await runVerification(ctx, params.summary);
+				const issues = await runVerification(params.summary);
 
 				if (issues.length === 0) {
 					pi.appendEntry("weaver-done", {
@@ -416,7 +359,6 @@ export default function weaver(pi: ExtensionAPI) {
 				};
 			}
 
-			// Second+ done() — accept
 			pi.appendEntry("weaver-done", {
 				summary: params.summary,
 				state: params.state,
@@ -445,17 +387,9 @@ export default function weaver(pi: ExtensionAPI) {
 	// Helpers
 	// -----------------------------------------------------------------------
 
-	/**
-	 * Run verification checks when done() is called.
-	 * Basic checks for now — Harbor's verifier handles real test verification.
-	 */
-	async function runVerification(
-		_ctx: ExtensionContext,
-		_summary: string,
-	): Promise<string[]> {
+	async function runVerification(_summary: string): Promise<string[]> {
 		const issues: string[] = [];
 
-		// Check if any checkpoints have remaining work
 		for (const [label, cp] of checkpoints) {
 			const remaining = cp.state.remaining;
 			if (remaining && Array.isArray(remaining) && remaining.length > 0) {
