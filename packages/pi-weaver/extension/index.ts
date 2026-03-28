@@ -242,10 +242,10 @@ export default function weaver(pi: ExtensionAPI) {
 			// Persist the intent to session (survives crashes)
 			pi.appendEntry("weaver-time-lapse-intent", intent);
 
-			// Abort current agent loop — stop burning context on wrong path
-			ctx.abort();
-
-			// Queue the rewind command as followUp — runs after agent is idle
+			// Queue the rewind command as followUp — runs after current turn ends.
+			// NOTE: Do NOT call ctx.abort() — in print mode (-p), abort kills the
+			// process before the followUp can execute. Let the turn finish naturally.
+			// The model will see the "rewind queued" message and stop on its own.
 			pi.sendUserMessage(`/weaver-time-lapse ${nonce}`, {
 				deliverAs: "followUp",
 			});
@@ -254,7 +254,10 @@ export default function weaver(pi: ExtensionAPI) {
 				content: [
 					{
 						type: "text",
-						text: `⏪ Time lapsing to "${params.target}"... Rewind queued.`,
+						text:
+							`⏪ Time lapsing to "${params.target}"... Rewind queued. ` +
+							`Do NOT make any more edits — the rewind will discard everything after the checkpoint. ` +
+							`Just acknowledge this message and stop.`,
 					},
 				],
 				details: { nonce, target: params.target },
