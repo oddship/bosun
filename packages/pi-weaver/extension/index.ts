@@ -47,6 +47,11 @@ export default function weaver(pi: ExtensionAPI) {
 	// When set, the next `context` event will prune messages and inject steering
 	let pendingRewind: PendingRewind | null = null;
 
+	// Track whether the last test/bash failed — used to inject reminders
+	let lastTestFailed = false;
+	// Track how many edits happened since last checkpoint or time_lapse
+	let editsSinceCheckpoint = 0;
+
 	// -----------------------------------------------------------------------
 	// Inject weaver system prompt
 	// -----------------------------------------------------------------------
@@ -68,6 +73,28 @@ export default function weaver(pi: ExtensionAPI) {
 	// The model sees a clean context and continues from the checkpoint.
 
 	pi.on("context", async (event) => {
+		// --- Inject system reminder when test failed after edits ---
+		if (!pendingRewind && lastTestFailed && editsSinceCheckpoint > 0 && checkpoints.size > 0) {
+			const latestCp = [...checkpoints.keys()].pop();
+			const messages = [...event.messages];
+			messages.push({
+				role: "user" as const,
+				content: [
+					{
+						type: "text" as const,
+						text: [
+							`⚠️ **WEAVER REMINDER**: Your last test/command failed after ${editsSinceCheckpoint} edit(s).`,
+							`Rule: edit → test → fail → time_lapse("${latestCp}", "what I tried, why it failed, what to try next").`,
+							`Do NOT edit again. Call time_lapse now to rewind and try a different approach.`,
+						].join("\n"),
+					},
+				],
+				timestamp: Date.now(),
+			});
+			lastTestFailed = false; // Only remind once
+			return { messages };
+		}
+
 		if (!pendingRewind) return;
 
 		const rewind = pendingRewind;
@@ -140,6 +167,47 @@ export default function weaver(pi: ExtensionAPI) {
 		});
 
 		return { messages: pruned };
+	});
+
+	// -----------------------------------------------------------------------
+	// Track test failures and edits for system reminders
+	// -----------------------------------------------------------------------
+
+	pi.on("tool_result", async (event) => {
+		if (!isWeaverMode) return;
+
+		// Track edits
+		if (event.toolName === "edit" || event.toolName === "write") {
+			editsSinceCheckpoint++;
+		}
+
+		// Track bash failures (test runs)
+		if (event.toolName === "bash") {
+			const details = event.details as { exitCode?: number } | undefined;
+			const content = Array.isArray(event.content)
+				? event.content.map((c: any) => c.text || "").join("")
+				: String(event.content || "");
+			const isFail =
+				(details?.exitCode && details.exitCode !== 0) ||
+				content.includes("FAIL") ||
+				content.includes("Error") ||
+				content.includes("error:");
+			if (isFail) {
+				lastTestFailed = true;
+			} else {
+				lastTestFailed = false;
+			}
+		}
+
+		// Reset counters on checkpoint or time_lapse
+		if (event.toolName === "checkpoint") {
+			editsSinceCheckpoint = 0;
+			lastTestFailed = false;
+		}
+		if (event.toolName === "time_lapse") {
+			editsSinceCheckpoint = 0;
+			lastTestFailed = false;
+		}
 	});
 
 	// -----------------------------------------------------------------------
