@@ -1,140 +1,228 @@
 # pi-weaver Research Notes
 
-## How This Started
+## Origin
 
-On March 27, 2026, antirez posted a thread about something that had been bugging him about agent harnesses:
+On March 27, 2026, antirez posted about agent harnesses:
 
 > One thing agents harnesses should be able to do is: to jump back in history
-> trimming what follows, just injecting some self-steering text. I wonder if
-> they can already do it.
+> trimming what follows, just injecting some self-steering text.
 
-He wasn't talking about the human using undo. He meant the model itself deciding "I'm going the wrong way" and calling a tool to rewind its own conversation. Micael pointed out that pi already has `/tree` for navigating session history manually, and Mario confirmed an extension could expose this programmatically. But antirez asked the harder question:
+He asked the harder question:
 
 > I wonder if without explicit reinforcement learning for this kind of context
 > saving, the model will be able to use it effectively.
 
-That's the real question. Not "can we build it" but "will models actually use it well."
+We built pi-weaver to find out.
 
-## What We Had Already: pi-exec
+## The Idea
 
-We'd built a plan-driven executor — about 800 lines of TypeScript that breaks tasks into pre-planned phases. Each phase gets scoped tools, a fresh context window, and a `done()` call that carries structured state to the next phase. Gates verify work between phases.
+Three tools that give the model control over its own conversation context:
 
-It worked well enough on our eval suite: 95.7% pass rate on gpt-5.4-mini across 24 tasks. But we noticed problems:
+- **checkpoint(label, state)** — mark a position, save structured state
+- **time_lapse(target, steering)** — erase everything after a checkpoint, inject a summary + steering text
+- **done(summary)** — signal completion with verification
 
-**Phases are rigid.** You define them upfront. If the model goes down a wrong path within a phase, it has no escape hatch — just grinds until budget exhaustion. The gate catches it *after*, but by then the budget for that phase is gone.
+Named after Dota 2 Weaver's ultimate: Time Lapse reverses to 5 seconds ago — position, health, mana all rewind. The agent reverses to a checkpoint — conversation context rewinds, structured state preserved, everything between is summarized.
 
-**The overhead is real.** Each phase boundary means resending the system prompt, tool definitions, and state. 1.4-3.2x more expensive than just letting the model work in a single conversation. The gap narrows on longer tasks but never disappears.
+The insight: this is just try/except for the model's reasoning. checkpoint = try:, time_lapse = raise, steering = exception message.
 
-**Our eval tasks were fake.** "Fix this off-by-one bug." "Rename this function across 3 files." The model knows exactly what to do before it starts. No exploration, no wrong turns, no judgment. These test the executor machinery, not the model's ability to self-correct.
+## What We Built
 
-## The Connection to try/except
+### Extension (~350 lines)
 
-During the discussion we realized something: what antirez describes is just try/except for the model's own reasoning.
+`packages/pi-weaver/extension/index.ts` — Pi extension that registers the three tools plus a hidden `/weaver-time-lapse` command.
 
-```
-checkpoint("before_attempt")     ← try:
-... try approach A ...
-... it's not working ...
-time_lapse("before_attempt",     ← raise Exception("A failed because X")
-  "A failed, try B instead")
-... approach B, informed by A's failure ...
-done()                           ← return result
-```
+**Architecture (command delegation pattern):**
+- Tool `time_lapse` stores intent, queues internal `/weaver-time-lapse` command via `sendUserMessage({ deliverAs: "followUp" })`
+- Command handler has `ExtensionCommandContext` with `navigateTree()` for true session tree rewind
+- `session_before_tree` hook customizes abandoned-branch summaries
+- `session_tree` hook rebuilds checkpoint cache after navigation
+- Idempotent nonce tracking prevents replay on session resume
 
-The checkpoint is `try:`. The time_lapse is `raise`. The steering text is the exception message. The branch summary (what pi generates automatically when you switch branches) is the traceback.
+This was designed with oracle's analysis — `ReadonlySessionManager` is a hard constraint on tool execute context, so direct `branchWithSummary()` calls from tools are unsafe.
 
-Models understand try/except deeply — they write exception handling all day. They don't need RL to understand "if this isn't working, stop and try something else." They need RL to *decide when* it's not working, which is harder. But a good system prompt with explicit heuristics ("time_lapse when: wrong approach, context is bloated, you've been stuck for 3+ rounds") gets pretty far.
+### System Prompt (~5KB)
 
-## The Name
+`packages/pi-weaver/extension/prompt.ts` — Teaches the model context economics and deterministic rules.
 
-Weaver's ultimate in Dota 2: **Time Lapse**. He reverses to where he was 5 seconds ago — position, health, mana all rewind. The agent reverses to a checkpoint — conversation state, structured findings all preserved, everything after the checkpoint is discarded (but summarized first, so knowledge isn't lost).
+**Key evolution:**
+1. v1: Pseudocode cookbook with abstract patterns → model ignored them
+2. v2: Added orientation step → helped (model installed missing tools)
+3. v3: XML tags per Anthropic prompting guide → better structure parsing
+4. v4: Concrete examples with turn numbers → model started checkpointing
+5. v5: Taught context economics (what gets erased, why early checkpoint matters)
+6. v6: Deterministic rules (edit → test → fail → time_lapse, always)
+7. v7: time_lapse for success too (context hygiene, not just failure recovery)
 
-We went with `time_lapse` as the tool name and `pi-weaver` as the package name.
+**Current rules:**
+- checkpoint("start") is always the first tool call
+- Orient → checkpoint("ready") → time_lapse("ready") to shed orientation output
+- edit → test → fail → time_lapse (deterministic, no judgment)
+- Phase complete → checkpoint results → time_lapse to shed work context
+- Each phase starts with clean context: system prompt + task + structured state
 
-## What We Built (The Spike)
+### Harbor Adapters
 
-The entire pi-exec executor (800 lines, phase loop, done protocol, gate system, metrics accumulator) collapsed into:
+`packages/pi-weaver/harbor/pi_harbor/` — Two Python adapters for Harbor eval framework:
 
-1. A system prompt with a "cookbook" of execution patterns (~150 lines)
-2. Three tools: `checkpoint`, `time_lapse`, `done` (~200 lines total)
-3. Pi's existing session tree handles everything else
+- `pi_agent.py` — Plain Pi (BaseInstalledAgent): installs bun + pi in Docker, configures auth.json + settings.json, runs `pi -p`
+- `pi_weaver_agent.py` — Pi + Weaver: extends PiAgent, copies extension files into container, runs `pi -p -e weaver/index.ts`
 
-The model reads a goal, writes pseudocode for how it'll accomplish it (matching against cookbook patterns), then executes according to its own pseudocode. If something goes wrong, it time_lapses back and tries differently.
+**Key fixes discovered during Harbor integration:**
+- Docker's `-e` flag doesn't expand `$HOME`/`$PATH` — set PATH inside the command, not env dict
+- Pi's shebang is `#!/usr/bin/env node` — symlink bun as node in container
+- Session files go to `~/.pi/agent/sessions/<cwd-slug>/` — copy to `/logs/agent/` for Harbor download
+- Install same system deps as Claude Code + Codex adapters (curl, git, unzip, ripgrep)
 
-Tested on three of our existing eval tasks — fix-bug, find-bugs, rename-export. All passed. But these are the easy ones. The model didn't need time_lapse on any of them because the right approach was obvious from the start.
+## Critical Bug: ctx.abort() Kills Print Mode
 
-## Why Our Eval Tasks Don't Test What Matters
+**The biggest finding.** time_lapse never fired in any eval run — zero invocations across 30+ task attempts on Haiku and Sonnet.
 
-After walking through all 24 pi-exec eval tasks, we found time_lapse would only matter on 3 of them (the long/complex ones). For everything else, the model just does the obvious thing in 3-4 rounds.
+Root cause: the original implementation called `ctx.abort()` to stop the agent loop before queuing the followUp command. In interactive mode, pi stays alive and processes the followUp. **In print mode (`pi -p`), abort = exit.** The followUp command never runs.
 
-That's because our tasks are **assistive**, not **agentic**:
+This was the exact blocker oracle warned about: "followUp timing in print mode is the one area I'd test carefully."
 
-- Assistive: "Fix the off-by-one bug in range.ts" — you know what's wrong, where it is, and what to do
-- Agentic: "Keep the dependencies in this project up to date" — you have to figure out what to do, explore, make judgment calls, and recover from wrong paths
+**Fix:** Remove `ctx.abort()`. Let the turn finish naturally. The tool returns a message telling the model to stop, and the followUp command runs after the turn ends.
 
-For Quartermaster (where we planned to use pi-exec), the tasks look like the second kind. Vague goals, real codebases, discovery needed.
+After the fix, time_lapse fired on the very first hard task (polyglot-c-py): checkpoint at T10, time_lapse at T38, rewind executed, context rebuilt, model continued with new approach.
 
-## Harbor and Terminal-Bench
+## Eval Results: Terminal-Bench Sample (10 tasks)
 
-We went looking for benchmarks that test agentic work and found:
+### Plain Pi + Haiku 4.5: 4/10 (40%)
 
-**Aider's Exercism benchmark** — 225 coding puzzles. Still assistive ("implement this function"). Tests raw coding, not agent behavior.
+| Task | Score | Notes |
+|------|-------|-------|
+| build-cython-ext | 0 | Too complex for Haiku |
+| chess-best-move | 0 | Needs vision |
+| configure-git-webserver | 0* | Auth error (0 tool calls) |
+| fix-code-vulnerability | 1 | 55 tool calls, $0.26 |
+| log-summary-date-ranges | 1 | |
+| polyglot-c-py | 0 | Left compiled binary in output dir |
+| qemu-alpine-ssh | 0 | Timeout at 900s |
+| qemu-startup | err | Docker container conflict |
+| regex-log | 1 | |
+| sqlite-with-gcov | 1 | |
 
-**SWE-bench** — Real GitHub issues. More agentic (explore repo, find bug, patch), but still single-issue fixes. Needs Docker, patch-format output.
+*Auth error means this task didn't actually run.
 
-**Terminal-Bench 2.0** (tbench.ai) — 89 real DevOps/SWE tasks in Docker containers. "Here's a messy situation, figure it out." This is the one. Tasks require exploration, debugging, multiple attempts. Exactly where time_lapse should earn its keep.
+### Weaver Pi + Haiku 4.5: 3/10 (30%)
 
-**Harbor** (harborframework.com) — The meta-framework that runs all of these. Already integrates Claude Code, Aider, OpenHands, Codex, mini-swe-agent. We write a pi adapter (~100 lines), get access to all benchmarks, and can compare directly against published numbers.
+| Task | Score | Notes |
+|------|-------|-------|
+| build-cython-ext | 0 | 88 calls, used 2 checkpoints |
+| chess-best-move | 0 | |
+| configure-git-webserver | 0 | 34 calls, $0.13 |
+| fix-code-vulnerability | 1 | 23 calls, $0.08 (3x cheaper than plain!) |
+| log-summary-date-ranges | 1 | |
+| polyglot-c-py | 0 | Left compiled binary |
+| qemu-alpine-ssh | err | |
+| qemu-startup | 0 | |
+| regex-log | 0 | Non-deterministic (scored 1.0 in spike runs) |
+| sqlite-with-gcov | 1 | |
 
-The plan: write a Harbor adapter for pi (plain) and pi-weaver, run Terminal-Bench 2.0, compare, and submit to the leaderboard if numbers are competitive.
+**Note:** These results are from BEFORE the ctx.abort() fix. time_lapse was broken during all eval runs.
+
+### Sonnet 4.6 + Weaver (4 tasks): 3/4 (75%)
+
+| Task | Score | Notes |
+|------|-------|-------|
+| build-cython-ext | 1 | Haiku couldn't solve this |
+| fix-code-vulnerability | 1 | 1 checkpoint, $0.25 |
+| regex-log | 1 | |
+| sqlite-with-gcov | 0 | Only gcov .gcda files missing (2/3 tests passed) |
+
+## Key Findings
+
+### 1. The tool was broken the whole time
+
+Zero time_lapse invocations wasn't a prompting problem or a model capability issue. The tool literally didn't work in print mode. Once fixed, it fired naturally on the first hard task.
+
+### 2. Weaver's cookbook prompt helps even without time_lapse
+
+On fix-code-vulnerability, weaver was 3x cheaper ($0.08 vs $0.26) with half the tool calls (23 vs 55). The structured workflow (orient → understand → checkpoint → fix → verify → done) leads to more focused execution, even if time_lapse never fires.
+
+### 3. Orientation step is high-value
+
+The biggest single win: adding "check what tools exist, install what's missing" to the prompt. On regex-log, this made Haiku install python3 and test with the actual `re.findall` instead of approximating with Perl (score 0 → 1).
+
+### 4. Prompt engineering matters more than we expected
+
+The model ignored abstract pseudocode patterns completely. What worked:
+- XML tags for structure (per Anthropic's prompting guide)
+- Concrete examples showing tool call sequences
+- Explaining the economics (what gets erased, why early checkpoint matters)
+- Deterministic rules (edit → test → fail → time_lapse) instead of vague heuristics
+- Observable triggers ("test fails") instead of counting ("after 3-5 calls")
+
+### 5. The model can't count turns
+
+Early prompts said "time_lapse after 3-5 failed tool calls." The model has no idea what turn it's on. Replaced with deterministic triggers based on observable events.
+
+### 6. Caching works well with time_lapse
+
+After a rewind, the prefix up to the checkpoint stays cached. In the polyglot session:
+- Pre-rewind: 99% cache rate, cacheRead growing to 43K
+- Post-rewind: cacheRead jumped to 46K (prefix preserved), 99% cache rate continues
+- The cache warmth transfers across the rewind — you shed context without losing cache
+
+### 7. Terminal-Bench sample is wrong for this hypothesis
+
+Most tasks are either "easy enough to solve directly" or "too hard for any scaffolding." The sweet spot — tasks where the model can solve it but needs to try multiple approaches — barely exists in the 10-task sample. Full 89-task set may have more.
+
+### 8. time_lapse for context hygiene, not just failure recovery
+
+The biggest conceptual shift: time_lapse after EVERY phase, not just failures. Orientation output, successful edits, debug logs — all dead weight once captured in a checkpoint. Shed it.
+
+The flow: checkpoint("start") → orient → checkpoint("ready") → time_lapse (shed orient) → attempt → test → if pass: checkpoint results → time_lapse (shed work) → next phase.
 
 ## Open Questions
 
-**Will models use time_lapse at the right moments?**
+### Does the fixed time_lapse actually improve scores?
 
-We don't know yet. The cookbook prompt teaches explicit heuristics, but we haven't seen the model hit a genuinely hard task where it needs to self-correct. Terminal-Bench should answer this.
+We haven't re-run the full eval since fixing ctx.abort(). The previous 3/10 vs 4/10 comparison is meaningless because time_lapse was broken. Need fresh numbers.
 
-**Does the pseudocode-first step help on complex tasks?**
+### Does aggressive time_lapsing (after every phase) help or hurt?
 
-On simple tasks, it's pure overhead (~7 seconds). On complex tasks, it might prevent wrong turns by forcing structured thinking upfront. We need data from tasks where the approach isn't obvious.
+Shedding orientation context means the model can't refer back to file listings or code it read during orient. The checkpoint state must capture everything needed. If the state is incomplete, the model loses information.
 
-**Is pi itself a competitive agent platform?**
+### Will models time_lapse on success voluntarily?
 
-Nobody has benchmarked pi against Claude Code or Aider on standard benchmarks. If pi's baseline is weak, weaver improving it from 25% to 35% is interesting research but not competitive. We need pi's standalone numbers first.
+The prompt says to, but models are trained to make forward progress. time_lapsing after success feels counterintuitive. Need to test if the model actually follows this instruction.
 
-**What about the ctx.abort() pattern?**
+### Is Haiku too weak for this hypothesis?
 
-The time_lapse tool uses `ctx.abort()` to stop the current agent loop, then `pi.sendMessage({ deliverAs: "followUp" })` to inject steering and restart. We tested this interactively but not in print mode inside Docker. Could be a blocker.
+Haiku 4.5 never time_lapsed organically (before the fix). After the fix, it did — once, on a very hard task. Sonnet 4.6 might use it more naturally. Need comparative data.
+
+### Would custom eval tasks work better?
+
+Tasks specifically designed to require backtracking: misleading error messages, red herring bugs, multi-approach problems. Terminal-Bench isn't optimized for testing this hypothesis.
 
 ## What's Done
 
-- [x] pi-weaver extension spike: checkpoint, time_lapse, done tools
-- [x] Cookbook system prompt with 8 execution patterns
-- [x] Basic eval runner using `pi -p -e`
-- [x] Tested on fix-bug, find-bugs, rename-export (all pass)
-- [x] Research into eval frameworks (Aider, SWE-bench, mini-swe-agent, Harbor)
-- [x] Plan for Harbor integration and Terminal-Bench evaluation
+- [x] Extension: checkpoint, time_lapse, done tools with command delegation
+- [x] Cookbook system prompt (7 iterations, current version teaches context economics)
+- [x] Harbor adapters for plain Pi and Pi+Weaver
+- [x] Fixed ctx.abort() bug — time_lapse now works in print mode
+- [x] 10-task eval on Haiku (pre-fix: plain 4/10, weaver 3/10)
+- [x] 4-task eval on Sonnet 4.6 (weaver: 3/4)
+- [x] Session audit tooling (audit-session.js, full trace analysis)
+- [x] Confirmed time_lapse fires and context is properly rebuilt post-rewind
+- [x] Confirmed prompt caching survives rewind (prefix stays cached)
 
 ## What's Next
 
-1. Install Harbor, write pi agent adapter, test on 1 Terminal-Bench task
-2. Add weaver extension to adapter
-3. Ensure clean environment isolation (no bosun config leaking)
-4. Full Terminal-Bench run: 89 tasks × 2 agents
-5. Analyze and iterate: when does time_lapse fire, does it help
-6. Leaderboard submission if competitive
+1. **Re-run full eval with fixed time_lapse** — the only valid comparison
+2. **Test aggressive context hygiene** — time_lapse after every phase including orientation
+3. **Sonnet 4.6 comparison** — stronger model may use time_lapse more effectively
+4. **Full 89-task Terminal-Bench** — sample of 10 is too small
+5. **Custom eval tasks** — design problems that specifically require backtracking
+6. **Analyze time_lapse economics** — does shedding context save enough tokens to offset the overhead?
 
 ## Auth & Cost
 
-We're using a ChatGPT Plus subscription ($20/mo), not pay-per-token API. Pi authenticates
-via OAuth token stored in auth.json. For Harbor containers, we copy the OAuth entry into
-the container's `~/.pi/agent/auth.json`. No per-token costs — just rate limits.
+Using Anthropic Claude subscription (OAuth tokens in auth.json). For Harbor containers, copy the auth entry into `~/.pi/agent/auth.json`. Also tested with OpenAI Codex subscription (ChatGPT Plus, $20/mo).
 
-Available models via `openai-codex` provider: gpt-5.1 through gpt-5.4, plus mini/codex variants.
-Primary eval model: `gpt-5.4-mini` (weakest — most interesting test for whether weaver helps).
-
-Rate limits on Plus: ~80-100 messages/3h. With 89 tasks × 2 agents, may need to run
-sequentially over several hours. Not a cost problem, just a patience problem.
+Available models: claude-haiku-4-5, claude-sonnet-4-6, claude-opus-4-6 (Anthropic); gpt-5.1 through gpt-5.4 (OpenAI Codex).
 
 ## References
 
@@ -142,5 +230,5 @@ sequentially over several hours. Not a cost problem, just a patience problem.
 - Pi: https://github.com/badlogic/pi-mono
 - Harbor: https://harborframework.com/
 - Terminal-Bench: https://www.tbench.ai/
+- Anthropic prompting guide: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices
 - Dota 2 Weaver: https://www.dota2.com/hero/weaver
-- pi-exec eval report: packages/pi-exec/eval/REPORT.md
