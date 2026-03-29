@@ -84,33 +84,51 @@ run_task() {
   docker cp "$authtmp" "$cid:/tmp/auth.json"
   docker cp "$settingstmp" "$cid:/tmp/settings.json"
   docker exec "$cid" bash -c '
-    cp /tmp/auth.json /home/agent/.pi/agent/auth.json
-    cp /tmp/settings.json /home/agent/.pi/agent/settings.json
-    chown agent:agent /home/agent/.pi/agent/auth.json /home/agent/.pi/agent/settings.json
-    chmod 600 /home/agent/.pi/agent/auth.json
+    # Update auth for both agent user and root (we run as default user = root)
+    for home in /home/agent /root; do
+      mkdir -p $home/.pi/agent
+      cp /tmp/auth.json $home/.pi/agent/auth.json
+      cp /tmp/settings.json $home/.pi/agent/settings.json
+      chmod 600 $home/.pi/agent/auth.json
+    done
   '
   rm -f "$authtmp" "$settingstmp"
 
   # Run pi as agent user with timeout, show progress in background
   local agent_timeout=900
+  # Ensure pi is available and auth is in the right home dir.
+  # Harbor runs agents as default container user (usually root).
+  # Our prebaked images installed bun+pi under /home/agent — symlink for root too.
+  docker exec "$cid" bash -c '
+    if [ ! -f "$HOME/.bun/bin/pi" ] && [ -f /home/agent/.bun/bin/pi ]; then
+      mkdir -p $HOME/.bun/bin
+      ln -sf /home/agent/.bun/bin/* $HOME/.bun/bin/
+      mkdir -p $HOME/.pi/agent
+      cp /home/agent/.pi/agent/* $HOME/.pi/agent/ 2>/dev/null || true
+    fi
+  '
+
   # Progress monitor: print tool call count every 30s
   (
     while true; do
       sleep 30
-      lines=$(docker exec -u agent "$cid" bash -c 'cat ~/.pi/agent/sessions/--app--/*.jsonl 2>/dev/null | grep -c toolCall 2>/dev/null || echo 0' 2>/dev/null || echo "?")
+      lines=$(docker exec "$cid" bash -c 'find /root/.pi /home/agent/.pi -path "*/sessions/*/*.jsonl" 2>/dev/null | head -1 | xargs grep -c toolCall 2>/dev/null || echo 0' 2>/dev/null || echo "?")
       elapsed_now=$(( SECONDS - start_time ))
       echo "    ... ${elapsed_now}s, ~${lines} tool calls" >&2
     done
   ) &
   local monitor_pid=$!
 
-  docker exec -u agent "$cid" bash -c '
-    export PATH="$HOME/.bun/bin:$PATH"
+  docker exec "$cid" bash -c '
+    export PATH="$HOME/.bun/bin:/home/agent/.bun/bin:$PATH"
     export CI=1
     cd /app 2>/dev/null || cd ~
     INSTRUCTION=$(cat /tmp/instruction.txt)
     timeout '"${agent_timeout}"' '"${pi_cmd}"' -- "$INSTRUCTION" 2>&1 | tee /logs/agent/pi.txt
-    cp -r ~/.pi/agent/sessions/ /logs/agent/sessions/ 2>/dev/null || true
+    find /root/.pi /home/agent/.pi -path "*/sessions/*" -name "*.jsonl" -exec cp {} /logs/agent/ \; 2>/dev/null || true
+    mkdir -p /logs/agent/sessions
+    cp -r /root/.pi/agent/sessions/* /logs/agent/sessions/ 2>/dev/null || true
+    cp -r /home/agent/.pi/agent/sessions/* /logs/agent/sessions/ 2>/dev/null || true
   ' > "$job_dir/agent/stdout.txt" 2>&1 || true
 
   kill "$monitor_pid" 2>/dev/null; wait "$monitor_pid" 2>/dev/null || true
