@@ -2,8 +2,8 @@
   "name": "pi-weaver",
   "version": "0.1.0",
   "type": "module",
-  "description": "Time Lapse execution extension for Pi — checkpoint, rewind, and self-correct",
-  "keywords": ["pi-package"],
+  "description": "Pi extension for LLM self-correction — checkpoint, time_lapse, done",
+  "keywords": ["pi", "agent", "self-correction", "checkpoint", "time-lapse", "eval"],
   "license": "MIT",
   "repository": {
     "type": "git",

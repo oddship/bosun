@@ -1,0 +1,7 @@
+eval/
+harbor/
+wiki/
+workspace/
+*.jsonl
+RESEARCH.md
+ROADMAP.md

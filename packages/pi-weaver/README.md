@@ -1,58 +1,44 @@
 # pi-weaver
 
-> *Time Lapse* — like Weaver's ultimate in Dota 2, rewind to a previous state and try again.
+Self-correction for Pi agents. The model checkpoints its progress, rewinds when stuck, and verifies before finishing.
 
-A Pi extension that transforms pi into an autonomous executor with self-correction. Instead of structured phases (pi-exec), the model drives its own execution using three primitives:
-
-- **checkpoint** — save named progress points with structured state
-- **time_lapse** — rewind to a checkpoint, abandoning the current approach (branch is summarized)
-- **done** — gated completion with harness verification
-
-## How It Works
-
-The extension injects a "cookbook" system prompt that teaches the model to:
-
-1. **Read the goal** and write pseudocode for how to accomplish it
-2. **Execute** according to the pseudocode, using checkpoint/time_lapse as try/except
-3. **Verify** via gated done() — the harness checks work before accepting
-
-The model picks from cookbook patterns (targeted fix, multi-file edit, investigation, audit, etc.) and adapts them to the task. The execution plan is emergent, not pre-planned.
-
-## Usage
+## Quick start
 
 ```bash
-# Interactive
-pi -e ./packages/pi-weaver/extension/index.ts
-
-# Headless (for eval/daemon)
-pi --no-session -p -e ./packages/pi-weaver/extension/index.ts "your goal here"
+pi -e pi-weaver "fix the bug in app.js"
 ```
 
-## Eval
+## What it does
 
-```bash
-# Run weaver against a specific task
-bun run packages/pi-weaver/eval/runner.ts --task fix-bug
+pi-weaver adds three tools to any Pi session:
 
-# Compare weaver vs plain pi
-bun run packages/pi-weaver/eval/runner.ts --task fix-bug --compare
+- **checkpoint** — saves a named snapshot of progress so the model can return to it later
+- **time_lapse** — rewinds to a previous checkpoint, discarding a failed approach and trying something different
+- **done** — signals completion with a verification gate; the harness checks the work before accepting it
 
-# All tasks
-bun run packages/pi-weaver/eval/runner.ts --compare
-```
+## When to use it
 
-## Inspiration
+- Complex, multi-step tasks where the first approach might not work
+- Debugging sessions that require trying different fixes
+- Build-from-source or configuration tasks with many failure modes
+- Any task where "undo and retry" is better than plowing ahead
 
-- [antirez's thread](https://x.com/antirez/status/2037488794379653620) on agent harnesses needing "jump back" tools
-- Pi's built-in session tree and `/tree` navigation
-- Weaver's Time Lapse ultimate from Dota 2
+## When NOT to use it
 
-## Comparison with pi-exec
+- Quick questions or explanations
+- One-shot edits where the change is obvious
+- Read-only tasks (code review, search, exploration)
+- Simple tasks that don't benefit from checkpointing overhead
 
-| | pi-exec | pi-weaver |
-|---|---|---|
-| Structure | Pre-planned phases | Model-driven pseudocode |
-| Recovery | Gates (external verification) | time_lapse (self-correction) |
-| Context | Reset per phase | Continuous with selective rewind |
-| Plan | Data structure (validated upfront) | Text in conversation (flexible) |
-| Cost model | Per-phase overhead | Single conversation with caching |
+## How it works
+
+The extension injects a system prompt that teaches the model to treat `checkpoint` and `time_lapse` like try/except — save progress at stable points, rewind if something goes wrong, and always verify via `done()` before finishing. Context is pruned at rewind time so the model doesn't carry forward dead-end reasoning. See [REPORT.md](REPORT.md) for evaluation results and [RESEARCH.md](RESEARCH.md) for design notes.
+
+## Configuration
+
+Toggle weaver on or off mid-session with `/weaver on|off` (coming soon).
+
+## Links
+
+- [Evaluation results](REPORT.md) — task-by-task performance data
+- [Research notes](RESEARCH.md) — design rationale and alternatives considered

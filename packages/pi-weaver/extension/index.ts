@@ -35,9 +35,12 @@ interface PendingRewind {
 	checkpointState: Record<string, unknown>;
 }
 
+const WEAVER_TOOLS = ["checkpoint", "time_lapse", "done"];
+
 export default function weaver(pi: ExtensionAPI) {
 	const checkpoints = new Map<string, CheckpointData>();
 	let isWeaverMode = false;
+	let isEnabled = true; // Toggle state — when false, tools hidden, prompts skipped
 
 	// When set, the next `context` event will prune messages and inject steering
 	let pendingRewind: PendingRewind | null = null;
@@ -46,6 +49,52 @@ export default function weaver(pi: ExtensionAPI) {
 	let lastTestFailed = false;
 	// Track how many edits happened since last checkpoint or time_lapse
 	let editsSinceCheckpoint = 0;
+
+	// -----------------------------------------------------------------------
+	// Toggle helpers
+	// -----------------------------------------------------------------------
+
+	function setWeaverEnabled(enabled: boolean, ctx: ExtensionContext) {
+		if (isEnabled === enabled) return;
+		isEnabled = enabled;
+
+		if (enabled) {
+			// Add weaver tools back to active set
+			const current = new Set(pi.getActiveTools().map((t) => t.name));
+			for (const name of WEAVER_TOOLS) current.add(name);
+			pi.setActiveTools([...current]);
+		} else {
+			// Remove weaver tools from active set
+			const filtered = pi.getActiveTools()
+				.map((t) => t.name)
+				.filter((n) => !WEAVER_TOOLS.includes(n));
+			pi.setActiveTools(filtered);
+		}
+
+		pi.appendEntry("weaver-toggle", { enabled, timestamp: Date.now() });
+		updateStatus(ctx);
+	}
+
+	// -----------------------------------------------------------------------
+	// Command: /weaver [on|off|toggle]
+	// -----------------------------------------------------------------------
+
+	pi.registerCommand("weaver", {
+		description: "Toggle weaver on/off (checkpoint, time_lapse, done tools)",
+		handler: async (args, ctx) => {
+			const arg = (args ?? "").trim().toLowerCase();
+			if (arg === "on") {
+				setWeaverEnabled(true, ctx);
+			} else if (arg === "off") {
+				setWeaverEnabled(false, ctx);
+			} else {
+				// toggle
+				setWeaverEnabled(!isEnabled, ctx);
+			}
+			const state = isEnabled ? "ON 🕸️" : "OFF";
+			ctx.ui.notify(`Weaver ${state}`, "info");
+		},
+	});
 
 	// -----------------------------------------------------------------------
 	// Restore state on session start/resume
@@ -66,6 +115,17 @@ export default function weaver(pi: ExtensionAPI) {
 			if (e.type === "custom" && e.customType === "weaver-active") {
 				isWeaverMode = true;
 			}
+			if (e.type === "custom" && e.customType === "weaver-toggle") {
+				isEnabled = (e.data as { enabled: boolean }).enabled;
+			}
+		}
+
+		// Apply tool visibility based on restored toggle state
+		if (!isEnabled) {
+			const filtered = pi.getActiveTools()
+				.map((t) => t.name)
+				.filter((n) => !WEAVER_TOOLS.includes(n));
+			pi.setActiveTools(filtered);
 		}
 
 		if (isWeaverMode) updateStatus(ctx);
@@ -76,6 +136,8 @@ export default function weaver(pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 
 	pi.on("before_agent_start", async (event) => {
+		if (!isEnabled) return;
+
 		isWeaverMode = true;
 		pi.appendEntry("weaver-active", { timestamp: Date.now() });
 		return {
@@ -92,6 +154,8 @@ export default function weaver(pi: ExtensionAPI) {
 	// The model sees a clean context and continues from the checkpoint.
 
 	pi.on("context", async (event) => {
+		if (!isEnabled) return;
+
 		// --- Inject system reminder when test failed after edits ---
 		if (!pendingRewind && lastTestFailed && editsSinceCheckpoint > 0 && checkpoints.size > 0) {
 			const latestCp = [...checkpoints.keys()].pop();
@@ -189,7 +253,7 @@ export default function weaver(pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 
 	pi.on("tool_result", async (event) => {
-		if (!isWeaverMode) return;
+		if (!isWeaverMode || !isEnabled) return;
 
 		// Track edits
 		if (event.toolName === "edit" || event.toolName === "write") {
@@ -242,16 +306,20 @@ export default function weaver(pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 
 	function updateStatus(ctx: ExtensionContext) {
+		if (!isEnabled) {
+			ctx.ui.setStatus("weaver", undefined);
+			return;
+		}
 		if (!isWeaverMode) return;
 		const cpCount = checkpoints.size;
 		if (cpCount > 0) {
 			const labels = [...checkpoints.keys()].slice(-3).join(", ");
 			ctx.ui.setStatus(
 				"weaver",
-				ctx.ui.theme.fg("accent", `🕸 ${cpCount} checkpoints: ${labels}`),
+				ctx.ui.theme.fg("accent", `🕸️ ${cpCount} checkpoints: ${labels}`),
 			);
 		} else {
-			ctx.ui.setStatus("weaver", ctx.ui.theme.fg("muted", "🕸 weaver"));
+			ctx.ui.setStatus("weaver", ctx.ui.theme.fg("muted", "🕸️ weaver"));
 		}
 	}
 
