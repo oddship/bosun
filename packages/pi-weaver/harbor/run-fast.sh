@@ -91,8 +91,19 @@ run_task() {
   '
   rm -f "$authtmp" "$settingstmp"
 
-  # Run pi as agent user with timeout
+  # Run pi as agent user with timeout, show progress in background
   local agent_timeout=900
+  # Progress monitor: print tool call count every 30s
+  (
+    while true; do
+      sleep 30
+      lines=$(docker exec -u agent "$cid" bash -c 'cat ~/.pi/agent/sessions/--app--/*.jsonl 2>/dev/null | grep -c toolCall 2>/dev/null || echo 0' 2>/dev/null || echo "?")
+      elapsed_now=$(( SECONDS - start_time ))
+      echo "    ... ${elapsed_now}s, ~${lines} tool calls" >&2
+    done
+  ) &
+  local monitor_pid=$!
+
   docker exec -u agent "$cid" bash -c '
     export PATH="$HOME/.bun/bin:$PATH"
     export CI=1
@@ -102,6 +113,7 @@ run_task() {
     cp -r ~/.pi/agent/sessions/ /logs/agent/sessions/ 2>/dev/null || true
   ' > "$job_dir/agent/stdout.txt" 2>&1 || true
 
+  kill "$monitor_pid" 2>/dev/null; wait "$monitor_pid" 2>/dev/null || true
   local elapsed=$(( SECONDS - start_time ))
 
   # Copy agent logs out
