@@ -3,14 +3,16 @@
 # Skips Harbor entirely — runs pi directly in containers, then runs verifiers.
 #
 # Usage:
-#   ./run-fast.sh plain   # Run all 10 tasks with plain pi
-#   ./run-fast.sh weaver  # Run all 10 tasks with pi + weaver
-#   ./run-fast.sh both    # Run both back-to-back
-#   ./run-fast.sh plain regex-log  # Run single task
+#   ./run-fast.sh plain                          # All 10, Haiku
+#   ./run-fast.sh weaver                         # All 10, Haiku
+#   ./run-fast.sh both                           # Both variants
+#   ./run-fast.sh plain regex-log                # Single task
+#   MODEL=claude-sonnet-4-6 ./run-fast.sh both   # Sonnet
 set -euo pipefail
 
 MODE="${1:-both}"
 SINGLE_TASK="${2:-}"
+MODEL="${MODEL:-claude-haiku-4-5}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TASK_CACHE="${REPO_ROOT}/.bosun-home/.cache/harbor/tasks"
@@ -73,13 +75,21 @@ run_task() {
   docker exec "$cid" chmod 644 /tmp/instruction.txt
   rm -f "$tmpfile"
 
-  # Inject fresh auth at runtime (tokens rotate)
-  local authtmp
+  # Inject fresh auth + model settings at runtime (tokens rotate, model may differ)
+  local authtmp settingstmp
   authtmp=$(mktemp)
+  settingstmp=$(mktemp)
   echo "$AUTH_JSON" > "$authtmp"
+  echo "{\"defaultProvider\":\"anthropic\",\"defaultModel\":\"$MODEL\"}" > "$settingstmp"
   docker cp "$authtmp" "$cid:/tmp/auth.json"
-  docker exec "$cid" bash -c 'cp /tmp/auth.json /home/agent/.pi/agent/auth.json && chown agent:agent /home/agent/.pi/agent/auth.json && chmod 600 /home/agent/.pi/agent/auth.json'
-  rm -f "$authtmp"
+  docker cp "$settingstmp" "$cid:/tmp/settings.json"
+  docker exec "$cid" bash -c '
+    cp /tmp/auth.json /home/agent/.pi/agent/auth.json
+    cp /tmp/settings.json /home/agent/.pi/agent/settings.json
+    chown agent:agent /home/agent/.pi/agent/auth.json /home/agent/.pi/agent/settings.json
+    chmod 600 /home/agent/.pi/agent/auth.json
+  '
+  rm -f "$authtmp" "$settingstmp"
 
   # Run pi as agent user with timeout
   local agent_timeout=900
@@ -157,6 +167,7 @@ run_variant() {
 }
 
 echo "=== Fast eval (pre-baked images) at $(date) ==="
+echo "=== Model: $MODEL ==="
 
 if [ "$MODE" = "both" ]; then
   run_variant "plain"
