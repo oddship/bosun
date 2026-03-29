@@ -1,9 +1,0 @@
-{
-  "name": "phase0-planning",
-  "task": "Add a middleware system to the server. The router should support middleware functions that run before route handlers. Each middleware receives the request and can modify it or reject it. Add at least a logging middleware and an auth middleware as examples in a new src/middleware.ts file.",
-  "initialState": {},
-  "assertions": [
-    { "type": "file_exists", "path": "src/middleware.ts", "description": "middleware.ts should be created" },
-    { "type": "file_contains", "path": "src/middleware.ts", "expected": "export", "description": "Should export middleware functions" }
-  ]
-}
