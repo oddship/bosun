@@ -23,7 +23,104 @@ We evaluated against Terminal-Bench 2.0 sample tasks — agentic terminal tasks 
 
 ---
 
-## 1. Benchmark Results
+## 1. From pi-exec to pi-weaver: Design Evolution
+
+### pi-exec: the predecessor (1,656 lines)
+
+pi-exec was a structured executor that broke tasks into **phases** with a planning step. The architecture:
+
+1. **Phase 0**: LLM generates a multi-phase plan (explore → edit → verify → ...)
+2. **Phase 1..N**: Each phase gets its own system prompt, tool set, and goal
+3. **Gate between phases**: Separate LLM call validates phase output before proceeding
+4. **State passing**: Structured JSON state flows between phases
+
+This worked well on controlled tasks (95.7% pass rate on 24 internal eval tasks with gpt-5.4-mini) but had fundamental limitations:
+
+- **Per-phase overhead**: Each phase required a fresh LLM context + gate call, even for trivial transitions
+- **Rigid structure**: The plan was fixed at Phase 0 — no adaptation when Phase 2 reveals the Phase 1 approach was wrong
+- **No intra-phase self-correction**: Within a phase, the model had no way to "undo" — failed attempts accumulated in context until the phase timed out
+
+### The antirez insight
+
+On March 27, 2026, antirez [posted](https://x.com/antirez/status/2037488794379653620):
+
+> One thing agents harnesses should be able to do is: to jump back in history trimming what follows, just injecting some self-steering text.
+
+And the harder question:
+
+> I wonder if without explicit reinforcement learning for this kind of context saving, the model will be able to use it effectively.
+
+This framed the design problem: instead of imposing structure (pi-exec's rigid phases), give the model **tools to manage its own context**. Let it decide when to checkpoint, when to rewind, when it's done.
+
+### pi-weaver: the rewrite (~410 lines)
+
+Three tools replace 1,656 lines of executor machinery:
+
+| Tool | Purpose | Maps to |
+|------|---------|---------|
+| `checkpoint(label, state)` | Save position + structured state | `try:` |
+| `time_lapse(target, steering)` | Prune context to checkpoint, inject steering | `raise` |
+| `done(summary)` | Signal completion | `return` |
+
+Named after Dota 2 Weaver's ultimate: Time Lapse reverses position, health, mana to 5 seconds ago. The agent reverses to a checkpoint — conversation context rewinds, structured state preserved, everything between is discarded.
+
+### Three architecture iterations
+
+The path to a working implementation required three complete rewrites:
+
+**Iteration 1: ctx.abort()** — Tool called `ctx.abort()` to stop the agent loop, then queued a followUp command to rebuild context. Problem: in print mode (`pi -p`), abort = exit. The followUp never ran. **Zero time_lapse invocations across 30+ eval runs.** We thought the model wouldn't use the tool — it was actually broken.
+
+**Iteration 2: followUp + steer** — Removed abort, queued rewind via `sendUserMessage({ deliverAs: "followUp" })`. Problem: `tool_call` blocking (to prevent batched tools post-rewind) created new turns, preventing the idle state followUp needs. Infinite loop — 64 blocked tool calls, $0.23 wasted in one run. Tried `steer` instead — model treated the raw command text as user input.
+
+**Iteration 3: context-event pruning** (current) — Replaced everything with a `context` event handler. The `context` event fires before each LLM call and can modify the message array directly. time_lapse sets a `pendingRewind` flag → `tool_call` hook blocks batched tools → `context` event prunes messages to checkpoint + injects steering. No commands, no timing issues, works in all modes. 498 → 410 lines.
+
+### Prompt evolution (7 versions)
+
+The system prompt went through equally dramatic iteration:
+
+| Version | Approach | Result |
+|---------|----------|--------|
+| v1 | Abstract pseudocode patterns | Model ignored them completely |
+| v2 | Added orientation step | Model started installing missing tools |
+| v3 | XML tags per Anthropic guide | Better structure parsing |
+| v4 | Concrete examples with turn numbers | Model started checkpointing |
+| v5 | Context economics (what gets erased, why) | Model understood rewind cost/benefit |
+| v6 | Deterministic rules (edit→test→fail→time_lapse) | Replaced vague heuristics |
+| v7 | time_lapse for success too (context hygiene) | Not just failure recovery |
+
+Key lesson: **the model can't count turns** ("time_lapse after 3-5 failures" doesn't work) but it responds well to **observable triggers** ("your test just failed after edits → time_lapse").
+
+### System reminder injection
+
+Even with good prompts, the model sometimes grinds (edits → test fails → edits again) instead of rewinding. Added a `tool_result` hook that tracks `lastTestFailed` + `editsSinceCheckpoint`. When both are true, the `context` event injects a reminder before the next LLM call:
+
+> "Your last test failed after N edits. Rule: edit → test → fail → time_lapse. Do NOT edit again."
+
+This addresses the gap between "knows the rule" and "follows the rule at the decision point."
+
+### Bug fixes from code review
+
+11 issues found and fixed through oracle-assisted review:
+
+| Issue | Impact |
+|-------|--------|
+| Duplicate rule numbers in prompt (4,5,4,5) | Model confused about priority |
+| Checkpoint lookup via string matching content text | False matches possible |
+| `lastTestFailed` triggered on orientation failures | Spurious reminders |
+| `lastTestFailed` cleared by any successful bash | Flag too easily reset |
+| `doneCallCount` never reset on time_lapse | Verification gate persisted across rewinds |
+| Fake `runVerification()` no-op | Misleading API |
+| `event.isError` not used for bash failure detection | Reminder never fired (details.exitCode undefined) |
+| Missing `session_start` handler | Checkpoints lost on resume |
+| Dead fields in types | Code clutter |
+| Stale "replaced by summary" text | Documentation drift |
+| Run-as-agent instead of root in Docker | /app read-only, model wasted 70+ calls on privilege escalation |
+
+The isError and run-as-root bugs were discovered during eval — both completely invisible in unit tests.
+
+---
+
+## 2. Benchmark Results
 
 ### Sonnet 4.6 — A/B Comparison (5 tasks)
 
@@ -42,7 +139,7 @@ Both plain and weaver scored **1/10** (only qemu-startup). Haiku is too weak for
 
 ---
 
-## 2. Session Trace Analysis
+## 3. Session Trace Analysis
 
 ### Where weaver helped most: build-cython-ext
 
@@ -80,7 +177,7 @@ This is the core limitation: **time_lapse is a recovery tool, not a stopping too
 
 ---
 
-## 3. time_lapse Effectiveness
+## 4. time_lapse Effectiveness
 
 ### Per-call analysis
 
@@ -113,7 +210,7 @@ The worst case had **only one coarse checkpoint**:
 
 ---
 
-## 4. Token Economics
+## 5. Token Economics
 
 ### Cost breakdown
 
@@ -150,7 +247,7 @@ Weaver was **534% more expensive** ($0.58 vs $0.09) on the shared failure:
 
 ---
 
-## 5. Conclusions
+## 6. Conclusions
 
 ### What works
 
