@@ -4,54 +4,57 @@
 **Result**: Plain fail (69s, $0.09) | Weaver fail (439s, $0.58)
 **Verdict**: weaver-hurts
 
-## Task Description
+## What the task asks
 
-Write a single file `main.py.c` that works as both a valid Python 3 program and a valid C program, computing the Nth Fibonacci number (f(0)=0, f(1)=1) when invoked via either `python3` or `gcc + run`.
+Write a single file `main.py.c` that works as both a valid Python 3 program and a valid C program. Both `python3 main.py.c N` and `gcc main.py.c -o cmain && ./cmain N` should print the Nth Fibonacci number.
 
-## Plain Session Trace
+## What happened without weaver
 
-1. **Design (T1)**: Immediately conceived the classic `#if 0` / `"""` polyglot trick — C preprocessor skips Python code via `#if 0`, Python ignores C code inside a triple-quoted string.
-2. **Write (T2)**: Wrote the polyglot file in one shot.
-3. **Test (T3–T6)**: Compiled with gcc, ran C binary (works). Ran with python3 — failed because `python3` wasn't available in the container (only `python3.12`). Tried workarounds.
-4. **Stopped (T7)**: Gave up after 7 turns. The polyglot logic was correct but the environment lacked `python3` symlink.
+The plain agent nailed the concept immediately. Turn 1: "I'll use the `#if 0` / `"""` bridge." This is the classic polyglot trick — C's preprocessor skips Python code via `#if 0`, Python hides C code inside a triple-quoted string. Turn 2: wrote the file. Turns 3–6: compiled with gcc (works), tried running with python3 (binary not found — only `python3.12` exists in the container).
 
-Total: 7 turns, 6 tool calls. Fast and cheap, but failed the validation.
+Seven turns. Six tool calls. $0.09. The polyglot was correct; the environment was broken. The agent didn't think to create a `python3` symlink, so it failed validation.
 
-## Weaver Session Trace
+## What happened with weaver
 
-1. **Checkpoint "start" (T1)**: Saved task requirements (paths, versions, test commands).
-2. **Exploration (T2–T6)**: Checked Python/GCC versions, verified environment. Found `python3` missing, used `python3.12` instead.
-3. **First attempt (T7–T10)**: Wrote the polyglot using the same `#if 0` trick. Both C and Python worked correctly with manual testing.
-4. **time_lapse → "start" (T12)**: Rewound to start checkpoint. This was triggered after the agent noticed GCC warnings about unterminated string literals inside `#if 0` blocks.
-5. **Second attempt (T13–T25)**: Rewrote the polyglot, tried multiple approaches to suppress GCC warnings (pragmas, different string delimiters). Spent 13 turns iterating on cosmetic warnings that don't affect correctness. Tried and removed pragma approaches. Eventually concluded the warnings are fundamental to the approach.
-6. **done (T26)**: Signaled completion.
+Same correct idea, same environment problem, but a very different trajectory.
 
-Total: 27 turns, 26 tool calls (17 bash, 4 write, 1 checkpoint, 1 time_lapse, 1 edit, 1 read, 1 done).
+The weaver agent checkpointed "start", explored the environment (found python3.12, not python3), and wrote the polyglot by turn 7. It worked — C compiled and ran, Python ran via `python3.12`. Same place the plain agent reached, same fundamental `python3` symlink problem.
 
-## Key Divergence
+Then things went sideways. GCC printed two warnings about unterminated string literals inside `#if 0` blocks. These warnings are cosmetic — they come from GCC's tokenizer scanning `"""` inside skipped preprocessor blocks. The compiled binary works fine. They're noise.
 
-Both agents failed for the same root cause: the task validator expected `python3` (not `python3.12`), and neither agent created the symlink. But they failed very differently:
+But the agent called `time_lapse("start")`.
 
-- **Plain** failed fast and cheap — 7 turns, $0.09, 69 seconds. It recognized the `python3` issue, tried a couple of things, and stopped.
-- **Weaver** failed slowly and expensively — 27 turns, $0.58, 439 seconds. After a correct first implementation, the time_lapse rewound to "start" and the agent spent many turns chasing GCC warnings that were harmless. The rewind threw away a working solution and replaced it with the same solution after extensive iteration.
+It rewound to the beginning, losing its working solution. Then it spent 13 more turns — rewriting the polyglot, trying `#pragma GCC diagnostic` to suppress the warnings, discovering that doesn't work for tokenizer-level warnings, removing the pragma, rewriting again. By turn 25 it had... the same polyglot file it had at turn 7. With the same warnings. Which were always harmless.
 
-The rewind was **counterproductive** here: the agent's first polyglot was functionally correct, and the GCC warnings were cosmetic. By rewinding to "start", it lost the knowledge that its solution worked and spent tokens re-deriving and over-polishing it.
+It called `done()` on turn 26 and failed validation for the same reason: no `python3` symlink.
 
-## Token Economics
+## The numbers are brutal
 
-| Metric | Plain | Weaver |
-|--------|-------|--------|
+| | Plain | Weaver |
+|--|-------|--------|
 | Turns | 7 | 27 |
 | Output tokens | 3,979 | 23,794 |
-| Cache read | 29,121 | 398,053 |
-| Cache write | 6,104 | 27,384 |
-| Cost | $0.0913 | $0.5791 |
+| Cost | $0.09 | $0.58 |
 | Time | 69s | 439s |
 
-Weaver cost **6.3x more** and took **6.4x longer** — the worst cost ratio in the entire evaluation. Output tokens ballooned to 23K (6x plain) because the agent generated and rewrote the polyglot file multiple times.
+6.3x the cost. 6.4x the time. The worst ratio in the entire [evaluation](../index.md).
 
-## Lessons
+The output tokens tell the story: 23K vs 4K. The agent generated and regenerated the polyglot file four times, each time producing long reasoning about string delimiter tricks. All of it converging on the original solution.
 
-**Weaver punishes unnecessary rewinds on creative tasks.** The polyglot task is essentially "write one clever file." There's no explore-then-execute structure — the solution is either right or wrong on the first try. Rewinding threw away correct work and triggered a perfectionist loop chasing cosmetic warnings. The model couldn't distinguish "GCC warnings" (harmless) from "actual bugs" (show-stopping), and weaver's rewind mechanism amplified this judgment error.
+## Why this went wrong
 
-**Both agents missed the real fix** — creating a `python3` symlink to `python3.12`. This is an environment problem, not a coding problem, and neither weaver tools nor plain exploration helped solve it. The task exposes a shared blind spot: agents assume the specified commands will work and don't think to fix the test harness.
+Two failures compounded:
+
+**The rewind was a judgment error.** The agent couldn't distinguish "GCC warnings" (cosmetic) from "GCC errors" (blocking). It treated warnings as a signal that its approach was flawed and rewound to try a different one. But there was no different approach — the `#if 0`/`"""` trick is essentially the only way to do Python/C polyglots, and the warnings are inherent to it.
+
+**Weaver amplified the judgment error.** Without weaver, the agent would have spent a few turns trying to fix the warnings and then moved on. With weaver, it *rewound past its working solution*. The rewind destroyed the knowledge that the polyglot was functionally correct, and the agent re-entered the same exploration from scratch. The tool didn't cause the bad judgment, but it made the consequences 6x more expensive.
+
+**Neither agent solved the real problem.** Both missed that `python3` → `python3.12` symlink was needed. This is an environment fix, not a coding fix. The agents were so focused on the polyglot logic that they never questioned whether the test harness's assumptions held. Weaver's tools don't help with this kind of problem — there's nothing to checkpoint about "the test runner can't find python3."
+
+## The lesson
+
+Weaver punishes unnecessary rewinds on creative tasks. The polyglot is a "write one clever file" problem — there's no explore-then-execute structure, no accumulated context to prune. The solution is either right or wrong on the first try.
+
+The [fix-code-vulnerability](fix-code-vulnerability.md) rewind worked because it pruned exploration that was genuinely finished — grep output, test analysis, CWE research. Here, the rewind pruned *the solution itself*. That's the difference between pruning scaffolding and demolishing the building.
+
+This is also a warning about what "self-correction" means in practice. The agent correctly identified a problem (GCC warnings), correctly used the tool (time_lapse to start over), and still made things worse. The tool worked. The judgment didn't. That's [antirez's question](../analysis/the-idea.md) showing up in the data.

@@ -4,57 +4,53 @@
 **Result**: Plain pass (75s, $0.06) | Weaver pass (106s, $0.16)
 **Verdict**: weaver-hurts
 
-## Task Description
+## What the task asks
 
-Configure a bare git repository at `/git/server` with a post-receive hook that deploys pushed content to a web server running on port 8080, so that `git push` automatically makes files available via HTTP.
+Set up a bare git repo at `/git/server` with a post-receive hook that deploys to a web server on port 8080. Push a file, curl it, see the content. Classic git-push-to-deploy.
 
-## Plain Session Trace
+## What happened without weaver
 
-1. **Setup (T1–T4)**: Created git user, initialized bare repo at `/git/server`, wrote a post-receive hook (`GIT_WORK_TREE=/var/www/gitdeploy git checkout -f`), configured nginx to serve from the deploy directory on port 8080.
-2. **Start services (T5–T6)**: Started nginx, set permissions.
-3. **End-to-end test (T7–T9)**: Cloned the repo locally, created `hello.html`, committed, pushed. Verified `curl http://localhost:8080/hello.html` returns "hello world".
-4. **Done (T10)**: Summarized the setup.
+The plain agent knew the recipe. Turn 1: create git user, init bare repo. Turn 2: write post-receive hook (`GIT_WORK_TREE=/var/www/gitdeploy git checkout -f`). Turn 3: nginx config. Turn 4: start nginx, set permissions. Turns 5–9: end-to-end test — clone, commit, push, curl. Works.
 
-Total: 10 turns, 10 tool calls (9 bash, 1 write). Clean, linear execution — the agent knew exactly what to do and did it.
+Ten turns. Ten tool calls. $0.06. Seventy-five seconds. No hesitation, no wrong turns, no wasted work. The agent had this one memorized.
 
-## Weaver Session Trace
+## What happened with weaver
 
-1. **Checkpoint "start" (T1)**: Saved task requirements (git clone path, web port, push-to-deploy pattern).
-2. **Exploration (T2–T4)**: Checked environment — OS version, available tools (nginx, apache, git), existing users. Used parallel tool calls.
-3. **Checkpoint "ready" (T4–T5)**: Saved environment details and a plan: `{env: "Ubuntu 24.04", tools: [...], plan: "bare repo + post-receive + nginx", nginx_config_path: ..., web_root: ..., repo_path: ...}`.
-4. **time_lapse → "ready" (T6)**: Rewound to "ready" checkpoint. Pruned exploration turns.
-5. **Setup (T7–T17)**: Created git user, bare repo, post-receive hook, nginx config. Started services. Ran end-to-end test. Hit a `systemctl` issue (not available in container), used `nginx` directly.
-6. **Cleanup & done (T18–T19)**: Cleaned up test repo, signaled completion.
+The weaver agent did something the plain agent didn't: it explored the environment first. What OS? Ubuntu 24.04. What web servers are available? Nginx, apache2. What users exist? It spent 4 turns answering questions it didn't need to ask — it was going to use nginx and a git user regardless.
 
-Total: 20 turns, 22 tool calls (15 bash, 2 checkpoint, 1 time_lapse, 3 write, 1 done).
+Then checkpoint "ready" with structured state: the OS version, available tools, a plan, the nginx config path, the web root, the repo path.
 
-## Key Divergence
+Then `time_lapse("ready")`.
 
-This task is **procedural knowledge** — the agent either knows how to set up git + nginx + post-receive hooks or it doesn't. Both agents knew.
+Then... the exact same setup the plain agent did. Create user, bare repo, hook, nginx config, start, test. But now with 20 turns instead of 10, because the checkpoint/rewind/done ceremony added overhead. And `systemctl` wasn't available in the container, so it had to fall back to running `nginx` directly — a hiccup the plain agent avoided by never trying systemctl in the first place.
 
-- **Plain** executed the recipe in 10 turns with zero wasted effort. It didn't need to explore because the task is well-defined and the agent had the knowledge already.
-- **Weaver** added overhead: 2 checkpoints, 1 time_lapse, and an exploration phase that discovered facts (Ubuntu 24.04, nginx available) the agent could have assumed. The rewind pruned 4 turns of exploration that cost very little to begin with.
+## The cost ratio problem
 
-The rewind was **net negative**: the 4 turns of exploration it pruned were cheap (~5K tokens), but the weaver tooling overhead (checkpoints, time_lapse, done) added 10 extra turns and 2x the tool calls.
-
-## Token Economics
-
-| Metric | Plain | Weaver |
-|--------|-------|--------|
+| | Plain | Weaver |
+|--|-------|--------|
 | Turns | 10 | 20 |
-| Tool calls | 10 | 22 |
-| Output tokens | 2,176 | 4,916 |
-| Cache read | 30,701 | 163,525 |
-| Cache write | 4,963 | 9,254 |
-| Cost | $0.0605 | $0.1576 |
+| Cache read | 31K | 164K |
+| Cost | $0.06 | $0.16 |
 | Time | 75s | 106s |
 
-Weaver cost **2.6x more** — from $0.06 to $0.16. The overhead is disproportionate because the base task was so cheap. Cache reads jumped 5x (30K → 163K) despite the task being shorter in real complexity.
+2.6x the cost. The absolute difference is a dime — I've spent more on a vending machine coffee. But the ratio matters because it tells you something about when weaver is structurally counterproductive.
 
-## Lessons
+The plain session was 31K cache reads. That's a tiny context window — the whole session fit comfortably. There was nothing to prune because there was nothing wasted. Weaver's rewind pruned 4 turns of environment exploration (~5K tokens) but the ceremony of doing so — two checkpoints, a time_lapse, a done call, plus the exploration itself — added 10 turns and 133K cache reads.
 
-**Weaver hurts on fast procedural tasks.** When the agent already knows the answer and can execute linearly, checkpoints and rewinds are pure overhead. There's nothing to prune because there's nothing wasted. The plain agent's 10-turn execution was already optimal.
+It's like hiring a moving crew to carry one box across the room.
 
-**The cost ratio matters more than the absolute difference.** The $0.10 absolute cost increase is small, but the 2.6x ratio is significant. For a benchmark with many easy procedural tasks, weaver would consistently overpay on the ones the model can already solve efficiently.
+## Why the agent explored at all
 
-**Weaver's exploration instinct is counterproductive for known recipes.** The weaver-equipped model spent turns checking the OS version and available packages — information it didn't need and wouldn't need even if it failed. This suggests the checkpoint/time_lapse tools encourage an "explore first" mindset even when direct execution would be faster.
+This is the subtler question. The plain agent went straight to execution. The weaver agent explored first. Same model, same task, different behavior. Why?
+
+I think the checkpoint tool creates an "explore first" instinct. When you have a tool that says "save your findings for later," the model wants to *have* findings. So it explores to justify the checkpoint. On [fix-code-vulnerability](fix-code-vulnerability.md), that instinct was correct — there were real findings (which CWE? which functions?). Here, the "findings" were "it's Ubuntu and nginx is installed," which the model already assumed.
+
+The exploration wasn't wrong, exactly. It was just unnecessary for a task the model could already solve from memory. The weaver prompt encourages a pattern that doesn't always fit.
+
+## The lesson
+
+Weaver hurts on fast procedural tasks. When the agent already has the recipe — create repo, write hook, configure nginx, test — checkpoints and rewinds are pure overhead. There's nothing to explore, nothing to prune, nothing to correct.
+
+This is the opposite end of the spectrum from [fix-code-vulnerability](fix-code-vulnerability.md). There, the agent didn't know the answer and had to discover it; the checkpoint captured the discovery and the rewind cleaned up the search. Here, the agent knew the answer before it started; the checkpoint captured nothing useful and the rewind deleted nothing wasteful.
+
+The pattern emerges across tasks: weaver's value correlates with uncertainty. High uncertainty (what's the vulnerability? → explore, checkpoint, rewind, fix) = [weaver helps](fix-code-vulnerability.md). Low uncertainty (set up git+nginx → just do it) = weaver hurts. Medium uncertainty (write a regex → think and iterate) = [weaver is neutral](regex-log.md). The tool is most valuable exactly when the task is hardest to predict, which is also when you'd most want a safety net.

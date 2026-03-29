@@ -4,60 +4,68 @@
 **Result**: Plain pass (247s, $0.63) | Weaver pass (355s, $0.83)
 **Verdict**: weaver-hurts
 
-## Task Description
+## What the task asks
 
-Clone pyknotid 0.5.3, fix NumPy 2.3.0 compatibility issues across ~15 source files, compile three Cython extensions (chelpers, ccomplexity, cinvariants), install to system Python, and verify the README snippet plus test suite pass.
+Clone pyknotid 0.5.3 (a knot theory library), fix its NumPy 2.3.0 compatibility issues across ~15 source files, compile three Cython extensions, install everything to system Python, and verify that both the README snippet and test suite still work.
 
-## Plain Session Trace
+This is the hardest task in my batch. It's not conceptually difficult — you're replacing deprecated NumPy aliases — but there are a lot of them, scattered across a lot of files, and the build has to work end-to-end.
 
-1. **Clone & survey (T1–T6)**: Cloned repo, read setup.py, examined Cython source files and Python modules. Identified numpy version, checked Cython availability.
-2. **Systematic grep (T7–T9)**: Searched for all deprecated NumPy aliases (`np.int`, `np.float`, `np.bool`, `np.complex`) across the codebase. Built a mental fix list.
-3. **Apply fixes (T11–T33)**: Methodically edited 12+ files, replacing deprecated aliases: `np.float` → `float`, `np.int` → `int`, `np.bool` → `bool`, `np.complex` → `complex`, `np.int` → `np.intp` (in Cython). Also fixed `fractions.gcd` → `math.gcd` for Python 3.9+ compatibility.
-4. **Build & verify (T35–T49)**: Built extensions with `python setup.py build_ext --inplace`, installed package, ran README snippet (works), ran test suite (18/18 pass).
+## What happened without weaver
 
-Total: 49 turns, 62 tool calls (30 bash, 21 read, 11 edit). Linear, methodical execution.
+The plain agent was methodical. It cloned the repo, read the key files, then ran two grep commands to find every deprecated NumPy alias in the codebase. That gave it a complete fix list: `np.float` → `float`, `np.int` → `int`, `np.bool` → `bool`, `np.complex` → `complex`, `np.int` → `np.intp` in Cython code. Also `fractions.gcd` → `math.gcd` for Python 3.9+.
 
-## Weaver Session Trace
+Then it edited. Twelve files, one after another, 22 turns of read-edit cycles. No backtracking. No surprises. It built the extensions, installed the package, ran the README snippet, ran the test suite. Eighteen tests pass. Done.
 
-1. **Checkpoint "start" (T1)**: Saved task overview (repo, numpy target, extensions needed, test snippet, skip-tests list).
-2. **Exploration (T2–T28)**: Long exploration phase — 27 turns of bash commands examining the codebase, checking versions, reading files, grepping for deprecated APIs. Much more exploration than plain.
-3. **Checkpoint "ready" (T29)**: Saved detailed fix plan: `{fixes_needed: [...], build_cmd: ..., test_cmd: ..., verify_snippet: ...}`.
-4. **time_lapse → "ready" (T30)**: First rewind. Pruned 28 turns of exploration.
-5. **Checkpoint "attempt_1" + fixes (T31–T44)**: Applied edits, ran build. Hit issues, made additional fixes.
-6. **time_lapse → "attempt_1" (T45)**: Second rewind after build errors. Retried.
-7. **time_lapse → "attempt_1" (T52)**: Third rewind. Still working through build issues.
-8. **time_lapse → "attempt_1" (T63)**: Fourth rewind. Finally got clean build.
-9. **Verify & done (T64–T68)**: Ran tests (18/18 pass), ran README snippet, checkpointed "done", called done().
+Forty-nine turns, 62 tool calls, $0.63. Linear execution — the agent had a clear mental model of every file that needed changes and followed it through.
 
-Total: 69 turns, 68 tool calls (44 bash, 4 checkpoint, 4 time_lapse, 12 edit, 3 read, 1 done).
+## What happened with weaver
 
-## Key Divergence
+The weaver agent started the same way: checkpoint "start", explore the codebase. But it explored for much longer — 27 turns of bash commands before saving checkpoint "ready" with a detailed fix plan.
 
-Both agents completed the task with the same set of fixes. The difference is in execution strategy:
+Then `time_lapse("ready")`. Good — that's the pattern that [worked for fix-code-vulnerability](fix-code-vulnerability.md). Prune the exploration, execute the fix plan from clean context.
 
-- **Plain** was methodical and linear: grep for all issues, fix them one by one, build once, verify. It had a clear mental model of all 12+ files that needed changes and executed the plan without backtracking.
-- **Weaver** used 4 time_lapses — one to compress exploration, and three retries from "attempt_1". The repeated rewinds suggest the agent kept hitting build errors, rewinding to a clean state, and retrying. But each rewind discarded partial progress (edits that were correct), forcing re-application.
+But this isn't a one-edit fix. This is twelve files. The agent started applying edits, hit build errors, and called `time_lapse("attempt_1")`. Then hit more errors. `time_lapse("attempt_1")` again. And again. And again.
 
-The core problem: **this task requires many small coordinated edits across many files**. Rewinding discards those edits, forcing the agent to redo them. The explore-then-execute pattern doesn't help when the "execute" phase itself is complex and iterative.
+Four time_lapses total. Each one rewound past all the edits the agent had applied and forced it to re-apply them. The checkpoint "attempt_1" was saved *before* any fixes were applied — so every rewind meant re-doing every edit from scratch.
 
-## Token Economics
+It got there eventually: 69 turns, 68 tool calls, $0.83. Same result as plain, same fixes, 32% more expensive, 44% slower.
 
-| Metric | Plain | Weaver |
-|--------|-------|--------|
+## The checkpoint placement problem
+
+This is the most instructive failure in my batch. The rewind pattern itself isn't wrong — it's where the checkpoint was placed.
+
+```
+checkpoint("ready")     ← fix plan saved
+time_lapse → "ready"    ← exploration pruned ✓
+  ... apply 12 edits ...
+  ... build fails ...
+checkpoint("attempt_1") ← saved BEFORE edits
+time_lapse → "attempt_1" ← edits lost ✗
+  ... re-apply 12 edits ...
+  ... build fails differently ...
+time_lapse → "attempt_1" ← edits lost again ✗
+```
+
+If "attempt_1" had been saved *after* all edits were applied, the rewinds would have preserved the edits and only retried the build step. Instead, the agent checkpointed its intent ("I'm about to fix things") rather than its progress ("I've fixed these 12 files"). Every rewind threw away correct work.
+
+This is a learnable skill. The model needs to understand: checkpoint *after* you've done something valuable, not before. The [architecture page](../analysis/architecture.md) describes checkpoint as analogous to `try:` — but in practice, you want it more like a database commit. Save the state you want to keep, not the state you want to start from.
+
+## The numbers
+
+| | Plain | Weaver |
+|--|-------|--------|
 | Turns | 49 | 69 |
 | Tool calls | 62 | 68 |
-| Output tokens | 10,566 | 15,920 |
-| Cache read | 1,086,163 | 1,452,445 |
-| Cache write | 38,645 | 41,503 |
-| Cost | $0.6294 | $0.8304 |
+| Cache read | 1.09M | 1.45M |
+| Cost | $0.63 | $0.83 |
 | Time | 247s | 355s |
 
-Weaver cost 32% more and took 44% longer. The 4 time_lapses each forced context rebuilding and re-application of fixes, adding ~370K cache reads and 5K output tokens compared to plain.
+The cache read difference — 370K extra tokens — is the cost of four rewinds. Each rewind forces the model to re-process everything from the checkpoint forward, and each re-application of edits adds to the context that subsequent turns must read.
 
-## Lessons
+## The lesson
 
-**Weaver struggles with multi-file edit tasks.** When the fix requires touching 12+ files with small targeted edits, rewinds are destructive — they erase correct edits along with stale context. The plain agent's linear approach was more efficient: grep everything, fix everything, build once.
+Weaver struggles with scattered multi-file edits. When the fix is twelve small changes across twelve files, rewinds are destructive — they erase correct changes along with stale context. The plain agent's linear approach was better: grep everything, fix everything, build once.
 
-**Multiple time_lapses signal trouble.** Four rewinds in a single task is a red flag. Each rewind means the previous attempt's work was lost. For build-and-fix tasks, a better strategy would be to never rewind past the point where edits were applied — checkpoint *after* edits, not before them. The "attempt_1" checkpoint was placed too early (before fixes), so rewinding to it meant re-doing all fixes.
+Four time_lapses in a single task is a red flag. Each one means the previous attempt's work was lost. Compare this to [fix-code-vulnerability](fix-code-vulnerability.md), which used one time_lapse perfectly — the difference is that a CRLF fix is a single edit, and this task is a dozen.
 
-**Checkpoint placement matters.** If "attempt_1" had been saved *after* all edits were applied (but before the build), rewinds would have preserved the edits and only retried the build step. This is a learnable skill for the model.
+The deeper lesson is about checkpoint granularity. The model treated the entire fix-and-build cycle as one atomic operation, but it's actually two: "apply all edits" (deterministic, repeatable, cheap) and "build and debug" (uncertain, iterative, where rewinds might help). Checkpointing between them would have given the model the best of both worlds. But nobody taught it that — and as [the-idea](../analysis/the-idea.md) notes, we're betting the model figures out these patterns without RL. Sometimes it doesn't.

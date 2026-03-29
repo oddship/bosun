@@ -4,53 +4,46 @@
 **Result**: Plain pass (217s, $0.35) | Weaver pass (191s, $0.30)
 **Verdict**: neutral
 
-## Task Description
+## What the task asks
 
-Write a single regex that matches the last YYYY-MM-DD date on lines containing a valid IPv4 address in a log file, handling edge cases like false-match avoidance (e.g., `1134-12-1234` is not a date) and no leading zeros in IP octets.
+Write a single regex that matches the last YYYY-MM-DD date on log lines containing a valid IPv4 address. Edge cases everywhere: February can have 29 days, IPs can't have leading zeros, things that look like dates (e.g., `1134-12-1234`) aren't, and valid dates/IPs can't be embedded inside larger alphanumeric strings.
 
-## Plain Session Trace
+## What happened without weaver
 
-1. **Design (T1)**: Reasoned about the regex requirements: IPv4 lookahead, date validation (month 01–12, day 01–31 with per-month limits), "last date on line" via greedy `.*`, word boundary guards.
-2. **Iterate (T2–T6)**: Wrote initial regex, tested against a manually-created test script. Failed some edge cases. Refined the regex multiple times — adjusting boundary assertions, fixing February handling (up to 29 days), tuning the IPv4 pattern to reject leading zeros.
-3. **Final test (T7)**: All 27 test cases pass.
-4. **Write (T7)**: Saved regex to `/app/regex.txt`.
+The plain agent spent most of its time thinking. Turn 1 was a massive output — 16K tokens of chain-of-thought reasoning about the regex structure. IPv4 lookahead, month validation (01–12), day validation (01–28/29/30/31 per month), greedy `.*` to match the *last* date, word boundary guards. Then it tested iteratively over 6 bash turns, fixing edge cases one at a time.
 
-Total: 8 turns, 7 tool calls (6 bash, 1 write). Note: despite only 8 turns, it took 217 seconds — the regex reasoning in the model's output was extremely long (16K output tokens, suggesting deep chain-of-thought).
+Eight turns total. All 27 test cases pass. $0.35.
 
-## Weaver Session Trace
+The cost is high for such a short session because the output tokens dominate — the model essentially wrote a regex essay before producing the actual regex.
 
-1. **Checkpoint "start" (T1)**: Saved task requirements (output file, regex constraints, MULTILINE flag usage).
-2. **Design (T2)**: Worked through the regex logic, similar approach to plain.
-3. **Build & test (T3–T8)**: Wrote regex, tested with a Bun/JS test script (regex syntax compatible with Python re module). Iterated on edge cases.
-4. **Write (T9–T10)**: Saved regex to file, ran final verification.
-5. **done (T11)**: Signaled completion. No time_lapse was used.
+## What happened with weaver
 
-Total: 12 turns, 11 tool calls (8 bash, 1 checkpoint, 1 write, 1 done). No rewinds.
+Checkpoint "start" (task requirements, output file path). Then the same kind of reasoning, spread across more turns. The agent built a test harness in Bun (regex syntax is compatible enough with Python `re` for these constructs), iterated on edge cases, and converged.
 
-## Key Divergence
+No time_lapse. The model never felt the need to rewind. There was nothing to rewind from — no exploration phase, no wrong turns, just iterative refinement of a single artifact.
 
-This task shows **minimal weaver impact**. Both agents followed the same strategy: reason about the regex, write it, test iteratively, save. The weaver agent used 1 checkpoint and 1 done call but **zero time_lapses** — it never felt the need to rewind.
+Twelve turns, $0.30. The checkpoint and `done()` call added 2 turns of overhead but the model's output was more concise (13K vs 16K tokens), which more than compensated.
 
-The slight cost advantage for weaver ($0.30 vs $0.35) comes from output token efficiency: plain generated 16K output tokens (long chain-of-thought reasoning) vs weaver's 13K. This difference is likely noise rather than a weaver effect — the checkpoint didn't cause the savings.
+## Why this is boring (and why that matters)
 
-The time difference (217s vs 191s) is similarly marginal and within run-to-run variance.
+The $0.05 difference is noise. The 26-second time difference is noise. This task tells us almost nothing about weaver's rewind mechanism because the mechanism was never used.
 
-## Token Economics
+But that *is* the data point. Not every task has an explore-then-execute structure. Some tasks are just "think hard, write one thing, test it." The regex task is pure reasoning — there's no codebase to explore, no files to read, no context to accumulate and then prune. The model thinks, writes, and iterates.
 
-| Metric | Plain | Weaver |
-|--------|-------|--------|
+| | Plain | Weaver |
+|--|-------|--------|
 | Turns | 8 | 12 |
-| Tool calls | 7 | 11 |
 | Output tokens | 16,307 | 12,787 |
-| Cache read | 96,888 | 163,285 |
-| Cache write | 20,184 | 14,530 |
-| Cost | $0.3494 | $0.2953 |
+| Cache read | 97K | 163K |
+| Cost | $0.35 | $0.30 |
 | Time | 217s | 191s |
 
-Weaver's higher turn count but lower output tokens shows that the model spread its reasoning across more turns rather than front-loading everything into one massive response. This is a style difference, not a structural advantage.
+The interesting asymmetry: weaver used more turns but fewer output tokens. The model spread its reasoning across more responses instead of front-loading everything into one massive turn. I don't think the checkpoint caused this — it's more likely run-to-run variance in how the model chooses to structure its thinking. But it's worth watching across more tasks.
 
-## Lessons
+## The lesson
 
-**Weaver is neutral for "think-then-write" tasks.** When the task is fundamentally about reasoning to a single artifact (one regex), there's no exploration phase to prune. The model doesn't accumulate wasteful context — it thinks, writes, tests. Checkpoints add a small overhead but don't change the trajectory.
+Weaver doesn't help or hurt on single-artifact reasoning tasks. No rewind means no savings — but no overhead either (the checkpoint cost is negligible). The tool just sat there, unused, like a fire extinguisher in a kitchen where nothing caught fire.
 
-**No rewind = no savings.** The checkpoint cost ($0 marginal, since it's just one tool call) is negligible, but the absence of time_lapse means weaver provided no structural benefit. The $0.05 savings is within noise. This is the expected behavior for well-scoped, single-artifact tasks.
+This contrasts sharply with [configure-git-webserver](configure-git-webserver.md), which is also a "short, no rewind needed" task — but where the checkpoint ritual added meaningful overhead because the base cost was so low ($0.06). Here the base cost ($0.35) is high enough that the checkpoint overhead disappears into rounding error.
+
+The takeaway: weaver's overhead is fixed (a few tool calls), so it matters more on cheap tasks and less on expensive ones. The [fix-code-vulnerability](fix-code-vulnerability.md) and [build-cython-ext](build-cython-ext.md) sessions, which cost $0.14–$0.83, are where the rewind decision actually moves the needle.
