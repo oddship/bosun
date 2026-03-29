@@ -118,13 +118,11 @@ run_task() {
         # Count tools by name
         grep -o "\"toolName\":\"[^\"]*\"" "$F" 2>/dev/null | sort | uniq -c | sort -rn | \
           awk "{gsub(/\"toolName\":\"/, \"\"); gsub(/\"/, \"\"); printf \"%s:%s \", \$2, \$1}" 
-        # Count weaver events
-        CP=$(grep -c "\"checkpoint\"" "$F" 2>/dev/null || echo 0)
-        TL=$(grep -c "\"time_lapse\"" "$F" 2>/dev/null || echo 0)
-        DONE=$(grep -c "\"done\"" "$F" 2>/dev/null || echo 0)
-        REM=$(grep -c "WEAVER REMINDER" "$F" 2>/dev/null || echo 0)
-        REW=$(grep -c "⏪" "$F" 2>/dev/null || echo 0)
-        [ "$CP" -gt 0 ] || [ "$TL" -gt 0 ] && printf "| cp:%s tl:%s done:%s rem:%s rew:%s" "$CP" "$TL" "$DONE" "$REM" "$REW"
+        # Count weaver events (tr -d \\n to avoid grep -c newline issues)
+        CP=$(grep -c "\"checkpoint\"" "$F" 2>/dev/null | tr -d "\\n" || printf 0)
+        TL=$(grep -c "\"time_lapse\"" "$F" 2>/dev/null | tr -d "\\n" || printf 0)
+        DN=$(grep -c "\"done\"" "$F" 2>/dev/null | tr -d "\\n" || printf 0)
+        [ "$CP" != "0" ] || [ "$TL" != "0" ] && printf "| cp:%s tl:%s done:%s" "$CP" "$TL" "$DN"
       ' 2>/dev/null || echo "?")
       elapsed_now=$(( SECONDS - start_time ))
       echo "    ${elapsed_now}s | $stats" >&2
