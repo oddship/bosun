@@ -159,6 +159,24 @@ Builder's log generation:
 
 [Source](https://github.com/oddship/bosun/tree/main/packages/pi-chronicles)
 
+### pi-weaver
+
+Self-correction extension for Pi agents. Gives the model three context-management tools:
+
+- **checkpoint(label, state)** — mark a position in the conversation with structured state
+- **time_lapse(label, steering)** — rewind to a checkpoint, shedding all context since then
+- **done(result)** — signal task completion
+
+The model checkpoints early, explores, and rewinds when a line of attack goes stale. Context pruning happens at the event level — dead branches are removed from the conversation, not just summarized.
+
+**Commands:** `/weaver on` · `/weaver off` (toggle mid-session)
+
+**Footer:** `🕸️ weaver` when active
+
+Best for insight tasks (hidden structure, forensic recovery) and multi-step debugging. Less useful for straight-line edits or capability-bound tasks. See the [evaluation write-up](https://rohanverma.net/pages/harness-engineering/research/pi-weaver/) for a 15-task Terminal-Bench 2.0 comparison.
+
+[Source](https://github.com/oddship/bosun/tree/main/packages/pi-weaver)
+
 ## Domain
 
 ### pi-q

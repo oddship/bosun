@@ -16,6 +16,7 @@ Bosun's agents are specialized Pi instances, each with a specific role, model ti
 | **verify** | medium | Validator | Run tests, check builds, validate changes |
 | **scout** | lite | Reconnaissance | Explore codebases, map structure |
 | **review** | medium | Code reviewer | Review changes without editing |
+| **weaver** | high | Self-correcting executor | Complex debugging, recovery, multi-step work where early approaches may fail |
 | **oracle** | oracle | Deep thinker | Architecture decisions, hard debugging |
 | **q** | high | Executive assistant | Task tracking, project planning |
 
