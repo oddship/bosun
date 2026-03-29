@@ -18,6 +18,7 @@ extensions:
   - pi-bash-readonly
   - pi-memory
   - pi-auto-resume
+  - pi-weaver
 defaultProgress: true
 ---
 

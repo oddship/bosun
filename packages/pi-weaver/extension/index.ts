@@ -40,7 +40,8 @@ const WEAVER_TOOLS = ["checkpoint", "time_lapse", "done"];
 export default function weaver(pi: ExtensionAPI) {
 	const checkpoints = new Map<string, CheckpointData>();
 	let isWeaverMode = false;
-	let isEnabled = true; // Toggle state — when false, tools hidden, prompts skipped
+	// Default: enabled for weaver agent, disabled for others (opt in via /weaver on)
+	let isEnabled = (process.env.PI_AGENT === "weaver");
 
 	// When set, the next `context` event will prune messages and inject steering
 	let pendingRewind: PendingRewind | null = null;
