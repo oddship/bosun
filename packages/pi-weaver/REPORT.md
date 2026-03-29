@@ -122,7 +122,7 @@ The isError and run-as-root bugs were discovered during eval — both completely
 
 ## 2. Benchmark Results
 
-### Sonnet 4.6 — A/B Comparison (5 tasks)
+### Sonnet 4.6 — Full A/B Comparison (15 tasks)
 
 | Task | Plain | Time | Cost | Weaver | Time | Cost | TL |
 |------|-------|------|------|--------|------|------|----|
@@ -131,11 +131,37 @@ The isError and run-as-root bugs were discovered during eval — both completely
 | regex-log | ✅ | 217s | $0.35 | ✅ | 191s | $0.30 | 0 |
 | build-cython-ext | ✅ | 247s | $0.63 | ✅ | 355s | $0.83 | 4 |
 | configure-git-webserver | ✅ | 75s | $0.06 | ✅ | 106s | $0.16 | 1 |
-| **Total** | **4/5** | **702s** | **$1.35** | **4/5** | **1162s** | **$2.01** | **7** |
+| sqlite-with-gcov | ❌ | 178s | $0.15 | ❌ | 110s | $0.11 | 1 |
+| log-summary-date-ranges | ✅ | 34s | $0.06 | ✅ | 45s | $0.08 | 1 |
+| qemu-startup | ✅ | 730s | $0.56 | ✅ | 373s | $0.17 | 0 |
+| chess-best-move | ❌ | 901s | $0.51 | ❌ | 901s | $0.80 | 0 |
+| **qemu-alpine-ssh** | **✅** | 543s | $0.28 | **❌** | 900s | $0.62 | 6 |
+| custom-memory-heap-crash | ✅ | 169s | $0.26 | ✅ | 453s | $0.89 | 0 |
+| **db-wal-recovery** | **❌** | 901s | $1.32 | **✅** | 84s | $0.14 | 0 |
+| fix-git | ✅ | 43s | $0.07 | ✅ | 67s | $0.10 | 1 |
+| password-recovery | ✅ | 482s | $1.19 | ✅ | 294s | $0.45 | 0 |
+| build-pmars | ✅ | 92s | $0.09 | ✅ | 110s | $0.13 | 1 |
+| **Total** | **11/15** | | **$5.84** | **11/15** | | **$5.55** | **17** |
 
-### Haiku 4.5 — Full 10-task run
+**Same pass rate (11/15), with two divergent results:**
+- **db-wal-recovery**: Weaver ✅ (84s, $0.14) vs Plain ❌ (901s, $1.32). Weaver's structured approach solved it 10x faster and 9x cheaper. Plain ground through 70 bash calls and timed out.
+- **qemu-alpine-ssh**: Plain ✅ (543s, $0.28) vs Weaver ❌ (900s, $0.62). Weaver used 6 time_lapses but kept re-entering the same failure. The grind pattern.
 
-Both plain and weaver scored **1/10** (only qemu-startup). Haiku is too weak for Terminal-Bench tasks — it cannot solve them regardless of tooling. The one interesting signal: weaver solved qemu-startup in 134s vs plain's 900s.
+**Notable speed wins for weaver** (both pass, weaver faster):
+- qemu-startup: 373s vs 730s (2x faster)
+- password-recovery: 294s vs 482s (1.6x faster)
+- fix-code-vulnerability: 71s vs 94s (1.3x faster)
+
+**Notable cost wins for weaver** (both pass):
+- password-recovery: $0.45 vs $1.19 (2.6x cheaper)
+- qemu-startup: $0.17 vs $0.56 (3.3x cheaper)
+- fix-code-vulnerability: $0.14 vs $0.22 (1.6x cheaper)
+
+**Overall cost**: Weaver $5.55 vs Plain $5.84 — weaver is actually **5% cheaper** at 15-task scale. The big savings on db-wal-recovery ($0.14 vs $1.32) and password-recovery ($0.45 vs $1.19) offset the grinding losses.
+
+### Haiku 4.5 — 10-task sample run
+
+Both plain and weaver scored **1/10** (only qemu-startup). Haiku is too weak for Terminal-Bench tasks — it cannot solve them regardless of tooling.
 
 ---
 
