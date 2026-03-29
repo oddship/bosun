@@ -108,13 +108,26 @@ run_task() {
     fi
   '
 
-  # Progress monitor: print tool call count every 30s
+  # Progress monitor: print tool breakdown every 30s
   (
     while true; do
       sleep 30
-      lines=$(docker exec "$cid" bash -c 'find /root/.pi /home/agent/.pi -path "*/sessions/*/*.jsonl" 2>/dev/null | head -1 | xargs grep -c toolCall 2>/dev/null || echo 0' 2>/dev/null || echo "?")
+      stats=$(docker exec "$cid" bash -c '
+        F=$(find /root/.pi /home/agent/.pi -path "*/sessions/*/*.jsonl" 2>/dev/null | head -1)
+        [ -z "$F" ] && echo "waiting..." && exit
+        # Count tools by name
+        grep -o "\"toolName\":\"[^\"]*\"" "$F" 2>/dev/null | sort | uniq -c | sort -rn | \
+          awk "{gsub(/\"toolName\":\"/, \"\"); gsub(/\"/, \"\"); printf \"%s:%s \", \$2, \$1}" 
+        # Count weaver events
+        CP=$(grep -c "\"checkpoint\"" "$F" 2>/dev/null || echo 0)
+        TL=$(grep -c "\"time_lapse\"" "$F" 2>/dev/null || echo 0)
+        DONE=$(grep -c "\"done\"" "$F" 2>/dev/null || echo 0)
+        REM=$(grep -c "WEAVER REMINDER" "$F" 2>/dev/null || echo 0)
+        REW=$(grep -c "⏪" "$F" 2>/dev/null || echo 0)
+        [ "$CP" -gt 0 ] || [ "$TL" -gt 0 ] && printf "| cp:%s tl:%s done:%s rem:%s rew:%s" "$CP" "$TL" "$DONE" "$REM" "$REW"
+      ' 2>/dev/null || echo "?")
       elapsed_now=$(( SECONDS - start_time ))
-      echo "    ... ${elapsed_now}s, ~${lines} tool calls" >&2
+      echo "    ${elapsed_now}s | $stats" >&2
     done
   ) &
   local monitor_pid=$!
