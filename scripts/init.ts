@@ -243,6 +243,34 @@ writeJson("agents.json", {
   }
 }
 
+// --- prompt templates from packages ---
+// Auto-discover prompt-templates/ directories in all packages and copy them
+// to .pi/prompts/. spawn.md is handled specially above; all other .md files
+// are copied as-is.
+{
+  const promptsDir = join(piDir, "prompts");
+  mkdirSync(promptsDir, { recursive: true });
+
+  const pkgDirs = [
+    ...localPackages.map((p) => join(packagesDir, p)),
+    ...(bosunPackagesDir ? filteredBosunPackages.map((p) => join(bosunPackagesDir, p)) : []),
+  ];
+
+  for (const pkgDir of pkgDirs) {
+    const templatesDir = join(pkgDir, "prompt-templates");
+    if (!existsSync(templatesDir)) continue;
+    for (const file of readdirSync(templatesDir)) {
+      if (!file.endsWith(".md")) continue;
+      // Skip spawn.md — handled above with special rendering
+      if (file === "spawn.md") continue;
+      const src = join(templatesDir, file);
+      const dest = join(promptsDir, file);
+      writeFileSync(dest, readFileSync(src, "utf-8"));
+      console.log(`  Copied .pi/prompts/${file}`);
+    }
+  }
+}
+
 // --- daemon.json ---
 // Workflows are auto-discovered from packages/*/workflows/, .pi/workflows/,
 // and workspace/workflows/. daemon.json only needs basic settings.
