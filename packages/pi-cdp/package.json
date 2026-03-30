@@ -1,0 +1,16 @@
+{
+  "name": "pi-cdp",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CDP browser automation and browser-mesh bridge skills",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-cdp"
+  },
+  "pi": {
+    "skills": ["./skills"]
+  }
+}
