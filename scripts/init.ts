@@ -231,8 +231,8 @@ writeJson("agents.json", {
 
   // Read spawn.md template and replace placeholder
   const spawnTemplatePath = isDependencyMode
-    ? join(bosunDepDir, "packages", "pi-bosun", "prompts", "spawn.md")
-    : join(ROOT, "packages", "pi-bosun", "prompts", "spawn.md");
+    ? join(bosunDepDir, "packages", "pi-bosun", "prompt-templates", "spawn.md")
+    : join(ROOT, "packages", "pi-bosun", "prompt-templates", "spawn.md");
 
   if (existsSync(spawnTemplatePath)) {
     const template = readFileSync(spawnTemplatePath, "utf-8");
