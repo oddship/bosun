@@ -14,7 +14,7 @@
  *   just init
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { parse as parseToml } from "@iarna/toml";
@@ -57,7 +57,7 @@ function writeJson(name: string, data: unknown): void {
 
 // --- settings.json ---
 // Auto-discover packages that have a "pi" key in package.json
-import { readdirSync } from "node:fs";
+
 
 /** Scan a directory for pi-packages (dirs with package.json containing "pi" key). */
 function discoverPiPackages(dir: string): string[] {
@@ -182,6 +182,67 @@ writeJson("agents.json", {
     command_prefix: backend.command_prefix || "scripts/sandbox.sh",
   },
 });
+
+// --- .pi/prompts/spawn.md (generated from agent definitions) ---
+{
+  // Resolve agentPaths relative to ROOT to find all agent .md files
+  const agentPaths = [
+    ...(Array.isArray(agents.extra_paths) ? (agents.extra_paths as string[]) : []),
+    ...(isDependencyMode
+      ? [
+          "./node_modules/bosun/packages/pi-bosun/agents",
+          "./node_modules/bosun/packages/pi-q/agents",
+          "./node_modules/bosun/packages/pi-chronicles/agents",
+        ]
+      : [
+          "./packages/pi-bosun/agents",
+          "./packages/pi-q/agents",
+          "./packages/pi-chronicles/agents",
+        ]),
+  ];
+
+  interface AgentInfo { name: string; emoji: string; description: string }
+  const agentList: AgentInfo[] = [];
+
+  for (const agentDir of agentPaths) {
+    const absDir = join(ROOT, agentDir);
+    if (!existsSync(absDir)) continue;
+    for (const file of readdirSync(absDir)) {
+      if (!file.endsWith(".md")) continue;
+      const content = readFileSync(join(absDir, file), "utf-8");
+      const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      if (!fmMatch) continue;
+      const fm = fmMatch[1];
+      const name = fm.match(/^name:\s*(.+)$/m)?.[1]?.trim();
+      const emoji = fm.match(/^emoji:\s*(.+)$/m)?.[1]?.trim() || "🤖";
+      const description = fm.match(/^description:\s*(.+)$/m)?.[1]?.trim();
+      if (name && description) {
+        agentList.push({ name, emoji, description });
+      }
+    }
+  }
+
+  // Build markdown table
+  const tableRows = agentList
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((a) => `| ${a.emoji} \`${a.name}\` | ${a.description} |`)
+    .join("\n");
+  const agentsTable = `| Agent | Description |\n|-------|-------------|\n${tableRows}`;
+
+  // Read spawn.md template and replace placeholder
+  const spawnTemplatePath = isDependencyMode
+    ? join(bosunDepDir, "packages", "pi-bosun", "prompts", "spawn.md")
+    : join(ROOT, "packages", "pi-bosun", "prompts", "spawn.md");
+
+  if (existsSync(spawnTemplatePath)) {
+    const template = readFileSync(spawnTemplatePath, "utf-8");
+    const rendered = template.replace("{{AGENTS_TABLE}}", agentsTable);
+    const promptsDir = join(piDir, "prompts");
+    mkdirSync(promptsDir, { recursive: true });
+    writeFileSync(join(promptsDir, "spawn.md"), rendered);
+    console.log("  Generated .pi/prompts/spawn.md");
+  }
+}
 
 // --- daemon.json ---
 // Workflows are auto-discovered from packages/*/workflows/, .pi/workflows/,

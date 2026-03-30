@@ -12,6 +12,7 @@
   },
   "pi": {
     "skills": ["./skills"],
-    "agents": ["./agents"]
+    "agents": ["./agents"],
+    "prompts": ["./prompts"]
   }
 }
