@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Pi extension for LLM self-correction — checkpoint, time_lapse, done",
-  "keywords": ["pi", "agent", "self-correction", "checkpoint", "time-lapse", "eval"],
+  "keywords": ["pi-package", "pi", "agent", "self-correction", "checkpoint", "time-lapse", "eval"],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +13,11 @@
   "main": "./extension/index.ts",
   "exports": {
     ".": "./extension/index.ts"
+  },
+  "pi": {
+    "extensions": [
+      "./extension/index.ts"
+    ]
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": ">=0.61.0",

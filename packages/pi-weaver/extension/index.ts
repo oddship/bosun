@@ -38,10 +38,30 @@ interface PendingRewind {
 const WEAVER_TOOLS = ["checkpoint", "time_lapse", "done"];
 
 export default function weaver(pi: ExtensionAPI) {
+	// Skip ALL registration when not the weaver agent.
+	// Loading pi-weaver's registerTool/hooks interferes with Pi's TUI tool
+	// rendering even when the tools are disabled. Until that Pi bug is fixed,
+	// only the weaver agent should load this extension.
+	if (process.env.PI_AGENT !== "weaver") {
+		// Register only the /weaver command so users see a helpful message
+		pi.registerCommand("weaver", {
+			description: "Weaver tools (only available in weaver agent)",
+			handler: async (_args, ctx) => {
+				ctx.ui.notify(
+					"Weaver tools are only available in the weaver agent. " +
+					"Spawn a weaver: spawn_agent({ agent: 'weaver', task: '...' })",
+					"warn",
+				);
+			},
+		});
+		return;
+	}
+
 	const checkpoints = new Map<string, CheckpointData>();
 	let isWeaverMode = false;
-	// Default: enabled for weaver agent, disabled for others (opt in via /weaver on)
-	let isEnabled = (process.env.PI_AGENT === "weaver");
+	// Starts enabled for weaver agent. /weaver off can disable mid-session.
+	// Non-weaver agents never reach here (early return above).
+	let isEnabled = true;
 
 	// When set, the next `context` event will prune messages and inject steering
 	let pendingRewind: PendingRewind | null = null;
@@ -292,7 +312,7 @@ export default function weaver(pi: ExtensionAPI) {
 	// LLM call will erase their results anyway.
 
 	pi.on("tool_call", async () => {
-		if (!pendingRewind) return;
+		if (!isEnabled || !pendingRewind) return;
 
 		return {
 			block: true,

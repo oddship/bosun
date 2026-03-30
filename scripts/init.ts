@@ -58,7 +58,6 @@ function writeJson(name: string, data: unknown): void {
 // --- settings.json ---
 // Auto-discover packages that have a "pi" key in package.json
 
-
 /** Scan a directory for pi-packages (dirs with package.json containing "pi" key). */
 function discoverPiPackages(dir: string): string[] {
   if (!existsSync(dir)) return [];

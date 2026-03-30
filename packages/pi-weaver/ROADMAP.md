@@ -76,3 +76,18 @@ Design tasks that specifically test backtracking:
 - "The obvious fix breaks something else"
 - "Red herring debugging"
 - "Multi-approach problem"
+
+## Known Issues
+
+### TUI tool call rendering broken when pi-weaver registers tools
+Pi-weaver's `registerTool` and `pi.on("tool_call")` calls interfere with Pi's
+TUI streaming tool call renderer. Tool calls render as raw `<tool_call>` XML
+instead of formatted blocks. Tools still execute correctly.
+
+**Mitigated**: non-weaver agents now early-return from the extension init,
+so only the weaver agent is affected. The weaver agent's TUI still shows raw
+XML but functions correctly.
+
+**Root cause**: likely a Pi upstream issue with extensions that register custom
+tools alongside built-in tool hooks. Needs investigation in Pi's
+`interactive-mode.js` rendering pipeline.
