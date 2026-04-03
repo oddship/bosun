@@ -1,6 +1,7 @@
 
 *~
 .bosun-daemon/
+*.processed
 .bosun-home/
 # Bosun runtime
 # Build output

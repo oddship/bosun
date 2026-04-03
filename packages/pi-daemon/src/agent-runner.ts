@@ -9,7 +9,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, createWriteStream } from "node:fs";
+import { existsSync, mkdirSync, createWriteStream, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { info, error, debug } from "./logger.js";
 import { setTaskPid } from "./queue.js";
@@ -17,6 +17,7 @@ import { loadConfig as loadAgentsConfig } from "../../pi-agents/src/config.js";
 import { resolveModel } from "../../pi-agents/src/models.js";
 import { buildAgentEnv } from "../../pi-agents/src/env.js";
 import { runValidators } from "./validators.js";
+import { processTemplate } from "../../pi-agents/src/template.js";
 import type { WorkflowConfig } from "./workflows.js";
 
 const PI_PATH = process.env.BOSUN_PI_PATH || "pi";
@@ -157,9 +158,17 @@ async function spawnAgent(
   // filesystem writes that workflow agents need (e.g., writing analysis JSON).
   const args: string[] = ["--print", "--no-extensions", "--model", model];
 
-  // Agent system prompt
+  // Agent system prompt — process Handlebars templates ({{> slot}} references)
   if (workflow.agent?.systemPromptFile && existsSync(workflow.agent.systemPromptFile)) {
-    args.push("--append-system-prompt", workflow.agent.systemPromptFile);
+    const raw = readFileSync(workflow.agent.systemPromptFile, "utf-8");
+    if (raw.includes("{{")) {
+      const processed = processTemplate(raw, { cwd: process.cwd() });
+      const tmpFile = workflow.agent.systemPromptFile + ".processed";
+      writeFileSync(tmpFile, processed);
+      args.push("--append-system-prompt", tmpFile);
+    } else {
+      args.push("--append-system-prompt", workflow.agent.systemPromptFile);
+    }
   }
 
   // Build task prompt
