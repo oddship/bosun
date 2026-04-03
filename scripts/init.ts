@@ -153,6 +153,23 @@ const models = (config.models as Record<string, string>) || {};
 const agents = (config.agents as Record<string, unknown>) || {};
 const backend = (config.backend as Record<string, unknown>) || {};
 
+// Auto-discover agent directories from all packages (local + bosun dep)
+const discoveredAgentPaths: string[] = [];
+for (const pkg of localPackages) {
+  const agentsDir = join(packagesDir, pkg, "agents");
+  if (existsSync(agentsDir)) {
+    discoveredAgentPaths.push(`./packages/${pkg}/agents`);
+  }
+}
+if (bosunPackagesDir) {
+  for (const pkg of filteredBosunPackages) {
+    const agentsDir = join(bosunPackagesDir, pkg, "agents");
+    if (existsSync(agentsDir)) {
+      discoveredAgentPaths.push(`./node_modules/bosun/packages/${pkg}/agents`);
+    }
+  }
+}
+
 writeJson("agents.json", {
   models: {
     lite: models.lite || "claude-haiku-4-5-20251001",
@@ -163,17 +180,7 @@ writeJson("agents.json", {
   defaultAgent: agents.default_agent || "bosun",
   agentPaths: [
     ...(Array.isArray(agents.extra_paths) ? agents.extra_paths : []),
-    ...(isDependencyMode
-      ? [
-          "./node_modules/bosun/packages/pi-bosun/agents",
-          "./node_modules/bosun/packages/pi-q/agents",
-          "./node_modules/bosun/packages/pi-chronicles/agents",
-        ]
-      : [
-          "./packages/pi-bosun/agents",
-          "./packages/pi-q/agents",
-          "./packages/pi-chronicles/agents",
-        ]),
+    ...discoveredAgentPaths,
   ],
   backend: {
     type: backend.type || "tmux",
@@ -184,20 +191,10 @@ writeJson("agents.json", {
 
 // --- .pi/prompts/spawn.md (generated from agent definitions) ---
 {
-  // Resolve agentPaths relative to ROOT to find all agent .md files
+  // Use the same auto-discovered agent paths as agents.json
   const agentPaths = [
     ...(Array.isArray(agents.extra_paths) ? (agents.extra_paths as string[]) : []),
-    ...(isDependencyMode
-      ? [
-          "./node_modules/bosun/packages/pi-bosun/agents",
-          "./node_modules/bosun/packages/pi-q/agents",
-          "./node_modules/bosun/packages/pi-chronicles/agents",
-        ]
-      : [
-          "./packages/pi-bosun/agents",
-          "./packages/pi-q/agents",
-          "./packages/pi-chronicles/agents",
-        ]),
+    ...discoveredAgentPaths,
   ];
 
   interface AgentInfo { name: string; emoji: string; description: string }
