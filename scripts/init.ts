@@ -361,6 +361,14 @@ writeJson("pi-mesh.json", {
   },
 });
 
+// --- pi-img-gen.json ---
+const imgGen = (config.img_gen as Record<string, unknown>) || {};
+
+writeJson("pi-img-gen.json", {
+  gemini_api_key: imgGen.gemini_api_key || (config.web_access as Record<string, unknown>)?.gemini_api_key || "",
+  default_model: imgGen.default_model || "gemini-2.5-flash-image",
+});
+
 // --- pi-q.json ---
 const q = (config.q as Record<string, unknown>) || {};
 

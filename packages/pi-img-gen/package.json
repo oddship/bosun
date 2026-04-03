@@ -1,0 +1,16 @@
+{
+  "name": "pi-img-gen",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Generate images using Gemini native image generation models (Nano Banana)",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-img-gen"
+  },
+  "pi": {
+    "skills": ["./skills"]
+  }
+}
