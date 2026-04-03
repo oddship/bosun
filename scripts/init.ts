@@ -286,6 +286,11 @@ writeJson("daemon.json", {
 // --- pi-auto-resume.json ---
 const autoResume = (config.auto_resume as Record<string, unknown>) || {};
 
+// compact_thresholds is a TOML table: [auto_resume.compact_thresholds]
+// "claude-opus-4-6" = 35
+const compactThresholds = autoResume.compact_thresholds as Record<string, number> | undefined;
+const compactThreshold = typeof autoResume.compact_threshold === "number" ? autoResume.compact_threshold : undefined;
+
 writeJson("pi-auto-resume.json", {
   enabled: autoResume.enabled ?? true,
   cooldownSeconds: autoResume.cooldown_seconds ?? 60,
@@ -293,6 +298,8 @@ writeJson("pi-auto-resume.json", {
     typeof autoResume.message === "string" && (autoResume.message as string).trim()
       ? autoResume.message
       : "Continue where you left off. If the previous task is complete or you need clarification, just ask.",
+  ...(compactThreshold !== undefined && { compactThreshold }),
+  ...(compactThresholds && Object.keys(compactThresholds).length > 0 && { compactThresholds }),
 });
 
 // --- sandbox.json ---

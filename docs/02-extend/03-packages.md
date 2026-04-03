@@ -48,7 +48,9 @@ mesh_send({ to: "bosun", message: "Done. Tests pass." })
 
 ### pi-auto-resume
 
-Automatically resume after context compaction. When Pi compacts a session, the agent normally goes idle. This extension sends a follow-up prompt so the agent continues from the summary's next steps.
+Automatically resume after context compaction, with optional early compaction based on context usage thresholds. When Pi compacts a session, the agent normally goes idle. This extension sends a follow-up prompt so the agent continues from the summary's next steps.
+
+Opt-in early compaction triggers compaction when context usage exceeds a configurable % threshold — before model quality degrades in long contexts. Supports per-model thresholds.
 
 **Commands:** `/autoresume` (toggle on/off)
 
@@ -60,6 +62,14 @@ Configure in `config.toml`:
 [auto_resume]
 enabled = true
 cooldown_seconds = 60
+
+# Early compaction (opt-in)
+# compact_threshold = 50          # default % for all models
+
+# Per-model overrides
+# [auto_resume.compact_thresholds]
+# "claude-opus-4-6" = 35
+# "claude-sonnet-4-6" = 40
 ```
 
 [Source](https://github.com/oddship/bosun/tree/main/packages/pi-auto-resume)
