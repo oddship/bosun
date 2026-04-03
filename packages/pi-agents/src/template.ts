@@ -22,6 +22,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import Handlebars from "handlebars";
 
 export interface TemplateContext {
@@ -133,7 +134,6 @@ function checkStaleConfig(cwd: string, settingsHash?: string): void {
   const configPath = path.join(cwd, "config.toml");
   if (!fs.existsSync(configPath)) return;
   try {
-    const { createHash } = require("node:crypto");
     const content = fs.readFileSync(configPath, "utf-8");
     const currentHash = createHash("sha256").update(content).digest("hex");
     if (currentHash !== settingsHash) {
@@ -146,14 +146,7 @@ function checkStaleConfig(cwd: string, settingsHash?: string): void {
   }
 }
 
-/**
- * Read .pi/settings.json and resolve package paths to absolute directories.
- * Returns a map of package name → absolute directory path.
- * @deprecated Use readSettings() for full settings access including slotPaths/slotRoots.
- */
-function readSettingsPackages(cwd: string): Map<string, string> {
-  return readSettings(cwd).packages;
-}
+
 
 /**
  * Scan for all packages that could be referenced in templates.
@@ -200,8 +193,8 @@ function buildContext(cwd: string): Record<string, boolean> {
 
   // Read .pi/settings.json for packages in non-standard locations
   // (e.g. node_modules/bosun/packages/pi-bosun when bosun is a dependency).
-  const settingsPkgs = readSettingsPackages(cwd);
-  for (const [pkgName] of settingsPkgs) {
+  const settings = readSettings(cwd);
+  for (const [pkgName] of settings.packages) {
     if (!seen.has(pkgName)) {
       const key = pkgName.replace(/-/g, "_");
       ctx[key] = true;
