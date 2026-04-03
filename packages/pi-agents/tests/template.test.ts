@@ -197,4 +197,132 @@ describe("processTemplate", () => {
     expect(result).toContain("Mesh is available.");
     expect(result).toContain("Bosun workspace.");
   });
+
+  // --- settings.json-based discovery tests ---
+
+  it("discovers packages from .pi/settings.json", () => {
+    // Simulate bosun-as-dependency layout: packages inside node_modules/bosun/packages/
+    const bosunPkgDir = path.join(tmpDir, "node_modules", "bosun", "packages", "pi-bosun");
+    fs.mkdirSync(bosunPkgDir, { recursive: true });
+    fs.writeFileSync(path.join(bosunPkgDir, "package.json"), '{"name":"pi-bosun"}');
+
+    // Create settings.json referencing it
+    const piDir = path.join(tmpDir, ".pi");
+    fs.mkdirSync(piDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(piDir, "settings.json"),
+      JSON.stringify({
+        packages: ["../node_modules/bosun/packages/pi-bosun"],
+      })
+    );
+
+    const body = "{{#if pi_bosun}}\nBosun found via settings.\n{{/if}}";
+    const result = processTemplate(body, { cwd: tmpDir });
+
+    expect(result).toContain("Bosun found via settings.");
+  });
+
+  it("resolves slots from settings.json package paths", () => {
+    // Create bosun-as-dependency layout with slots
+    const bosunPkgDir = path.join(tmpDir, "node_modules", "bosun", "packages", "pi-bosun");
+    fs.mkdirSync(bosunPkgDir, { recursive: true });
+    fs.writeFileSync(path.join(bosunPkgDir, "package.json"), '{"name":"pi-bosun"}');
+    const slotsDir = path.join(bosunPkgDir, "slots");
+    fs.mkdirSync(slotsDir, { recursive: true });
+    fs.writeFileSync(path.join(slotsDir, "workspace.md"), "Write to workspace/ dir.");
+
+    // Create settings.json
+    const piDir = path.join(tmpDir, ".pi");
+    fs.mkdirSync(piDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(piDir, "settings.json"),
+      JSON.stringify({
+        packages: ["../node_modules/bosun/packages/pi-bosun"],
+      })
+    );
+
+    const body = "{{#if pi_bosun}}\n{{> pi_bosun/workspace}}\n{{/if}}";
+    const result = processTemplate(body, { cwd: tmpDir });
+
+    expect(result).toContain("Write to workspace/ dir.");
+  });
+
+  it("resolves .pi/slots/ from dependency repo root", () => {
+    // Create bosun-as-dependency layout
+    const bosunPkgDir = path.join(tmpDir, "node_modules", "bosun", "packages", "pi-bosun");
+    fs.mkdirSync(bosunPkgDir, { recursive: true });
+    fs.writeFileSync(path.join(bosunPkgDir, "package.json"), '{"name":"pi-bosun"}');
+
+    // Bosun's project-level .pi/slots/ (for pi-mesh slots that pi-mesh npm doesn't ship)
+    const bosunSlotsDir = path.join(tmpDir, "node_modules", "bosun", ".pi", "slots", "pi-mesh");
+    fs.mkdirSync(bosunSlotsDir, { recursive: true });
+    fs.writeFileSync(path.join(bosunSlotsDir, "worker_reporting.md"), "Report via mesh_send.");
+
+    // pi-mesh as npm dep (has package.json but no slots/)
+    const meshDir = path.join(tmpDir, "node_modules", "pi-mesh");
+    fs.mkdirSync(meshDir, { recursive: true });
+    fs.writeFileSync(path.join(meshDir, "package.json"), '{"name":"pi-mesh"}');
+
+    // settings.json references bosun packages
+    const piDir = path.join(tmpDir, ".pi");
+    fs.mkdirSync(piDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(piDir, "settings.json"),
+      JSON.stringify({
+        packages: ["../node_modules/bosun/packages/pi-bosun"],
+      })
+    );
+
+    const body = "{{#if pi_mesh}}\n{{> pi_mesh/worker_reporting}}\n{{/if}}";
+    const result = processTemplate(body, { cwd: tmpDir });
+
+    expect(result).toContain("Report via mesh_send.");
+  });
+
+  it("project .pi/slots/ overrides dependency slots", () => {
+    // Create bosun-as-dependency slot
+    const bosunPkgDir = path.join(tmpDir, "node_modules", "bosun", "packages", "pi-bosun");
+    fs.mkdirSync(bosunPkgDir, { recursive: true });
+    fs.writeFileSync(path.join(bosunPkgDir, "package.json"), '{"name":"pi-bosun"}');
+    const bosunSlots = path.join(bosunPkgDir, "slots");
+    fs.mkdirSync(bosunSlots, { recursive: true });
+    fs.writeFileSync(path.join(bosunSlots, "workspace.md"), "Upstream workspace.");
+
+    // Project override
+    const overrideDir = path.join(tmpDir, ".pi", "slots", "pi-bosun");
+    fs.mkdirSync(overrideDir, { recursive: true });
+    fs.writeFileSync(path.join(overrideDir, "workspace.md"), "Custom workspace.");
+
+    // settings.json
+    const piDir = path.join(tmpDir, ".pi");
+    fs.writeFileSync(
+      path.join(piDir, "settings.json"),
+      JSON.stringify({
+        packages: ["../node_modules/bosun/packages/pi-bosun"],
+      })
+    );
+
+    const body = "{{#if pi_bosun}}\n{{> pi_bosun/workspace}}\n{{/if}}";
+    const result = processTemplate(body, { cwd: tmpDir });
+
+    expect(result).toContain("Custom workspace.");
+    expect(result).not.toContain("Upstream workspace.");
+  });
+
+  it("skips npm: references in settings.json", () => {
+    const piDir = path.join(tmpDir, ".pi");
+    fs.mkdirSync(piDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(piDir, "settings.json"),
+      JSON.stringify({
+        packages: ["npm:pi-bash-readonly@0.2.0", "npm:pi-mesh@0.2.2"],
+      })
+    );
+
+    // npm: packages should not crash or add context flags
+    const body = "{{#if pi_bash_readonly}}\nFound.\n{{/if}}";
+    const result = processTemplate(body, { cwd: tmpDir });
+
+    expect(result).not.toContain("Found.");
+  });
 });

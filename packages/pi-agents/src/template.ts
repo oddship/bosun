@@ -7,10 +7,17 @@
  *   {{> pi_mesh/worker_reporting}}           — partial from package slots
  *
  * Package names use underscores in templates: pi_mesh → pi-mesh on filesystem.
- * Partials resolve from:
- *   .pi/slots/<pkg>/<name>.md (project override)
- *   → packages/<pkg>/slots/<name>.md (local)
- *   → node_modules/<pkg>/slots/<name>.md (npm)
+ *
+ * Package discovery (for conditionals):
+ *   1. Filesystem: packages/, node_modules/pi-*
+ *   2. .pi/settings.json "packages" array (covers deps like node_modules/bosun/packages/*)
+ *
+ * Partial/slot resolution (first match wins):
+ *   .pi/slots/<pkg>/<name>.md                     (project override)
+ *   → packages/<pkg>/slots/<name>.md              (local package)
+ *   → node_modules/<pkg>/slots/<name>.md          (npm package)
+ *   → <settings.json package path>/slots/<name>.md (any registered package)
+ *   → .pi/slots/ from parent of each settings.json package path (project-level slots)
  */
 
 import * as fs from "node:fs";
@@ -29,8 +36,47 @@ function normalizePackageName(name: string): string {
 }
 
 /**
+ * Read .pi/settings.json and resolve package paths to absolute directories.
+ * Returns a map of package name → absolute directory path.
+ * Handles relative paths (prefixed with ../) and npm: references.
+ */
+function readSettingsPackages(cwd: string): Map<string, string> {
+  const result = new Map<string, string>();
+  const settingsPath = path.join(cwd, ".pi", "settings.json");
+  if (!fs.existsSync(settingsPath)) return result;
+
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    const packages = settings.packages;
+    if (!Array.isArray(packages)) return result;
+
+    const piDir = path.join(cwd, ".pi");
+    for (const pkg of packages) {
+      if (typeof pkg !== "string") continue;
+      // Skip npm: references — they're resolved by pi's package loader, not filesystem
+      if (pkg.startsWith("npm:")) continue;
+      // Resolve relative to .pi/ directory (settings.json lives there)
+      const absPath = path.resolve(piDir, pkg);
+      const pkgName = path.basename(absPath);
+      if (pkgName && fs.existsSync(absPath)) {
+        result.set(pkgName, absPath);
+      }
+    }
+  } catch {
+    // Ignore parse errors — fall back to filesystem scanning
+  }
+
+  return result;
+}
+
+/**
  * Scan for all packages that could be referenced in templates.
  * Returns a context object with boolean flags: { pi_mesh: true, pi_agents: true, ... }
+ *
+ * Discovery sources (in order):
+ *   1. packages/ directory (local packages)
+ *   2. node_modules/pi-* (npm packages)
+ *   3. .pi/settings.json packages array (covers deps in any layout)
  */
 function buildContext(cwd: string): Record<string, boolean> {
   const ctx: Record<string, boolean> = {};
@@ -60,8 +106,20 @@ function buildContext(cwd: string): Record<string, boolean> {
         if (fs.existsSync(pkgJson)) {
           const key = entry.replace(/-/g, "_");
           ctx[key] = true;
+          seen.add(entry);
         }
       }
+    }
+  }
+
+  // Read .pi/settings.json for packages in non-standard locations
+  // (e.g. node_modules/bosun/packages/pi-bosun when bosun is a dependency).
+  const settingsPkgs = readSettingsPackages(cwd);
+  for (const [pkgName] of settingsPkgs) {
+    if (!seen.has(pkgName)) {
+      const key = pkgName.replace(/-/g, "_");
+      ctx[key] = true;
+      seen.add(pkgName);
     }
   }
 
@@ -80,11 +138,34 @@ function resolvePartial(name: string, cwd: string): string {
   const [pkgKey, slotName] = parts;
   const fsName = normalizePackageName(pkgKey);
 
+  // Static candidates (always checked)
   const candidates = [
     path.join(cwd, ".pi", "slots", fsName, `${slotName}.md`),
     path.join(cwd, "packages", fsName, "slots", `${slotName}.md`),
     path.join(cwd, "node_modules", fsName, "slots", `${slotName}.md`),
   ];
+
+  // Dynamic candidates from settings.json — resolves slots in any layout.
+  // For each package in settings.json, add its slots/ dir as a candidate.
+  // Also check .pi/slots/ relative to each package's parent root for
+  // project-level slot overrides from dependency repos.
+  const settingsPkgs = readSettingsPackages(cwd);
+  const pkgDir = settingsPkgs.get(fsName);
+  if (pkgDir) {
+    candidates.push(path.join(pkgDir, "slots", `${slotName}.md`));
+  }
+  // Check .pi/slots/ in the root of each unique parent directory tree.
+  // This finds project-level slot overrides in dependency repos
+  // (e.g. node_modules/bosun/.pi/slots/pi-mesh/worker_reporting.md).
+  const checkedRoots = new Set<string>();
+  for (const [, dir] of settingsPkgs) {
+    // Walk up from package dir to find a .pi/slots/ directory
+    const parentDir = path.dirname(dir);
+    const rootDir = path.dirname(parentDir);
+    if (checkedRoots.has(rootDir)) continue;
+    checkedRoots.add(rootDir);
+    candidates.push(path.join(rootDir, ".pi", "slots", fsName, `${slotName}.md`));
+  }
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
