@@ -35,38 +35,124 @@ function normalizePackageName(name: string): string {
   return name.replace(/_/g, "-");
 }
 
+/** Parsed settings from .pi/settings.json */
+interface SettingsData {
+  packages: Map<string, string>;
+  slotPaths: string[];
+  slotRoots: string[];
+  configHash?: string;
+}
+
+/** Cache for readSettings() — keyed by cwd */
+const settingsCache = new Map<string, SettingsData>();
+
+/** Whether we've already checked for stale config */
+let staleCheckDone = false;
+
 /**
  * Read .pi/settings.json and resolve package paths to absolute directories.
- * Returns a map of package name → absolute directory path.
- * Handles relative paths (prefixed with ../) and npm: references.
+ * Results are memoized per cwd for the lifetime of the process.
+ *
+ * Returns packages map (name → abs dir), slotPaths, slotRoots, and configHash.
  */
-function readSettingsPackages(cwd: string): Map<string, string> {
-  const result = new Map<string, string>();
+function readSettings(cwd: string): SettingsData {
+  const cached = settingsCache.get(cwd);
+  if (cached) return cached;
+
+  const empty: SettingsData = { packages: new Map(), slotPaths: [], slotRoots: [] };
   const settingsPath = path.join(cwd, ".pi", "settings.json");
-  if (!fs.existsSync(settingsPath)) return result;
+  if (!fs.existsSync(settingsPath)) {
+    settingsCache.set(cwd, empty);
+    return empty;
+  }
 
   try {
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-    const packages = settings.packages;
-    if (!Array.isArray(packages)) return result;
-
     const piDir = path.join(cwd, ".pi");
-    for (const pkg of packages) {
-      if (typeof pkg !== "string") continue;
-      // Skip npm: references — they're resolved by pi's package loader, not filesystem
-      if (pkg.startsWith("npm:")) continue;
-      // Resolve relative to .pi/ directory (settings.json lives there)
-      const absPath = path.resolve(piDir, pkg);
-      const pkgName = path.basename(absPath);
-      if (pkgName && fs.existsSync(absPath)) {
-        result.set(pkgName, absPath);
+
+    // Parse packages
+    const packages = new Map<string, string>();
+    if (Array.isArray(settings.packages)) {
+      for (const pkg of settings.packages) {
+        if (typeof pkg !== "string" || pkg.startsWith("npm:")) continue;
+        const absPath = path.resolve(piDir, pkg);
+        const pkgName = path.basename(absPath);
+        if (pkgName && fs.existsSync(absPath)) {
+          packages.set(pkgName, absPath);
+        }
       }
     }
-  } catch {
-    // Ignore parse errors — fall back to filesystem scanning
-  }
 
-  return result;
+    // Parse slotPaths — resolve relative to .pi/
+    const slotPaths: string[] = [];
+    if (Array.isArray(settings.slotPaths)) {
+      for (const sp of settings.slotPaths) {
+        if (typeof sp === "string") {
+          slotPaths.push(path.resolve(piDir, sp));
+        }
+      }
+    }
+
+    // Parse slotRoots — resolve relative to .pi/
+    const slotRoots: string[] = [];
+    if (Array.isArray(settings.slotRoots)) {
+      for (const sr of settings.slotRoots) {
+        if (typeof sr === "string") {
+          slotRoots.push(path.resolve(piDir, sr));
+        }
+      }
+    }
+
+    const result: SettingsData = {
+      packages,
+      slotPaths,
+      slotRoots,
+      configHash: settings._configHash,
+    };
+
+    // Stale config check — run once per process
+    if (!staleCheckDone) {
+      staleCheckDone = true;
+      checkStaleConfig(cwd, result.configHash);
+    }
+
+    settingsCache.set(cwd, result);
+    return result;
+  } catch {
+    settingsCache.set(cwd, empty);
+    return empty;
+  }
+}
+
+/**
+ * Check if .pi/settings.json is stale by comparing its _configHash
+ * with the current config.toml hash. Logs a warning if they differ.
+ */
+function checkStaleConfig(cwd: string, settingsHash?: string): void {
+  if (!settingsHash) return;
+  const configPath = path.join(cwd, "config.toml");
+  if (!fs.existsSync(configPath)) return;
+  try {
+    const { createHash } = require("node:crypto");
+    const content = fs.readFileSync(configPath, "utf-8");
+    const currentHash = createHash("sha256").update(content).digest("hex");
+    if (currentHash !== settingsHash) {
+      console.error(
+        "[pi-agents] Warning: .pi/settings.json may be stale — run 'just init' to regenerate"
+      );
+    }
+  } catch {
+    // Non-critical — skip if we can't read config.toml
+  }
+}
+
+/**
+ * Read .pi/settings.json and resolve package paths to absolute directories.
+ * Returns a map of package name → absolute directory path.
+ * @deprecated Use readSettings() for full settings access including slotPaths/slotRoots.
+ */
+function readSettingsPackages(cwd: string): Map<string, string> {
+  return readSettings(cwd).packages;
 }
 
 /**
@@ -145,26 +231,36 @@ function resolvePartial(name: string, cwd: string): string {
     path.join(cwd, "node_modules", fsName, "slots", `${slotName}.md`),
   ];
 
-  // Dynamic candidates from settings.json — resolves slots in any layout.
-  // For each package in settings.json, add its slots/ dir as a candidate.
-  // Also check .pi/slots/ relative to each package's parent root for
-  // project-level slot overrides from dependency repos.
-  const settingsPkgs = readSettingsPackages(cwd);
-  const pkgDir = settingsPkgs.get(fsName);
-  if (pkgDir) {
-    candidates.push(path.join(pkgDir, "slots", `${slotName}.md`));
+  // Dynamic candidates from settings.json slotPaths and slotRoots.
+  const settings = readSettings(cwd);
+
+  // slotPaths — package directories that have a slots/ subdirectory
+  for (const slotPath of settings.slotPaths) {
+    if (path.basename(slotPath) === fsName) {
+      candidates.push(path.join(slotPath, "slots", `${slotName}.md`));
+    }
   }
-  // Check .pi/slots/ in the root of each unique parent directory tree.
-  // This finds project-level slot overrides in dependency repos
-  // (e.g. node_modules/bosun/.pi/slots/pi-mesh/worker_reporting.md).
-  const checkedRoots = new Set<string>();
-  for (const [, dir] of settingsPkgs) {
-    // Walk up from package dir to find a .pi/slots/ directory
-    const parentDir = path.dirname(dir);
-    const rootDir = path.dirname(parentDir);
-    if (checkedRoots.has(rootDir)) continue;
-    checkedRoots.add(rootDir);
-    candidates.push(path.join(rootDir, ".pi", "slots", fsName, `${slotName}.md`));
+
+  // slotRoots — project roots with .pi/slots/ for dependency-level overrides
+  for (const slotRoot of settings.slotRoots) {
+    candidates.push(path.join(slotRoot, ".pi", "slots", fsName, `${slotName}.md`));
+  }
+
+  // Fallback: if slotPaths/slotRoots are not in settings.json (old config),
+  // use package paths from settings.json directly
+  if (settings.slotPaths.length === 0 && settings.slotRoots.length === 0) {
+    const pkgDir = settings.packages.get(fsName);
+    if (pkgDir) {
+      candidates.push(path.join(pkgDir, "slots", `${slotName}.md`));
+    }
+    const checkedRoots = new Set<string>();
+    for (const [, dir] of settings.packages) {
+      const parentDir = path.dirname(dir);
+      const rootDir = path.dirname(parentDir);
+      if (checkedRoots.has(rootDir)) continue;
+      checkedRoots.add(rootDir);
+      candidates.push(path.join(rootDir, ".pi", "slots", fsName, `${slotName}.md`));
+    }
   }
 
   for (const candidate of candidates) {

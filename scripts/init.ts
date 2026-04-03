@@ -138,6 +138,30 @@ if (isDependencyMode && existsSync(join(bosunDepDir, "skills"))) {
 
 // Paths in settings.json are resolved relative to .pi/ (where the file lives),
 // so we need "../packages/" or "../node_modules/bosun/packages/" to reach them.
+
+// slotPaths — directories that may contain slots/<name>.md (only if slots/ subdir exists)
+const slotPaths: string[] = [];
+for (const pkg of localPackages) {
+  if (existsSync(join(packagesDir, pkg, "slots"))) {
+    slotPaths.push(`../packages/${pkg}`);
+  }
+}
+if (bosunPackagesDir) {
+  for (const pkg of filteredBosunPackages) {
+    if (existsSync(join(bosunPackagesDir, pkg, "slots"))) {
+      slotPaths.push(`../node_modules/bosun/packages/${pkg}`);
+    }
+  }
+}
+
+// slotRoots — project roots that have .pi/slots/ for project-level slot overrides
+const slotRoots: string[] = [];
+if (isDependencyMode && existsSync(join(bosunDepDir, ".pi", "slots"))) {
+  slotRoots.push("../node_modules/bosun");
+}
+// The current project's .pi/slots/ is always checked first by template.ts,
+// so we don't need to include it here.
+
 writeJson("settings.json", {
   _configHash: configHash,
   packages: [
@@ -145,6 +169,8 @@ writeJson("settings.json", {
     ...filteredBosunPackages.map((p) => `../node_modules/bosun/packages/${p}`),
     ...npmPackages.map((p) => `npm:${p}`),
   ],
+  ...(slotPaths.length > 0 ? { slotPaths } : {}),
+  ...(slotRoots.length > 0 ? { slotRoots } : {}),
   ...(skillsPaths.length > 0 ? { skills: skillsPaths } : {}),
 });
 
