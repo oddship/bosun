@@ -21,9 +21,9 @@ ${section.key}
 Dot-separated paths into the TOML structure. Examples:
 
 ```
-${models.lite}     → claude-haiku-4-5-20251001
-${models.medium}   → claude-sonnet-4-5-20250929
-${models.high}     → claude-opus-4-6
+${models.lite}     → (value of lite in config.toml [models])
+${models.medium}   → (value of medium in config.toml [models])
+${models.high}     → (value of high in config.toml [models])
 ```
 
 ### Code Block Protection

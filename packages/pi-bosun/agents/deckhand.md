@@ -3,7 +3,7 @@ name: deckhand
 emoji: ⚓
 description: General-purpose executor agent. Handles interactive project work with full tool access.
 tools: read, grep, find, ls, bash, write, edit
-model: high
+model: medium
 thinking: medium
 skill: git
 bash-readonly: false

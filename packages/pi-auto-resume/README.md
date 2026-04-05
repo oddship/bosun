@@ -36,8 +36,8 @@ cooldown_seconds = 60     # min seconds between auto-resumes (0 = disabled)
 
 # Per-model overrides (takes precedence over compact_threshold)
 # [auto_resume.compact_thresholds]
-# "claude-opus-4-6" = 35          # Opus degrades after ~35% context usage
-# "claude-sonnet-4-6" = 40
+# "<your-high-model>" = 30         # e.g. compact early for large reasoning models
+# "<your-medium-model>" = 40
 # "gpt-5.4" = 30
 ```
 

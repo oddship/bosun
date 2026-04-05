@@ -44,10 +44,10 @@ In `config.toml`:
 
 ```toml
 [models]
-lite = "claude-haiku-4-5-20251001"    # Fast, cheap
-medium = "claude-sonnet-4-5-20250929" # Balanced
-high = "claude-opus-4-6"              # Best quality
-oracle = "gpt-5.3-codex"              # Deep reasoning
+lite = "<your-fast-model>"               # Fast, cheap — e.g. gpt-4.1-mini, claude-haiku-4-5
+medium = "<your-balanced-model>"          # Balanced — e.g. gpt-5.3-codex, claude-sonnet-4-6
+high = "<your-best-model>"               # Best quality — e.g. gpt-5.4, claude-opus-4-6
+oracle = "<your-reasoning-model>"         # Deep reasoning — e.g. gpt-5.4, o3
 ```
 
 Agent frontmatter references tiers by name:

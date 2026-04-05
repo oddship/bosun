@@ -44,8 +44,8 @@ Configured in root `config.toml`:
 
 ```toml
 [models]
-lite = "claude-haiku-4-5"
-medium = "claude-sonnet-4"
+lite = "<your-fast-model>"       # e.g. gpt-4.1-mini, claude-haiku-4-5
+medium = "<your-balanced-model>"  # e.g. gpt-5.3-codex, claude-sonnet-4-6
 ```
 
 Workflows reference tiers: `model = "lite"` resolves to the configured model.

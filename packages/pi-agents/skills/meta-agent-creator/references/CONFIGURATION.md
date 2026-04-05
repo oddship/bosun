@@ -9,9 +9,9 @@ Model tiers are defined in `.pi/agents.json`:
 ```json
 {
   "models": {
-    "lite": "claude-haiku-4-6",
-    "medium": "claude-sonnet-4-6",
-    "high": "claude-opus-4-6",
+    "lite": "<your-fast-model>",
+    "medium": "<your-balanced-model>",
+    "high": "<your-best-model>",
     "oracle": "gpt-5.3-codex"
   }
 }
@@ -48,7 +48,7 @@ The filename becomes the agent name (e.g., `review.md` → `review` agent).
 | `name` | string | filename | Agent identifier |
 | `description` | string | "" | **Required**. What the agent does, when to use |
 | `model` | string | — | Tier name (`lite`, `medium`, `high`, `oracle`) or raw model string |
-| `thinking` | string | — | Thinking level: `off`, `medium`, `high` |
+| `thinking` | string | — | Thinking level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh` |
 | `tools` | string | — | Comma-separated: `read, grep, find, ls, bash, write, edit` |
 | `extensions` | string | — | Comma-separated pi package names loaded by spawn_agent |
 | `skill` | string | — | Comma-separated skills to inject into system prompt |

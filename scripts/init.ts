@@ -198,10 +198,10 @@ if (bosunPackagesDir) {
 
 writeJson("agents.json", {
   models: {
-    lite: models.lite || "claude-haiku-4-5-20251001",
-    medium: models.medium || "claude-sonnet-4-6",
-    high: models.high || "claude-opus-4-6",
-    oracle: models.oracle || "gpt-5.3-codex",
+    lite: models.lite || "gpt-5.4-mini",
+    medium: models.medium || "gpt-5.3-codex",
+    high: models.high || "gpt-5.4",
+    oracle: models.oracle || "gpt-5.4",
   },
   defaultAgent: agents.default_agent || "bosun",
   agentPaths: [
@@ -310,7 +310,7 @@ writeJson("daemon.json", {
 const autoResume = (config.auto_resume as Record<string, unknown>) || {};
 
 // compact_thresholds is a TOML table: [auto_resume.compact_thresholds]
-// "claude-opus-4-6" = 35
+// e.g. "gpt-5.4" = 30
 const compactThresholds = autoResume.compact_thresholds as Record<string, number> | undefined;
 const compactThreshold = typeof autoResume.compact_threshold === "number" ? autoResume.compact_threshold : undefined;
 

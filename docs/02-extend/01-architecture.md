@@ -171,11 +171,11 @@ User asks bosun to delegate
     │       │
     │       ├── pi-agents resolves "lite" → checks .pi/agents/, then packages/*/agents/
     │       ├── Reads frontmatter: model tier, extensions
-    │       ├── Resolves tier "lite" → "claude-haiku-4-5-20251001"
+    │       ├── Resolves tier "lite" → configured model string
     │       ├── Builds command:
     │       │     scripts/sandbox.sh pi --no-extensions \
     │       │       -e npm:pi-mesh -e npm:pi-tmux \
-    │       │       --model claude-haiku-4-5-20251001
+    │       │       --model <resolved-model>
     │       └── Spawns in tmux window or session
     │
     └── Spawned agent auto-joins mesh, works, reports back

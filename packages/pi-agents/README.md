@@ -59,9 +59,9 @@ Create `.pi/agents.json`:
 ```json
 {
   "models": {
-    "lite": "claude-haiku-4-5-20251001",
-    "medium": "claude-sonnet-4-6",
-    "high": "claude-opus-4-6"
+    "lite": "<your-fast-model>",
+    "medium": "<your-balanced-model>",
+    "high": "<your-best-model>"
   },
   "defaultAgent": "bosun",
   "agentPaths": [],
@@ -111,9 +111,9 @@ That means:
 ```
 spawn_agent({ agent: "lite", task: "fix tests" })
   → reads .pi/agents/lite.md frontmatter
-  → resolves model: lite → "claude-haiku-4-5-20251001"
+  → resolves model: lite → <configured lite model>
   → reads extensions: pi-agents, pi-question
-  → builds: [command_prefix] pi --no-extensions -e npm:pi-agents -e npm:pi-question --models claude-haiku-4-5-20251001 'fix tests'
+  → builds: [command_prefix] pi --no-extensions -e npm:pi-agents -e npm:pi-question --models <resolved-model> --thinking <level> 'fix tests'
   → tmux -S <socket> new-window -d -n lite -e PI_AGENT=lite -e PI_AGENT_NAME=lite "<command>"
 ```
 

@@ -26,10 +26,10 @@ Agents declare a tier, not a specific model. You map tiers to models in `config.
 
 ```toml
 [models]
-lite = "claude-haiku-4-5-20251001"      # Fast, cheap
-medium = "claude-sonnet-4-6"    # Balanced
-high = "claude-opus-4-6"      # Capable
-oracle = "o3"                            # Maximum reasoning
+lite = "<your-fast-model>"               # e.g. gpt-4.1-mini, claude-haiku-4-5
+medium = "<your-balanced-model>"          # e.g. gpt-5.3-codex, claude-sonnet-4-6
+high = "<your-best-model>"               # e.g. gpt-5.4, claude-opus-4-6
+oracle = "<your-reasoning-model>"         # e.g. gpt-5.4, o3
 ```
 
 Change the model behind a tier without touching any agent definitions.

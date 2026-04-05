@@ -3,7 +3,7 @@ name: weaver
 emoji: 🕸️
 description: Self-correcting executor. Checkpoints context, rewinds on failure, retries with clean state. Best for complex debugging, recovery tasks, and multi-step work where early approaches may fail.
 tools: read, grep, find, ls, bash, write, edit
-model: high
+model: medium
 thinking: medium
 skill: git
 bash-readonly: false

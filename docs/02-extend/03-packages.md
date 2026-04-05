@@ -68,8 +68,8 @@ cooldown_seconds = 60
 
 # Per-model overrides
 # [auto_resume.compact_thresholds]
-# "claude-opus-4-6" = 35
-# "claude-sonnet-4-6" = 40
+# "<your-high-model>" = 30    # e.g. threshold for your high-tier model
+# "<your-medium-model>" = 40
 ```
 
 [Source](https://github.com/oddship/bosun/tree/main/packages/pi-auto-resume)

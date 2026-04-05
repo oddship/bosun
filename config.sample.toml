@@ -5,12 +5,15 @@
 # Model Configuration
 # =============================================================================
 # Model tiers — referenced by tier name in agent frontmatter (e.g., model: lite)
+# Use any model string your provider supports. Examples:
+#   OpenAI:    gpt-5.4-mini, gpt-5.3-codex, gpt-5.4, o3
+#   Anthropic: claude-haiku-4-5, claude-sonnet-4-6, claude-opus-4-6
 
 [models]
-lite = "claude-haiku-4-6"               # Fast, cheap — context gathering, summaries
-medium = "claude-sonnet-4-6"            # Balanced — most coding tasks
-high = "claude-opus-4-6"                 # Best — complex planning, orchestration
-oracle = "gpt-5.3-codex"                 # Deep reasoning — architecture, hard debugging
+lite = "gpt-5.4-mini"                    # Fast, cheap — context gathering, summaries
+medium = "gpt-5.3-codex"                 # Balanced — coding tasks, IDE-grade speed
+high = "gpt-5.4"                         # Best — complex planning, orchestration
+oracle = "gpt-5.4"                       # Deep reasoning — architecture, hard debugging
 
 # =============================================================================
 # Workspace
@@ -213,9 +216,8 @@ cooldown_seconds = 60                     # Min seconds between auto-resumes (0 
 
 # Per-model overrides (model string → threshold %). Takes precedence over compact_threshold.
 # [auto_resume.compact_thresholds]
-# "claude-opus-4-6" = 35          # Opus degrades after ~35% context usage
-# "claude-sonnet-4-6" = 40
-# "gpt-5.4" = 30
+# "gpt-5.4" = 30                  # GPT-5.4 — compact early for long orchestration
+# "gpt-5.3-codex" = 40
 
 # =============================================================================
 # Pi Keybindings (overrides Pi TUI defaults)

@@ -212,6 +212,9 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
   if (resolvedModel) {
     piArgs.push("--models", resolvedModel);
   }
+  if (agent.thinking) {
+    piArgs.push("--thinking", agent.thinking);
+  }
   if (task) {
     piArgs.push(task);
   }

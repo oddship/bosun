@@ -127,10 +127,10 @@ The single config file. Key sections:
 
 ```toml
 [models]
-lite = "claude-haiku-4-5"
-medium = "claude-sonnet-4-6"
-high = "claude-opus-4-6"
-oracle = "gpt-5.3-codex"
+lite = "<your-fast-model>"       # see config.sample.toml for examples
+medium = "<your-balanced-model>"
+high = "<your-best-model>"
+oracle = "<your-reasoning-model>"
 
 [env]
 allowed = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", ...]  # passed into sandbox

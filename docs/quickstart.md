@@ -33,10 +33,10 @@ Edit `config.toml` — add your API keys to the environment allowlist and choose
 
 ```toml
 [models]
-lite = "claude-haiku-4-5"           # fast, cheap
-medium = "claude-sonnet-4-6"        # balanced
-high = "claude-opus-4-6"            # best quality
-oracle = "gpt-5.3-codex"            # deep reasoning
+lite = "<your-fast-model>"           # e.g. gpt-4.1-mini, claude-haiku-4-5
+medium = "<your-balanced-model>"     # e.g. gpt-5.3-codex, claude-sonnet-4-6
+high = "<your-best-model>"           # e.g. gpt-5.4, claude-opus-4-6
+oracle = "<your-reasoning-model>"    # e.g. gpt-5.4, o3
 
 [env]
 allowed = [
