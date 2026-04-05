@@ -16,7 +16,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join, dirname } from "node:path";
+import { join, dirname, isAbsolute } from "node:path";
 import { parse as parseToml } from "@iarna/toml";
 
 const ROOT = process.cwd();
@@ -50,6 +50,12 @@ if (!existsSync(CONFIG_PATH)) {
 const configContent = readFileSync(CONFIG_PATH, "utf-8");
 const configHash = createHash("sha256").update(configContent).digest("hex");
 const config = parseToml(configContent) as Record<string, unknown>;
+const DEFAULT_MODEL_TIERS: Record<string, string> = {
+  lite: "openai-codex/gpt-5.4-mini",
+  medium: "openai-codex/gpt-5.3-codex",
+  high: "openai-codex/gpt-5.4",
+  oracle: "openai-codex/gpt-5.4",
+};
 const models = (config.models as Record<string, string>) || {};
 const agents = (config.agents as Record<string, unknown>) || {};
 const backend = (config.backend as Record<string, unknown>) || {};
@@ -84,6 +90,18 @@ function splitProviderQualifiedModel(value: string | undefined): { provider?: st
     provider: value.slice(0, slash),
     model: value.slice(slash + 1),
   };
+}
+
+function resolveConfigPath(pathValue: string): string {
+  return isAbsolute(pathValue) ? pathValue : join(ROOT, pathValue);
+}
+
+function inferProviderFromTier(tierOrModel: string | undefined): string | undefined {
+  if (!tierOrModel) return undefined;
+  const configured = splitProviderQualifiedModel(models[tierOrModel] || tierOrModel);
+  if (configured.provider) return configured.provider;
+  const fallback = splitProviderQualifiedModel(DEFAULT_MODEL_TIERS[tierOrModel]);
+  return fallback.provider;
 }
 
 function loadAgentFrontmatterDefaults(agentFile: string): { model?: string; thinking?: string } {
@@ -235,12 +253,12 @@ function inferPiProjectDefaults(agentPaths: string[]): PiProjectDefaults {
 
   const defaultAgent = getString(agents.default_agent) || "bosun";
   for (const agentPath of agentPaths) {
-    const candidate = join(ROOT, agentPath, `${defaultAgent}.md`);
+    const candidate = join(resolveConfigPath(agentPath), `${defaultAgent}.md`);
     if (!existsSync(candidate)) continue;
     const agentDefaults = loadAgentFrontmatterDefaults(candidate);
     const resolvedModel = agentDefaults.model ? (models[agentDefaults.model] || agentDefaults.model) : undefined;
     const splitModel = splitProviderQualifiedModel(resolvedModel);
-    inferredProvider = splitModel.provider;
+    inferredProvider = splitModel.provider || inferProviderFromTier(agentDefaults.model);
     inferredModel = splitModel.model;
     inferredThinking = agentDefaults.thinking;
     break;
@@ -304,7 +322,7 @@ writeJson("agents.json", {
   const agentList: AgentInfo[] = [];
 
   for (const agentDir of agentPaths) {
-    const absDir = join(ROOT, agentDir);
+    const absDir = resolveConfigPath(agentDir);
     if (!existsSync(absDir)) continue;
     for (const file of readdirSync(absDir)) {
       if (!file.endsWith(".md")) continue;
