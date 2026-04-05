@@ -9,6 +9,7 @@
 
 bosun_pkg := env("BOSUN_PKG", justfile_directory())
 project_root := justfile_directory()
+bosun_cli := 'bun "' + bosun_pkg + '/packages/pi-bosun/src/cli.ts"'
 tmux_sock := '$(bash "' + bosun_pkg + '/scripts/tmux-socket.sh" "' + project_root + '")'
 tmux_cmd := "tmux -S " + tmux_sock
 
@@ -41,167 +42,53 @@ doctor:
     $ok && echo "All good. Run: just start" || echo "Install missing tools or use: nix develop"
 
 # Start bosun (sandboxed via bwrap)
-start:
+start *args:
     #!/usr/bin/env bash
-    just _check-config
-    just _ensure bwrap tmux bun pi
-    {{_helpers}}
-    ensure_dirs
-    check_inside_tmux
-
-    if {{tmux_cmd}} has-session -t bosun 2>/dev/null; then
-      VERSION=$({{tmux_cmd}} show-environment -g BOSUN_SANDBOX_VERSION 2>/dev/null | cut -d= -f2- || echo "1")
-      if [[ "$VERSION" != "2" ]]; then
-        echo "Security update: tmux server must run inside sandbox."
-        echo "Old session detected. Please restart: just stop && just start"
-        exit 1
-      fi
-      echo "Attaching to existing session 'bosun'..."
-      exec {{tmux_cmd}} attach -t bosun
+    PKG="{{project_root}}"
+    if [[ ! -f "$PKG/packages/pi-bosun/src/cli.ts" ]]; then
+      PKG="{{bosun_pkg}}"
     fi
-
-    echo "Creating new session 'bosun'..."
-    echo ""
-    echo "Keybindings:"
-    echo "  Ctrl+A       - Prefix"
-    echo "  Alt+1-5      - Switch to window 1-5"
-    echo "  Alt+0        - Toggle last window"
-    echo "  Shift+←/→    - Previous/next window"
-    echo ""
-
-    # If tmux server already exists (e.g. daemon still running), just create
-    # a new session on it. Otherwise start server inside bwrap so all
-    # windows/panes inherit the sandbox.
-    if {{tmux_cmd}} has-session 2>/dev/null; then
-      VERSION=$({{tmux_cmd}} show-environment -g BOSUN_SANDBOX_VERSION 2>/dev/null | cut -d= -f2- || echo "1")
-      if [[ "$VERSION" != "2" ]]; then
-        echo "Security update: tmux server must run inside sandbox."
-        echo "Old session detected. Please restart: just stop && just start"
-        exit 1
-      fi
-      {{tmux_cmd}} new-session -d -s bosun -n bosun \
-        "/bin/sh -c 'cd {{project_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
-    else
-      {{bosun_pkg}}/scripts/sandbox.sh tmux -S "$TMUX_SOCK" -f "{{bosun_pkg}}/config/tmux.conf" \
-        new-session -d -s bosun -n bosun \
-        "/bin/sh -c 'cd {{project_root}} && pi; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
-      {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
-    fi
-    BOSUN_DEFAULT_AGENT=bosun set_tmux_env
-    just _ensure-daemon
-    {{tmux_cmd}} attach -t bosun
+    BOSUN_PKG="$PKG" bun "$PKG/packages/pi-bosun/src/cli.ts" start {{args}}
 
 # Start without process-level sandbox (pi-sandbox still active)
-start-unsandboxed:
+start-unsandboxed *args:
     #!/usr/bin/env bash
-    just _check-config
-    just _ensure tmux bun pi
-    {{_helpers}}
-    ensure_dirs
-    check_inside_tmux
-
-    if {{tmux_cmd}} has-session -t bosun 2>/dev/null; then
-      echo "Attaching to existing session 'bosun'..."
-      exec {{tmux_cmd}} attach -t bosun
+    PKG="{{project_root}}"
+    if [[ ! -f "$PKG/packages/pi-bosun/src/cli.ts" ]]; then
+      PKG="{{bosun_pkg}}"
     fi
-
-    echo "Creating new session 'bosun'..."
-    {{tmux_cmd}} -f "{{bosun_pkg}}/config/tmux.conf" new-session -d -s bosun -n bosun
-    {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "1"
-    BOSUN_DEFAULT_AGENT=bosun set_tmux_env
-    {{tmux_cmd}} send-keys -t bosun:bosun "cd {{project_root}} && BOSUN_ROOT={{project_root}} BOSUN_WORKSPACE={{project_root}}/workspace PI_CODING_AGENT_DIR={{project_root}}/.bosun-home/.pi/agent PI_AGENT=bosun PI_AGENT_NAME=bosun pi" Enter
-    {{tmux_cmd}} attach -t bosun
+    BOSUN_PKG="$PKG" bun "$PKG/packages/pi-bosun/src/cli.ts" start-unsandboxed {{args}}
 
 # Run a new bosun session (creates bosun, bosun-2, bosun-3, ...)
 run *args:
     #!/usr/bin/env bash
-    just _check-config
-    just _ensure bwrap tmux bun pi
-    {{_helpers}}
-    ensure_dirs
-    # Find next available name (checks sessions, windows, AND mesh registry)
-    if {{tmux_cmd}} has-session -t bosun 2>/dev/null; then
-      N=$(BOSUN_ROOT="{{project_root}}" "{{bosun_pkg}}/scripts/tmux-next-bosun.sh")
-      SESSION="bosun-$N"
-    else
-      SESSION="bosun"
+    PKG="{{project_root}}"
+    if [[ ! -f "$PKG/packages/pi-bosun/src/cli.ts" ]]; then
+      PKG="{{bosun_pkg}}"
     fi
-
-    echo "Creating new session '$SESSION'..."
-    # If tmux server already exists (sandboxed), just create a new session on it.
-    # If not (first run via `just run`), start server inside bwrap.
-    if {{tmux_cmd}} has-session 2>/dev/null; then
-      VERSION=$({{tmux_cmd}} show-environment -g BOSUN_SANDBOX_VERSION 2>/dev/null | cut -d= -f2- || echo "1")
-      if [[ "$VERSION" != "2" ]]; then
-        echo "Security update: tmux server must run inside sandbox."
-        echo "Old session detected. Please restart: just stop && just start"
-        exit 1
-      fi
-      {{tmux_cmd}} new-session -d -s "$SESSION" -n "$SESSION" \
-        "/bin/sh -c 'cd {{project_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
-    else
-      {{bosun_pkg}}/scripts/sandbox.sh tmux -S "$TMUX_SOCK" -f "{{bosun_pkg}}/config/tmux.conf" \
-        new-session -d -s "$SESSION" -n "$SESSION" \
-        "/bin/sh -c 'cd {{project_root}} && PI_AGENT_NAME=$SESSION pi {{args}}; EXIT=\$?; if [ \$EXIT -ne 0 ]; then echo \"=== PI EXITED (\$EXIT) ===\"; sleep 300; fi'"
-      {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
-    fi
-    BOSUN_DEFAULT_AGENT=bosun set_tmux_env
-    {{tmux_cmd}} attach -t "$SESSION"
+    BOSUN_PKG="$PKG" bun "$PKG/packages/pi-bosun/src/cli.ts" run {{args}}
 
 # Attach to running session (auto-detects available sessions)
 attach session="":
     #!/usr/bin/env bash
-    {{_helpers}}
+    PKG="{{project_root}}"
+    if [[ ! -f "$PKG/packages/pi-bosun/src/cli.ts" ]]; then
+      PKG="{{bosun_pkg}}"
+    fi
     if [[ -n "{{session}}" ]]; then
-      exec {{tmux_cmd}} attach -t "{{session}}"
+      BOSUN_PKG="$PKG" bun "$PKG/packages/pi-bosun/src/cli.ts" attach {{session}}
+    else
+      BOSUN_PKG="$PKG" bun "$PKG/packages/pi-bosun/src/cli.ts" attach
     fi
-    SESSIONS=$(bosun_sessions)
-    if [[ -z "$SESSIONS" ]]; then
-      # If daemon is running, start a new bosun session and attach
-      if {{tmux_cmd}} has-session -t bosun-daemon 2>/dev/null; then
-        echo "No bosun sessions running (daemon is active). Starting one..."
-        just start
-        exit $?
-      fi
-      echo "No bosun sessions running. Start one with: just start"
-      exit 1
-    fi
-    COUNT=$(echo "$SESSIONS" | wc -l)
-    if [[ "$COUNT" -eq 1 ]]; then
-      exec {{tmux_cmd}} attach -t "$SESSIONS"
-    fi
-    echo "Multiple sessions available:"
-    echo "$SESSIONS" | nl -w2 -s'. '
-    echo ""
-    read -rp "Pick session number [1]: " PICK
-    PICK=${PICK:-1}
-    TARGET=$(echo "$SESSIONS" | sed -n "${PICK}p")
-    if [[ -z "$TARGET" ]]; then
-      echo "Invalid selection"
-      exit 1
-    fi
-    exec {{tmux_cmd}} attach -t "$TARGET"
 
 # Stop everything
 stop:
     #!/usr/bin/env bash
-    if ! {{tmux_cmd}} list-sessions 2>/dev/null; then
-      echo "No bosun sessions running"
-      exit 0
+    PKG="{{project_root}}"
+    if [[ ! -f "$PKG/packages/pi-bosun/src/cli.ts" ]]; then
+      PKG="{{bosun_pkg}}"
     fi
-    # Collect PIDs of all processes in bosun tmux panes before killing
-    PIDS=$({{tmux_cmd}} list-panes -a -F '#{pane_pid}' 2>/dev/null || true)
-    # Kill tmux server (sends SIGHUP to direct children)
-    {{tmux_cmd}} kill-server 2>/dev/null || true
-    # Wait briefly, then clean up any orphans
-    sleep 1
-    for pid in $PIDS; do
-      if kill -0 "$pid" 2>/dev/null; then
-        echo "Cleaning up orphan process $pid"
-        kill -TERM "$pid" 2>/dev/null || true
-      fi
-    done
-    echo "Stopped."
+    BOSUN_PKG="$PKG" bun "$PKG/packages/pi-bosun/src/cli.ts" stop
 
 # Update pi and ecosystem packages
 update:

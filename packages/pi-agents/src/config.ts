@@ -27,8 +27,15 @@ export interface AgentsConfig {
   backend: BackendConfig;
 }
 
+const DEFAULT_MODEL_TIERS: Record<string, string> = {
+  lite: "gpt-5.4-mini",
+  medium: "gpt-5.3-codex",
+  high: "gpt-5.4",
+  oracle: "gpt-5.4",
+};
+
 const DEFAULTS: AgentsConfig = {
-  models: {},
+  models: DEFAULT_MODEL_TIERS,
   defaultAgent: "bosun",
   agentPaths: [],
   backend: {
@@ -44,13 +51,13 @@ export function loadConfig(cwd: string): AgentsConfig {
   const configPath = path.join(cwd, ".pi", "agents.json");
 
   if (!fs.existsSync(configPath)) {
-    return { ...DEFAULTS, backend: { ...DEFAULTS.backend } };
+    return { ...DEFAULTS, models: { ...DEFAULTS.models }, backend: { ...DEFAULTS.backend } };
   }
 
   try {
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     return {
-      models: raw.models && typeof raw.models === "object" ? raw.models : DEFAULTS.models,
+      models: raw.models && typeof raw.models === "object" ? { ...DEFAULTS.models, ...raw.models } : { ...DEFAULTS.models },
       defaultAgent: typeof raw.defaultAgent === "string" ? raw.defaultAgent : DEFAULTS.defaultAgent,
       agentPaths: Array.isArray(raw.agentPaths) ? raw.agentPaths : DEFAULTS.agentPaths,
       backend: {
@@ -59,6 +66,6 @@ export function loadConfig(cwd: string): AgentsConfig {
       },
     };
   } catch {
-    return { ...DEFAULTS, backend: { ...DEFAULTS.backend } };
+    return { ...DEFAULTS, models: { ...DEFAULTS.models }, backend: { ...DEFAULTS.backend } };
   }
 }

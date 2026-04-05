@@ -15,9 +15,14 @@ describe("loadConfig", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns defaults when no config file exists", () => {
+  it("returns built-in defaults when no config file exists", () => {
     const config = loadConfig(tmpDir);
-    expect(config.models).toEqual({});
+    expect(config.models).toEqual({
+      lite: "gpt-5.4-mini",
+      medium: "gpt-5.3-codex",
+      high: "gpt-5.4",
+      oracle: "gpt-5.4",
+    });
     expect(config.defaultAgent).toBe("bosun");
     expect(config.agentPaths).toEqual([]);
     expect(config.backend.type).toBe("tmux");
@@ -42,7 +47,12 @@ describe("loadConfig", () => {
     );
 
     const config = loadConfig(tmpDir);
-    expect(config.models).toEqual({ lite: "haiku-123", high: "opus-456" });
+    expect(config.models).toEqual({
+      lite: "haiku-123",
+      medium: "gpt-5.3-codex",
+      high: "opus-456",
+      oracle: "gpt-5.4",
+    });
     expect(config.defaultAgent).toBe("myagent");
     expect(config.agentPaths).toEqual(["extra/agents"]);
     expect(config.backend.type).toBe("tmux");
@@ -57,7 +67,12 @@ describe("loadConfig", () => {
     fs.writeFileSync(path.join(piDir, "agents.json"), "not json{{{");
 
     const config = loadConfig(tmpDir);
-    expect(config.models).toEqual({});
+    expect(config.models).toEqual({
+      lite: "gpt-5.4-mini",
+      medium: "gpt-5.3-codex",
+      high: "gpt-5.4",
+      oracle: "gpt-5.4",
+    });
     expect(config.defaultAgent).toBe("bosun");
   });
 
@@ -70,7 +85,12 @@ describe("loadConfig", () => {
     );
 
     const config = loadConfig(tmpDir);
-    expect(config.models).toEqual({ lite: "fast-model" });
+    expect(config.models).toEqual({
+      lite: "fast-model",
+      medium: "gpt-5.3-codex",
+      high: "gpt-5.4",
+      oracle: "gpt-5.4",
+    });
     expect(config.defaultAgent).toBe("bosun");
     expect(config.agentPaths).toEqual([]);
     expect(config.backend.type).toBe("tmux");

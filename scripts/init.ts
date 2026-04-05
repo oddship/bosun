@@ -21,13 +21,20 @@ import { parse as parseToml } from "@iarna/toml";
 
 const ROOT = process.cwd();
 const CONFIG_PATH = join(ROOT, "config.toml");
+const bosunPkgOverride = process.env.BOSUN_PKG ? process.env.BOSUN_PKG : null;
 
-// Detect mode: is bosun a dependency (node_modules/bosun/) or are we inside the bosun repo?
+// Detect mode: is bosun a dependency (node_modules/bosun/) or an explicitly provided package root?
 const bosunDepDir = join(ROOT, "node_modules", "bosun");
-const isDependencyMode = existsSync(join(bosunDepDir, "packages")) && !existsSync(join(ROOT, "packages", "pi-bosun", "package.json"));
+const localBosunRepo = existsSync(join(ROOT, "packages", "pi-bosun", "package.json"));
+const externalBosunRoot = bosunPkgOverride && existsSync(join(bosunPkgOverride, "packages", "pi-bosun", "package.json"))
+  ? bosunPkgOverride
+  : null;
+const activeBosunRoot = localBosunRepo ? ROOT : (existsSync(join(bosunDepDir, "packages")) ? bosunDepDir : externalBosunRoot);
+const isDependencyMode = !localBosunRepo && activeBosunRoot !== null;
 
 // Resolve the bosun packages directory
-const bosunPackagesDir = isDependencyMode ? join(bosunDepDir, "packages") : null;
+const bosunPackagesDir = activeBosunRoot ? join(activeBosunRoot, "packages") : null;
+const bosunRelativePrefix = activeBosunRoot === bosunDepDir ? "../node_modules/bosun" : activeBosunRoot;
 
 // Import memory defaults — resolve relative to this script's location (works in both modes)
 const { DEFAULT_MEMORY_COLLECTIONS, DEFAULT_MEMORY_CONFIG } = await import(
@@ -101,7 +108,7 @@ const npmPackages: string[] = Object.entries(rootPkg.dependencies || {})
 // In dependency mode, also discover npm pi-packages from bosun's dependencies
 // that got hoisted to the project's node_modules/
 if (isDependencyMode) {
-  const bosunPkg = JSON.parse(readFileSync(join(bosunDepDir, "package.json"), "utf-8"));
+  const bosunPkg = JSON.parse(readFileSync(join(activeBosunRoot!, "package.json"), "utf-8"));
   const bosunNpmDeps = Object.entries(bosunPkg.dependencies || {})
     .filter(([name, version]) =>
       typeof version === "string" &&
@@ -132,8 +139,8 @@ if (existsSync(localSkillsDir)) {
   skillsPaths.push("../skills");
 }
 // Bosun dependency skills
-if (isDependencyMode && existsSync(join(bosunDepDir, "skills"))) {
-  skillsPaths.push("../node_modules/bosun/skills");
+if (isDependencyMode && activeBosunRoot && existsSync(join(activeBosunRoot, "skills"))) {
+  skillsPaths.push(join(activeBosunRoot, "skills"));
 }
 
 // Paths in settings.json are resolved relative to .pi/ (where the file lives),
@@ -149,15 +156,15 @@ for (const pkg of localPackages) {
 if (bosunPackagesDir) {
   for (const pkg of filteredBosunPackages) {
     if (existsSync(join(bosunPackagesDir, pkg, "slots"))) {
-      slotPaths.push(`../node_modules/bosun/packages/${pkg}`);
+      slotPaths.push(`${bosunRelativePrefix}/packages/${pkg}`);
     }
   }
 }
 
 // slotRoots — project roots that have .pi/slots/ for project-level slot overrides
 const slotRoots: string[] = [];
-if (isDependencyMode && existsSync(join(bosunDepDir, ".pi", "slots"))) {
-  slotRoots.push("../node_modules/bosun");
+if (isDependencyMode && activeBosunRoot && existsSync(join(activeBosunRoot, ".pi", "slots"))) {
+  slotRoots.push(activeBosunRoot);
 }
 // The current project's .pi/slots/ is always checked first by template.ts,
 // so we don't need to include it here.
@@ -166,7 +173,7 @@ writeJson("settings.json", {
   _configHash: configHash,
   packages: [
     ...localPackages.map((p) => `../packages/${p}`),
-    ...filteredBosunPackages.map((p) => `../node_modules/bosun/packages/${p}`),
+    ...filteredBosunPackages.map((p) => `${bosunRelativePrefix}/packages/${p}`),
     ...npmPackages.map((p) => `npm:${p}`),
   ],
   ...(slotPaths.length > 0 ? { slotPaths } : {}),
@@ -191,7 +198,7 @@ if (bosunPackagesDir) {
   for (const pkg of filteredBosunPackages) {
     const agentsDir = join(bosunPackagesDir, pkg, "agents");
     if (existsSync(agentsDir)) {
-      discoveredAgentPaths.push(`./node_modules/bosun/packages/${pkg}/agents`);
+      discoveredAgentPaths.push(`${bosunRelativePrefix}/packages/${pkg}/agents`);
     }
   }
 }
@@ -211,7 +218,7 @@ writeJson("agents.json", {
   backend: {
     type: backend.type || "tmux",
     ...(backend.socket ? { socket: backend.socket } : {}),
-    command_prefix: backend.command_prefix || "scripts/sandbox.sh",
+    command_prefix: backend.command_prefix || (isDependencyMode ? "node_modules/bosun/scripts/sandbox.sh" : "scripts/sandbox.sh"),
   },
 });
 

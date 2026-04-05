@@ -17,7 +17,8 @@
     "./agents": "./src/agents.ts",
     "./config": "./src/config.ts",
     "./template": "./src/template.ts",
-    "./spawn": "./src/spawn.ts"
+    "./spawn": "./src/spawn.ts",
+    "./launch": "./src/launch.ts"
   },
   "pi": {
     "extensions": [
