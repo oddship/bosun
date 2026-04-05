@@ -117,11 +117,29 @@ Defined in `flake.nix` `devTools`:
 **Containers:** docker-client (CLI only — connects to host daemon via socket)
 **Infra:** nomad, awscli2
 
+## Bash Sandbox (pi-bash-readonly)
+
+In addition to the outer bwrap sandbox (process-level), `pi-bash-readonly` wraps each `bash` tool call in a nested bwrap with a read-only filesystem. This is a separate, inner layer.
+
+By default (v0.3.0+), network is also isolated via `--unshare-net`. Configure in `config.toml`:
+
+```toml
+[bash_readonly]
+network = true                # Allow network (agents need git, curl, etc.)
+# network = false             # Block TCP/UDP (default — most secure)
+# writable = ["/tmp"]         # Paths writable inside the inner sandbox
+# enabled = true              # Sandbox on by default
+```
+
+Run `just init` to regenerate `.pi/pi-bash-readonly.json`. Active sessions pick up changes on next bash call.
+
+**Note:** `--unshare-net` blocks TCP/UDP but Unix domain sockets on the mounted filesystem may still be reachable.
+
 ## Sandbox Quirks
 
 - `whoami` fails (no user database inside sandbox). Use `$USER`.
 - Child processes inherit sandbox restrictions.
-- Network access is unrestricted (needed for AI APIs).
+- Network access is unrestricted at the outer bwrap level (needed for AI APIs). The inner bash sandbox can optionally restrict it.
 - SSH keys are symlinked from host `~/.ssh`.
 - Git config is merged from host `.gitconfig` + `config/gitconfig`.
 

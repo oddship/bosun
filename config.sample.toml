@@ -191,6 +191,16 @@ include_by_default = false
 # provider = "auto"                      # auto | perplexity | gemini
 
 # =============================================================================
+# Bash Readonly (pi-bash-readonly)
+# =============================================================================
+
+[bash_readonly]
+# network = false                        # Block TCP/UDP via --unshare-net (default)
+# network = true                         # Allow network — if agents need git clone, curl, etc.
+# writable = ["/tmp"]                    # Paths writable inside bwrap sandbox (default: none)
+# enabled = true                         # Sandbox on by default (overridden by agent frontmatter)
+
+# =============================================================================
 # Image Generation (pi-img-gen)
 # =============================================================================
 

@@ -148,6 +148,11 @@ gpu_passthrough = true                 # bind GPU render nodes + /sys into sandb
 [daemon]
 enabled = true
 heartbeat_interval_seconds = 30
+
+[bash_readonly]
+# network = false                        # Block TCP/UDP (default — most secure)
+network = true                           # Allow network — agents need git, curl, etc.
+# writable = ["/tmp"]                    # Paths writable inside bwrap sandbox
 ```
 
 #### Web search
