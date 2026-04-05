@@ -12,7 +12,9 @@ Configuration for the bosun sandboxed multi-agent environment.
 | To change... | Edit this file | Then run |
 |--------------|----------------|----------|
 | Models | `config.toml` `[models]` | `just init` |
-| Agent behavior | `.pi/agents/{name}.md` | (direct edit, checked in) |
+| Stock agent behavior | `packages/pi-bosun/agents/{name}.md` | (direct edit, checked in) |
+| Shared bosun prompt policy | `packages/pi-bosun/slots/*.md` | (direct edit, checked in) |
+| Project-specific agent overrides | `.pi/agents/{name}.md` | (direct edit, checked in if you choose) |
 | Pi settings/packages | `config.toml` | `just init` (regenerates `.pi/settings.json`) |
 | Env vars (sandbox) | `config.toml` `[env]` | Restart session |
 | Daemon settings | `config.toml` `[daemon]` | `just init` then restart daemon |
@@ -37,7 +39,7 @@ config.toml                   ← Source of truth (user edits this)
 
 **Generated `.pi/*.json` files are gitignored.** Don't edit them directly.
 
-**Agent files (`.pi/agents/*.md`) are checked in.** Edit them directly — they use model tier names (not specific model strings).
+**In this repo, stock bosun agents live in `packages/pi-bosun/agents/*.md` and shared prompt slots live in `packages/pi-bosun/slots/*.md`.** Use `.pi/agents/*.md` only for local project overrides. Agent frontmatter uses model tier names (not specific model strings).
 
 ## Model Tiers
 
@@ -93,6 +95,12 @@ Then restart: `just stop && just start`
    ---
    ```
 2. Use: `spawn_agent({ agent: "my-agent", task: "..." })`
+
+### Change shared bosun behavior
+
+- Edit `packages/pi-bosun/agents/*.md` for stock agent role/instructions
+- Edit `packages/pi-bosun/slots/*.md` for shared reusable prompt fragments
+- Run `just init` only when changing generated config/prompt outputs such as `.pi/prompts/spawn.md`
 
 ### Modify tool-level sandbox rules
 

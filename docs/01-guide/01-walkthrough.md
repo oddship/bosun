@@ -32,7 +32,7 @@ Bosun clones the repo and spawns scout for reconnaissance:
 ```typescript
 spawn_agent({
   agent: "scout",
-  task: "Explore workspace/code/github.com/myorg/myapi — report via mesh_send to bosun"
+  task: "Explore workspace/code/github.com/myorg/myapi and send one concise mesh_send report to bosun with structure, entry points, and notable findings"
 })
 ```
 
@@ -43,7 +43,7 @@ A new tmux window appears: `scout-1`. It scans the repo and reports back via mes
        Middleware auth, PostgreSQL, REST+gRPC. Tests in _test.go files."
 ```
 
-You can switch to the scout window (`Alt+2`) to watch it work, or stay in bosun's window and wait for the mesh message.
+You can switch to the scout window (`Alt+2`) to watch it work, or stay in bosun's window and wait for the mesh message. Bosun should not poll mesh-aware agents with `capture_pane`; their report arrives automatically.
 
 ## Planning work
 
@@ -92,7 +92,7 @@ mesh_reserve({ paths: ["middleware/ratelimit.go"], reason: "Implementing rate li
 mesh_release({})
 ```
 
-Results arrive as mesh messages:
+Results arrive as mesh messages — ideally one substantive report per agent, not a stream of acknowledgments:
 
 ```
 [mesh] lite-1: "Rate limiter implemented. Token bucket. Files:

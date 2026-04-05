@@ -44,14 +44,14 @@ Must be running inside tmux. Start with `just start` or `tmux`.
 
 ## Workflow: Mesh-Aware Agents (default)
 
-Most agents have mesh tools and will report back automatically. **Do NOT poll them.**
+Most agents have mesh tools and will report back automatically. **Do NOT poll them.** The mesh is for coordination, not conversation — ask for concise, substantive reports rather than chatty progress pings.
 
 ### 1. Spawn Agent
 
 ```typescript
 spawn_agent({ 
   agent: "verify",
-  task: "Run tests and report via mesh_send to bosun"
+  task: "Run tests and send one concise mesh_send report to bosun with pass/fail summary and any blockers"
 })
 // Spawns in background, returns immediately
 ```
@@ -64,7 +64,7 @@ spawn_agent({
 
 ### 3. Wait — Do Nothing
 
-The agent's `mesh_send` message arrives automatically as a follow-up. **NEVER use `capture_pane` to check on mesh agents.** If the user has other work, handle that instead.
+The agent's `mesh_send` message arrives automatically as a follow-up. **NEVER use `capture_pane` to check on mesh agents.** If the user has other work, handle that instead. Do not send acknowledgment-only replies back over mesh unless you need the agent to change course.
 
 ### 4. Process the Report
 
@@ -124,7 +124,9 @@ spawn_agent({
 
 1. **Agents run in background**: `-d` flag keeps focus on current window
 2. **Most agents are mesh-aware**: They `mesh_send` results when done — just wait
-3. **NEVER poll mesh agents**: Do not use `capture_pane` to check on agents that have mesh tools
-4. **Use descriptive window names**: Makes `list_windows` clearer
-5. **Don't close windows without asking**: Leave agent windows open - the user decides when to close them
-6. **Default to spawn_agent for user-visible work**: Use inline work only for quick internal tasks
+3. **Ask for one substantive report**: Prefer a single completion/blocker message over incremental chatter
+4. **NEVER poll mesh agents**: Do not use `capture_pane` to check on agents that have mesh tools
+5. **Don't ACK just to ACK**: No `got it`, `thanks`, or emoji-only mesh replies
+6. **Use descriptive window names**: Makes `list_windows` clearer
+7. **Don't close windows without asking**: Leave agent windows open - the user decides when to close them
+8. **Default to spawn_agent for user-visible work**: Use inline work only for quick internal tasks

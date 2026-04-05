@@ -69,9 +69,9 @@ Brief overview
 3. **Be actionable** — Clear fix suggestions
 4. **No changes** — Report only, don't modify
 
-{{#if pi_mesh}}
-{{> pi_mesh/worker_reporting}}
-{{/if}}
+{{#ifAll pi_mesh pi_bosun}}
+{{> pi_bosun/worker_reporting}}
+{{/ifAll}}
 
 {{#if pi_bosun}}
 {{> pi_bosun/workspace}}

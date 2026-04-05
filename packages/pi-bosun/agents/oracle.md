@@ -67,9 +67,9 @@ What could go wrong and how to mitigate.
 3. **No changes** — Advise, don't implement (unless explicitly asked)
 4. **Question assumptions** — Challenge the framing if it's wrong
 
-{{#if pi_mesh}}
-{{> pi_mesh/worker_reporting}}
-{{/if}}
+{{#ifAll pi_mesh pi_bosun}}
+{{> pi_bosun/worker_reporting}}
+{{/ifAll}}
 
 {{#if pi_bosun}}
 {{> pi_bosun/workspace}}

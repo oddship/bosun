@@ -62,6 +62,8 @@ mesh_send({ broadcast: true, message: "Deploying in 5 minutes" })
 
 Use urgent sparingly - only for time-sensitive coordination.
 
+The mesh is for coordination, not conversation. Prefer a single substantive message over a stream of tiny updates. Do not send acknowledgment-only messages like `ack`, `got it`, `thanks`, or emoji reactions.
+
 ### mesh_manage
 Utility actions:
 
@@ -79,7 +81,7 @@ mesh_manage({ action: "feed", limit: 20 })            // Activity timeline
 2. `mesh_reserve({ paths: [...] })` - claim your files
 3. Do your work
 4. `mesh_release({})` - release when done
-5. `mesh_send({ ... })` - notify if your changes affect others
+5. `mesh_send({ ... })` - notify only if your changes affect others or you need coordination
 
 ### Parallel Work on Same Module
 Agent A reserves `src/auth/login.ts`, Agent B reserves `src/auth/signup.ts`. Both can work in parallel without conflicts. If B needs login.ts, they message A.
@@ -97,7 +99,7 @@ mesh_reserve({ paths: ["src/auth/"] })
 ### Spawning Coordinated Agents
 When spawning agents via tmux, they auto-join the mesh:
 ```
-spawn_agent({ agent: "lite", task: "Fix tests in src/utils/" })
+spawn_agent({ agent: "lite", task: "Fix tests in src/utils/ and send one concise mesh_send report with results or blockers" })
 // The lite agent appears in mesh_peers automatically
 ```
 
@@ -143,6 +145,8 @@ Config at `.pi/pi-mesh.json` (in bosun, generated from `config.toml` via `bosun 
 - Repeated `mesh_peers` to check if an agent has responded
 
 Instead, tell the user you're waiting for reports and let the mesh messages arrive naturally.
+
+**Don't use the mesh as a chat room.** Avoid back-and-forth chatter, status pings that don't change anything, and acknowledgment loops. If you can batch updates into one message at the end, do that.
 
 **Don't use capture_pane for mesh-aware agents.** If the agent has mesh tools, ask it to `mesh_send` results. Only use `capture_pane` for non-mesh agents (e.g., Q) or debugging.
 

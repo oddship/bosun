@@ -18,7 +18,7 @@
 - Any task that needs both thinking AND writing/editing capability
 
 **Use `lite`** when:
-- You need quick context gathered and reported back to you
+- You need quick context gathered and sent back in one concise report
 - The task is fire-and-forget (summarize this, check that)
 - Speed matters more than depth
 

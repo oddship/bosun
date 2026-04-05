@@ -41,7 +41,7 @@ From bosun (or any orchestrator), spawn agents with:
 ```typescript
 spawn_agent({
   agent: "lite",
-  task: "Refactor the auth module. Report via mesh_send to bosun."
+  task: "Refactor the auth module. Send one concise mesh_send report to bosun with blockers, decisions, or completion summary."
 })
 ```
 
@@ -95,24 +95,24 @@ mesh_release({})
 
 ### Messaging
 
-Agents communicate through mesh messages:
+Agents communicate through mesh messages for coordination, not conversation:
 
 ```typescript
-// Send to a specific agent
-mesh_send({ to: "bosun", message: "Tests pass, 42/42." })
+// Send one substantive completion/blocker report to a specific agent
+mesh_send({ to: "bosun", message: "Done. 42/42 tests pass. No blockers." })
 
-// Broadcast to all
-mesh_send({ broadcast: true, message: "Auth interfaces changed." })
+// Broadcast only when other agents actually need to know
+mesh_send({ broadcast: true, message: "Auth interfaces changed; rebase or re-read before editing auth." })
 
 // Urgent (interrupts the recipient)
 mesh_send({ to: "lite-1", message: "Stop — requirements changed.", urgent: true })
 ```
 
-Messages arrive as follow-up events — no polling needed.
+Prefer one concise, batched message over a stream of tiny updates. Do not send acknowledgment-only messages like `ack`, `got it`, `thanks`, or emoji reactions. Messages arrive as follow-up events — no polling needed.
 
 ## Agent definitions
 
-Default agents live in `packages/pi-bosun/agents/*.md`. Override any agent by placing a file with the same name in `.pi/agents/`. Definitions use YAML frontmatter:
+Default agents live in `packages/pi-bosun/agents/*.md`. Shared bosun prompt policy lives in `packages/pi-bosun/slots/*.md` — including mesh coordination/reporting behavior. Override any agent by placing a file with the same name in `.pi/agents/`. Definitions use YAML frontmatter:
 
 ```yaml
 ---

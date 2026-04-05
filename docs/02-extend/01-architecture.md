@@ -151,7 +151,7 @@ config.toml (source of truth)
             └── .pi/pi-q.json          → Q data paths
 ```
 
-Agent files use tier names (`model: high`), not specific model strings. Default agents live in `packages/pi-bosun/agents/`; override by placing a file with the same name in `.pi/agents/`.
+Agent files use tier names (`model: high`), not specific model strings. Default agents live in `packages/pi-bosun/agents/`; shared reusable prompt policy lives in `packages/pi-bosun/slots/`; override agent or slot behavior locally via `.pi/agents/` and `.pi/slots/` when needed.
 
 ## Runtime identity
 
@@ -170,6 +170,7 @@ User asks bosun to delegate
     ├── bosun calls spawn_agent({ agent: "lite", task: "..." })
     │       │
     │       ├── pi-agents resolves "lite" → checks .pi/agents/, then packages/*/agents/
+    │       ├── Template partials resolve similarly → .pi/slots/<pkg>/, then packages/*/slots/
     │       ├── Reads frontmatter: model tier, extensions
     │       ├── Resolves tier "lite" → configured model string
     │       ├── Builds command:

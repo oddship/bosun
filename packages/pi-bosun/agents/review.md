@@ -70,9 +70,9 @@ You are a code reviewer. Analyze changes and provide constructive feedback.
 
 For reviewing written content (blog posts, documentation), load the **editorial-review** skill.
 
-{{#if pi_mesh}}
-{{> pi_mesh/worker_reporting}}
-{{/if}}
+{{#ifAll pi_mesh pi_bosun}}
+{{> pi_bosun/worker_reporting}}
+{{/ifAll}}
 
 {{#if pi_bosun}}
 {{> pi_bosun/workspace}}

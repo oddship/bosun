@@ -58,9 +58,9 @@ Write to context.md:
 2. **Be broad** — Cover the whole codebase
 3. **Be useful** — Focus on what matters
 
-{{#if pi_mesh}}
-{{> pi_mesh/worker_reporting}}
-{{/if}}
+{{#ifAll pi_mesh pi_bosun}}
+{{> pi_bosun/worker_reporting}}
+{{/ifAll}}
 
 {{#if pi_bosun}}
 {{> pi_bosun/workspace}}
