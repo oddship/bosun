@@ -33,6 +33,7 @@ check_inside_tmux() {
 # Defaults to "bosun" if not set. Downstream projects should set this to their orchestrator name.
 set_tmux_env() {
   $TMUX_CMD set-environment -g BOSUN_ROOT "$BOSUN_ROOT"
+  $TMUX_CMD set-environment -g BOSUN_PKG "${BOSUN_PKG:-$BOSUN_ROOT}"
   $TMUX_CMD set-environment -g BOSUN_PI_PATH "$(command -v pi)"
   $TMUX_CMD set-environment -g BOSUN_BUN_PATH "$(command -v bun)"
   $TMUX_CMD set-environment -g BOSUN_BWRAP_PATH "$(command -v bwrap)"

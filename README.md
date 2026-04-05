@@ -35,6 +35,8 @@ npx bosun onboard   # scaffolds config, justfile, directories
 just start
 ```
 
+`just` lifecycle recipes now call the Bosun CLI under the hood (`bosun start|run|attach|stop|init|doctor`).
+
 See [Downstream Projects](docs/02-extend/02-downstream.md) for the full guide.
 
 Then:

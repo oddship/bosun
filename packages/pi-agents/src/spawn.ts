@@ -9,8 +9,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadConfig, type AgentsConfig } from "./config.js";
-import { discoverAgents, findAgentFile, loadAgent, type AgentDef } from "./agents.js";
-import { resolveModel } from "./models.js";
+import { discoverAgents, type AgentDef } from "./agents.js";
+import { buildLaunchSpec } from "./launch.js";
 import { buildAgentEnv } from "./env.js";
 import {
   isInTmux,
@@ -158,9 +158,13 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
 
   const config = options.config || loadConfig(cwd);
 
-  // Find agent definition
-  const agentFile = findAgentFile(cwd, config.agentPaths, agentName);
-  if (!agentFile) {
+  let agent: AgentDef;
+  let resolvedModel: string | undefined;
+  try {
+    const launchSpec = buildLaunchSpec(cwd, { config, agentName });
+    agent = launchSpec.agent;
+    resolvedModel = launchSpec.model;
+  } catch {
     const available = discoverAgents(cwd, config.agentPaths);
     return {
       success: false,
@@ -169,8 +173,6 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
       error: `Agent '${agentName}' not found. Available: ${available.join(", ") || "(none)"}`,
     };
   }
-
-  const agent = loadAgent(agentFile);
   const wantsSession = options.session !== undefined && options.session !== false;
   const targetSessionName = typeof options.session === "string"
     ? options.session
@@ -197,11 +199,6 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
       error: `Window '${windowName}' already exists.`,
     };
   }
-
-  // Resolve model tier → actual model string
-  const resolvedModel = agent.model
-    ? resolveModel(agent.model, config.models)
-    : undefined;
 
   // Build extension flags
   const extList = buildExtensionList(agent);

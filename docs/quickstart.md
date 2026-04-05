@@ -20,7 +20,7 @@ direnv allow    # or: nix develop
 ```bash
 git clone https://github.com/oddship/bosun.git
 cd bosun
-just doctor     # checks what's installed
+just doctor     # or: bosun doctor
 ```
 
 ## Setup
@@ -54,6 +54,18 @@ API keys are **not stored in config.toml** — they're environment variables on 
 just start              # sandboxed tmux session (recommended)
 # or
 just start-unsandboxed  # no bwrap, if you don't have it
+```
+
+Bosun is now CLI-first. `just` recipes call the same commands under the hood:
+
+```bash
+bosun start             # start/attach main session
+bosun run               # start a new session (bosun-2, bosun-3, ...)
+bosun run --window      # add a new agent window to current session
+bosun attach [session]  # attach (or choose from active sessions)
+bosun stop              # stop all Bosun tmux sessions
+bosun init              # regenerate .pi/*.json from config.toml
+bosun doctor            # dependency + config drift checks
 ```
 
 You're now in a tmux session with bosun ready. Look for the **🛡️** indicator in the bottom bar — it shows which sandbox layers are active:
@@ -131,7 +143,7 @@ daemon({ action: "logs", lines: 20 })
 
 ## Configuration reference
 
-All config lives in `config.toml`. Run `just init` to regenerate `.pi/*.json` files after changes.
+All config lives in `config.toml`. Run `just init` (or `bosun init`) to regenerate `.pi/*.json` files after changes.
 
 ```
 config.toml (source of truth)
@@ -142,6 +154,8 @@ config.toml (source of truth)
           ├─► .pi/sandbox.json
           └─► .pi/bwrap.json
 ```
+
+`[pi] default_provider`, `default_model`, and `default_thinking_level` in `config.toml` are generated into `.pi/settings.json` as project-level Pi defaults.
 
 **Never edit `.pi/*.json` directly** — they're regenerated.
 

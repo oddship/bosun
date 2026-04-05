@@ -18,6 +18,9 @@ export type { TemplateContext } from "./template.js";
 
 export { resolveModel } from "./models.js";
 
+export { buildLaunchSpec } from "./launch.js";
+export type { LaunchSpec, BuildLaunchSpecOptions } from "./launch.js";
+
 export { buildAgentEnv } from "./env.js";
 export type { AgentEnvOptions } from "./env.js";
 

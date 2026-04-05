@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "bosun": "./scripts/onboard.sh"
+    "bosun": "./packages/pi-bosun/src/cli.ts"
   },
   "description": "Bosun — personal multi-agent Pi coding environment",
   "license": "MIT",

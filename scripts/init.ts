@@ -16,18 +16,25 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join, dirname } from "node:path";
+import { join, dirname, isAbsolute } from "node:path";
 import { parse as parseToml } from "@iarna/toml";
 
 const ROOT = process.cwd();
 const CONFIG_PATH = join(ROOT, "config.toml");
+const bosunPkgOverride = process.env.BOSUN_PKG ? process.env.BOSUN_PKG : null;
 
-// Detect mode: is bosun a dependency (node_modules/bosun/) or are we inside the bosun repo?
+// Detect mode: is bosun a dependency (node_modules/bosun/) or an explicitly provided package root?
 const bosunDepDir = join(ROOT, "node_modules", "bosun");
-const isDependencyMode = existsSync(join(bosunDepDir, "packages")) && !existsSync(join(ROOT, "packages", "pi-bosun", "package.json"));
+const localBosunRepo = existsSync(join(ROOT, "packages", "pi-bosun", "package.json"));
+const externalBosunRoot = bosunPkgOverride && existsSync(join(bosunPkgOverride, "packages", "pi-bosun", "package.json"))
+  ? bosunPkgOverride
+  : null;
+const activeBosunRoot = localBosunRepo ? ROOT : (existsSync(join(bosunDepDir, "packages")) ? bosunDepDir : externalBosunRoot);
+const isDependencyMode = !localBosunRepo && activeBosunRoot !== null;
 
 // Resolve the bosun packages directory
-const bosunPackagesDir = isDependencyMode ? join(bosunDepDir, "packages") : null;
+const bosunPackagesDir = activeBosunRoot ? join(activeBosunRoot, "packages") : null;
+const bosunRelativePrefix = activeBosunRoot === bosunDepDir ? "../node_modules/bosun" : activeBosunRoot;
 
 // Import memory defaults — resolve relative to this script's location (works in both modes)
 const { DEFAULT_MEMORY_COLLECTIONS, DEFAULT_MEMORY_CONFIG } = await import(
@@ -43,6 +50,16 @@ if (!existsSync(CONFIG_PATH)) {
 const configContent = readFileSync(CONFIG_PATH, "utf-8");
 const configHash = createHash("sha256").update(configContent).digest("hex");
 const config = parseToml(configContent) as Record<string, unknown>;
+const DEFAULT_MODEL_TIERS: Record<string, string> = {
+  lite: "openai-codex/gpt-5.4-mini",
+  medium: "openai-codex/gpt-5.3-codex",
+  high: "openai-codex/gpt-5.4",
+  oracle: "openai-codex/gpt-5.4",
+};
+const models = (config.models as Record<string, string>) || {};
+const agents = (config.agents as Record<string, unknown>) || {};
+const backend = (config.backend as Record<string, unknown>) || {};
+const pi = (config.pi as Record<string, unknown>) || {};
 
 console.log("Loaded config.toml");
 
@@ -53,6 +70,49 @@ function writeJson(name: string, data: unknown): void {
   const path = join(piDir, name);
   writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
   console.log(`  Generated .pi/${name}`);
+}
+
+interface PiProjectDefaults {
+  defaultProvider?: string;
+  defaultModel?: string;
+  defaultThinkingLevel?: string;
+}
+
+function getString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function splitProviderQualifiedModel(value: string | undefined): { provider?: string; model?: string } {
+  if (!value) return {};
+  const slash = value.indexOf("/");
+  if (slash === -1) return { model: value };
+  return {
+    provider: value.slice(0, slash),
+    model: value.slice(slash + 1),
+  };
+}
+
+function resolveConfigPath(pathValue: string): string {
+  return isAbsolute(pathValue) ? pathValue : join(ROOT, pathValue);
+}
+
+function inferProviderFromTier(tierOrModel: string | undefined): string | undefined {
+  if (!tierOrModel) return undefined;
+  const configured = splitProviderQualifiedModel(models[tierOrModel] || tierOrModel);
+  if (configured.provider) return configured.provider;
+  const fallback = splitProviderQualifiedModel(DEFAULT_MODEL_TIERS[tierOrModel]);
+  return fallback.provider;
+}
+
+function loadAgentFrontmatterDefaults(agentFile: string): { model?: string; thinking?: string } {
+  const content = readFileSync(agentFile, "utf-8");
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return {};
+  const fm = fmMatch[1];
+  return {
+    model: getString(fm.match(/^model:\s*(.+)$/m)?.[1]),
+    thinking: getString(fm.match(/^thinking:\s*(.+)$/m)?.[1]),
+  };
 }
 
 // --- settings.json ---
@@ -101,7 +161,7 @@ const npmPackages: string[] = Object.entries(rootPkg.dependencies || {})
 // In dependency mode, also discover npm pi-packages from bosun's dependencies
 // that got hoisted to the project's node_modules/
 if (isDependencyMode) {
-  const bosunPkg = JSON.parse(readFileSync(join(bosunDepDir, "package.json"), "utf-8"));
+  const bosunPkg = JSON.parse(readFileSync(join(activeBosunRoot!, "package.json"), "utf-8"));
   const bosunNpmDeps = Object.entries(bosunPkg.dependencies || {})
     .filter(([name, version]) =>
       typeof version === "string" &&
@@ -132,8 +192,8 @@ if (existsSync(localSkillsDir)) {
   skillsPaths.push("../skills");
 }
 // Bosun dependency skills
-if (isDependencyMode && existsSync(join(bosunDepDir, "skills"))) {
-  skillsPaths.push("../node_modules/bosun/skills");
+if (isDependencyMode && activeBosunRoot && existsSync(join(activeBosunRoot, "skills"))) {
+  skillsPaths.push(join(activeBosunRoot, "skills"));
 }
 
 // Paths in settings.json are resolved relative to .pi/ (where the file lives),
@@ -149,35 +209,20 @@ for (const pkg of localPackages) {
 if (bosunPackagesDir) {
   for (const pkg of filteredBosunPackages) {
     if (existsSync(join(bosunPackagesDir, pkg, "slots"))) {
-      slotPaths.push(`../node_modules/bosun/packages/${pkg}`);
+      slotPaths.push(`${bosunRelativePrefix}/packages/${pkg}`);
     }
   }
 }
 
 // slotRoots — project roots that have .pi/slots/ for project-level slot overrides
 const slotRoots: string[] = [];
-if (isDependencyMode && existsSync(join(bosunDepDir, ".pi", "slots"))) {
-  slotRoots.push("../node_modules/bosun");
+if (isDependencyMode && activeBosunRoot && existsSync(join(activeBosunRoot, ".pi", "slots"))) {
+  slotRoots.push(activeBosunRoot);
 }
 // The current project's .pi/slots/ is always checked first by template.ts,
 // so we don't need to include it here.
 
-writeJson("settings.json", {
-  _configHash: configHash,
-  packages: [
-    ...localPackages.map((p) => `../packages/${p}`),
-    ...filteredBosunPackages.map((p) => `../node_modules/bosun/packages/${p}`),
-    ...npmPackages.map((p) => `npm:${p}`),
-  ],
-  ...(slotPaths.length > 0 ? { slotPaths } : {}),
-  ...(slotRoots.length > 0 ? { slotRoots } : {}),
-  ...(skillsPaths.length > 0 ? { skills: skillsPaths } : {}),
-});
-
 // --- agents.json ---
-const models = (config.models as Record<string, string>) || {};
-const agents = (config.agents as Record<string, unknown>) || {};
-const backend = (config.backend as Record<string, unknown>) || {};
 
 // Auto-discover agent directories from all packages (local + bosun dep)
 const discoveredAgentPaths: string[] = [];
@@ -191,17 +236,67 @@ if (bosunPackagesDir) {
   for (const pkg of filteredBosunPackages) {
     const agentsDir = join(bosunPackagesDir, pkg, "agents");
     if (existsSync(agentsDir)) {
-      discoveredAgentPaths.push(`./node_modules/bosun/packages/${pkg}/agents`);
+      discoveredAgentPaths.push(`${bosunRelativePrefix}/packages/${pkg}/agents`);
     }
   }
 }
 
+function inferPiProjectDefaults(agentPaths: string[]): PiProjectDefaults {
+  const explicitProvider = getString(pi.default_provider);
+  const explicitModelValue = getString(pi.default_model);
+  const explicitThinking = getString(pi.default_thinking_level);
+  const explicitModel = splitProviderQualifiedModel(explicitModelValue);
+
+  let inferredProvider: string | undefined;
+  let inferredModel: string | undefined;
+  let inferredThinking: string | undefined;
+
+  const defaultAgent = getString(agents.default_agent) || "bosun";
+  for (const agentPath of agentPaths) {
+    const candidate = join(resolveConfigPath(agentPath), `${defaultAgent}.md`);
+    if (!existsSync(candidate)) continue;
+    const agentDefaults = loadAgentFrontmatterDefaults(candidate);
+    const resolvedModel = agentDefaults.model ? (models[agentDefaults.model] || agentDefaults.model) : undefined;
+    const splitModel = splitProviderQualifiedModel(resolvedModel);
+    inferredProvider = splitModel.provider || inferProviderFromTier(agentDefaults.model);
+    inferredModel = splitModel.model;
+    inferredThinking = agentDefaults.thinking;
+    break;
+  }
+
+  return {
+    defaultProvider: explicitProvider || explicitModel.provider || inferredProvider,
+    defaultModel: explicitModel.model || inferredModel,
+    defaultThinkingLevel: explicitThinking || inferredThinking,
+  };
+}
+
+const projectPiDefaults = inferPiProjectDefaults([
+  ...(Array.isArray(agents.extra_paths) ? (agents.extra_paths as string[]) : []),
+  ...discoveredAgentPaths,
+]);
+
+writeJson("settings.json", {
+  _configHash: configHash,
+  packages: [
+    ...localPackages.map((p) => `../packages/${p}`),
+    ...filteredBosunPackages.map((p) => `${bosunRelativePrefix}/packages/${p}`),
+    ...npmPackages.map((p) => `npm:${p}`),
+  ],
+  ...(slotPaths.length > 0 ? { slotPaths } : {}),
+  ...(slotRoots.length > 0 ? { slotRoots } : {}),
+  ...(skillsPaths.length > 0 ? { skills: skillsPaths } : {}),
+  ...(projectPiDefaults.defaultProvider ? { defaultProvider: projectPiDefaults.defaultProvider } : {}),
+  ...(projectPiDefaults.defaultModel ? { defaultModel: projectPiDefaults.defaultModel } : {}),
+  ...(projectPiDefaults.defaultThinkingLevel ? { defaultThinkingLevel: projectPiDefaults.defaultThinkingLevel } : {}),
+});
+
 writeJson("agents.json", {
   models: {
-    lite: models.lite || "gpt-5.4-mini",
-    medium: models.medium || "gpt-5.3-codex",
-    high: models.high || "gpt-5.4",
-    oracle: models.oracle || "gpt-5.4",
+    lite: models.lite || "openai-codex/gpt-5.4-mini",
+    medium: models.medium || "openai-codex/gpt-5.3-codex",
+    high: models.high || "openai-codex/gpt-5.4",
+    oracle: models.oracle || "openai-codex/gpt-5.4",
   },
   defaultAgent: agents.default_agent || "bosun",
   agentPaths: [
@@ -211,7 +306,7 @@ writeJson("agents.json", {
   backend: {
     type: backend.type || "tmux",
     ...(backend.socket ? { socket: backend.socket } : {}),
-    command_prefix: backend.command_prefix || "scripts/sandbox.sh",
+    command_prefix: backend.command_prefix || (isDependencyMode ? "node_modules/bosun/scripts/sandbox.sh" : "scripts/sandbox.sh"),
   },
 });
 
@@ -227,7 +322,7 @@ writeJson("agents.json", {
   const agentList: AgentInfo[] = [];
 
   for (const agentDir of agentPaths) {
-    const absDir = join(ROOT, agentDir);
+    const absDir = resolveConfigPath(agentDir);
     if (!existsSync(absDir)) continue;
     for (const file of readdirSync(absDir)) {
       if (!file.endsWith(".md")) continue;

@@ -9,8 +9,8 @@
  * We use a dynamic import for qmd to guarantee this ordering.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve, isAbsolute } from "node:path";
+import { existsSync, readFileSync, mkdirSync } from "node:fs";
+import { join, resolve, isAbsolute, dirname } from "node:path";
 import { setupGpu } from "./setup-gpu.js";
 
 const BOSUN_ROOT = process.env.BOSUN_ROOT || process.cwd();
@@ -78,6 +78,8 @@ async function main() {
   type QMDStore = Awaited<ReturnType<typeof createStore>>;
 
   const dbPath = resolvePath(config.dbPath);
+
+  mkdirSync(dirname(dbPath), { recursive: true });
 
   console.log(`[memory-embed] DB: ${dbPath}`);
   console.log(`[memory-embed] Collections: ${Object.keys(config.collections).join(", ")}`);
