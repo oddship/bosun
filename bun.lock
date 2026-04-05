@@ -11,7 +11,7 @@
         "gray-matter": "4.0.3",
         "handlebars": "4.7.8",
         "js-yaml": "4.1.0",
-        "pi-bash-readonly": "0.2.0",
+        "pi-bash-readonly": "0.3.0",
         "pi-mcp-adapter": "2.1.2",
         "pi-mesh": "0.2.2",
         "pi-web-access": "0.10.2",
@@ -44,6 +44,10 @@
       "name": "pi-bosun",
       "version": "0.1.0",
     },
+    "packages/pi-cdp": {
+      "name": "pi-cdp",
+      "version": "0.1.0",
+    },
     "packages/pi-chronicles": {
       "name": "pi-chronicles",
       "version": "0.1.0",
@@ -61,6 +65,10 @@
         "@mariozechner/pi-coding-agent": "*",
         "@sinclair/typebox": "*",
       },
+    },
+    "packages/pi-img-gen": {
+      "name": "pi-img-gen",
+      "version": "0.1.0",
     },
     "packages/pi-memory": {
       "name": "pi-memory",
@@ -913,13 +921,17 @@
 
     "pi-auto-resume": ["pi-auto-resume@workspace:packages/pi-auto-resume"],
 
-    "pi-bash-readonly": ["pi-bash-readonly@0.2.0", "", { "dependencies": { "gray-matter": "4.0.3" }, "peerDependencies": { "@mariozechner/pi-coding-agent": "^0.62.0", "@sinclair/typebox": "^0.34.48" } }, "sha512-MIyhoxKWAFKkJ1d15jOwu4W27IoWGBp1+95j2v+ElSXTuaBRiryljRbfPFpW1qcSriSTOtxzXjmE3/eLcAtkxg=="],
+    "pi-bash-readonly": ["pi-bash-readonly@0.3.0", "", { "dependencies": { "gray-matter": "4.0.3" }, "peerDependencies": { "@mariozechner/pi-coding-agent": "^0.62.0", "@sinclair/typebox": "^0.34.48" } }, "sha512-0aT/oAf6RO7ZtK1tzL7PukN6/fnOKoMkpdOGgqdGfIql2jUNybT8tNpKHf3jsZWrBZGHpNrFbGv34BTiyDGvcg=="],
 
     "pi-bosun": ["pi-bosun@workspace:packages/pi-bosun"],
+
+    "pi-cdp": ["pi-cdp@workspace:packages/pi-cdp"],
 
     "pi-chronicles": ["pi-chronicles@workspace:packages/pi-chronicles"],
 
     "pi-daemon": ["pi-daemon@workspace:packages/pi-daemon"],
+
+    "pi-img-gen": ["pi-img-gen@workspace:packages/pi-img-gen"],
 
     "pi-mcp-adapter": ["pi-mcp-adapter@2.1.2", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.25.1", "@sinclair/typebox": "^0.32.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "bin": { "pi-mcp-adapter": "cli.js" } }, "sha512-W1N/ZNNxnCxsyegcqGrfq0SRv5KAHa48nltpoDpT7hTxTPNy2GIKxr8CU8SxvhXCUFS4GbKNsRQRirbxooVVJw=="],
 

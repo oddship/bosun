@@ -31,7 +31,8 @@ config.toml                   ← Source of truth (user edits this)
             ├─→ .pi/daemon.json       (daemon settings)
             ├─→ .pi/sandbox.json      (tool-level restrictions)
             ├─→ .pi/bwrap.json        (process-level sandbox)
-            └─→ .pi/pi-q.json         (Q data paths)
+            ├─→ .pi/pi-q.json         (Q data paths)
+            └─→ .pi/pi-bash-readonly.json (bash sandbox: network, writable paths)
 ```
 
 **Generated `.pi/*.json` files are gitignored.** Don't edit them directly.

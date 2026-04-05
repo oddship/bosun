@@ -447,6 +447,16 @@ writeJson("pi-memory.json", {
   collections: mergedMemoryCollections,
 });
 
+// --- pi-bash-readonly.json ---
+const bashReadonly = (config.bash_readonly as Record<string, unknown>) || {};
+const bashReadonlyConfig: Record<string, unknown> = {};
+if (typeof bashReadonly.network === "boolean") bashReadonlyConfig.network = bashReadonly.network;
+if (typeof bashReadonly.enabled === "boolean") bashReadonlyConfig.enabled = bashReadonly.enabled;
+if (Array.isArray(bashReadonly.writable)) {
+  bashReadonlyConfig.writable = (bashReadonly.writable as unknown[]).filter((p) => typeof p === "string");
+}
+writeJson("pi-bash-readonly.json", bashReadonlyConfig);
+
 // --- secrets.env (env var values from config.toml [env.values]) ---
 const envValues = (env.values as Record<string, string>) || {};
 if (Object.keys(envValues).length > 0) {
