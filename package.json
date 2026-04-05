@@ -25,7 +25,7 @@
     "js-yaml": "4.1.0",
     "pi-mcp-adapter": "2.1.2",
     "pi-bash-readonly": "0.3.0",
-    "pi-mesh": "0.2.2",
+    "pi-mesh": "0.2.3",
     "pi-web-access": "0.10.2"
   },
   "devDependencies": {

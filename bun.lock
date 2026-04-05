@@ -13,7 +13,7 @@
         "js-yaml": "4.1.0",
         "pi-bash-readonly": "0.3.0",
         "pi-mcp-adapter": "2.1.2",
-        "pi-mesh": "0.2.2",
+        "pi-mesh": "0.2.3",
         "pi-web-access": "0.10.2",
       },
       "devDependencies": {
@@ -937,7 +937,7 @@
 
     "pi-memory": ["pi-memory@workspace:packages/pi-memory"],
 
-    "pi-mesh": ["pi-mesh@0.2.2", "", { "peerDependencies": { "@mariozechner/pi-coding-agent": "^0.62.0", "@mariozechner/pi-tui": "*", "@sinclair/typebox": "*" } }, "sha512-gD7v1E59vh5c4bdqbIWXuAUhjAni9WtuxpeKtX5y5ewGT5URbk4+mDzhWSI9wxXJ5wLlyts/UtNr87Hh2VjI9w=="],
+    "pi-mesh": ["pi-mesh@0.2.3", "", { "peerDependencies": { "@mariozechner/pi-coding-agent": "^0.62.0", "@mariozechner/pi-tui": "*", "@sinclair/typebox": "*" } }, "sha512-FfCQ587Z5kWGsWoZDMd/+OcSCDCcOy1Y2EruBTkni+EKU0FaDChJgBjsFUR2d8GcCtTUepJ4wWPr3bFIUMGoIw=="],
 
     "pi-meta-skills": ["pi-meta-skills@workspace:packages/pi-meta-skills"],
 
