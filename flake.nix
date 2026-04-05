@@ -25,6 +25,8 @@
 
           # Languages
           pkgs.go
+          pkgs.python3
+          pkgs.uv
 
           # Containers (client only — connects to host daemon via socket)
           pkgs.docker-client
