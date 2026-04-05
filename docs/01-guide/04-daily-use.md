@@ -15,6 +15,11 @@ Patterns for everyday work with bosun.
 just start              # Sandboxed session (recommended)
 just start-unsandboxed  # Without bwrap
 just attach             # Reattach to existing session
+
+# Direct CLI equivalents
+bosun start
+bosun run
+bosun attach [session]
 ```
 
 ### During a session
@@ -35,6 +40,12 @@ mesh_peers({})
 - `Alt+n` — next window
 - `Alt+p` — previous window
 
+**Spawn agents from tmux keybindings (CLI-backed):**
+- `Ctrl+A n` → `bosun run --window`
+- `Ctrl+A N` → `bosun run`
+
+`just` recipes and tmux spawn keybindings now route through the same Bosun CLI.
+
 ### Ending
 
 Save context before stopping:
@@ -46,6 +57,8 @@ You: /handoff
 Then:
 ```bash
 just stop               # Closes everything
+# or
+bosun stop
 ```
 
 ### Resuming
@@ -173,6 +186,8 @@ After adding or changing a key, run `just init` to regenerate `~/.pi/web-search.
 ```bash
 just update     # Updates pi and all packages
 just doctor     # Check environment health
+bosun doctor    # Same checks via CLI
+bosun init      # Regenerate .pi/*.json from config.toml
 ```
 
 ### Troubleshooting

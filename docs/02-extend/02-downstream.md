@@ -173,6 +173,8 @@ seed-db:
     bun scripts/seed.ts
 ```
 
+Keep `BOSUN_PKG` set in downstream justfiles. Bosun CLI calls and tmux keybindings use it to resolve the correct package path (`node_modules/bosun` in dependency mode).
+
 ### Upgrades
 
 ```bash
