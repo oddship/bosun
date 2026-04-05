@@ -41,6 +41,42 @@ vim.opt.conceallevel = 2 -- needed for render-markdown
 
 -- Load plugins
 require("lazy").setup({
+  {
+    "folke/tokyonight.nvim",
+    lazy = false,
+    priority = 1000,
+    config = function()
+      require("tokyonight").setup({
+        style = "night",
+        on_highlights = function(hl, c)
+          hl.RenderMarkdownH1 = { fg = c.blue, bold = true }
+          hl.RenderMarkdownH2 = { fg = c.magenta, bold = true }
+          hl.RenderMarkdownH3 = { fg = c.cyan, bold = true }
+          hl.RenderMarkdownH4 = { fg = c.green, bold = true }
+          hl.RenderMarkdownH5 = { fg = c.yellow, bold = true }
+          hl.RenderMarkdownH6 = { fg = c.orange, bold = true }
+
+          hl.RenderMarkdownCode = { bg = c.bg_dark }
+          hl.RenderMarkdownCodeInline = { bg = c.bg_highlight, fg = c.blue1 }
+
+          hl.RenderMarkdownQuote = { fg = c.dark5 }
+
+          hl.RenderMarkdownTableHead = { fg = c.purple, bold = true }
+          hl.RenderMarkdownTableRow = { fg = c.fg_gutter }
+          hl.RenderMarkdownTableFill = { fg = c.dark3 }
+
+          hl.RenderMarkdownUnchecked = { fg = c.red }
+          hl.RenderMarkdownChecked = { fg = c.green }
+          hl.RenderMarkdownTodo = { fg = c.orange }
+
+          hl.RenderMarkdownBullet = { fg = c.blue }
+          hl.RenderMarkdownDash = { fg = c.comment }
+        end,
+      })
+      vim.cmd.colorscheme("tokyonight-night")
+    end,
+  },
+
   -- Markdown Preview (render in-neovim)
   {
     "MeanderingProgrammer/render-markdown.nvim",
