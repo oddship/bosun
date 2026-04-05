@@ -47,3 +47,4 @@ secrets.env
 workspace/
 .vulkan-sdk
 packages/pi-weaver/harbor/pi_harbor/__pycache__/
+.zig-cache-global/
