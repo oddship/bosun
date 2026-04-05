@@ -5,15 +5,30 @@
 # Model Configuration
 # =============================================================================
 # Model tiers — referenced by tier name in agent frontmatter (e.g., model: lite)
-# Use any model string your provider supports. Examples:
-#   OpenAI:    gpt-5.4-mini, gpt-5.3-codex, gpt-5.4, o3
-#   Anthropic: claude-haiku-4-5, claude-sonnet-4-6, claude-opus-4-6
+# Use any model string your provider supports. Provider-qualified strings are
+# recommended when the same model ID exists on multiple providers.
+# Examples:
+#   OpenAI Codex:        openai-codex/gpt-5.4-mini, openai-codex/gpt-5.3-codex, openai-codex/gpt-5.4
+#   Azure OpenAI Resp.: azure-openai-responses/gpt-5.4-mini, azure-openai-responses/gpt-5.3-codex, azure-openai-responses/gpt-5.4
+#   Anthropic:          anthropic/claude-haiku-4-5, anthropic/claude-sonnet-4-6, anthropic/claude-opus-4-6
 
 [models]
-lite = "gpt-5.4-mini"                    # Fast, cheap — context gathering, summaries
-medium = "gpt-5.3-codex"                 # Balanced — coding tasks, IDE-grade speed
-high = "gpt-5.4"                         # Best — complex planning, orchestration
-oracle = "gpt-5.4"                       # Deep reasoning — architecture, hard debugging
+lite = "openai-codex/gpt-5.4-mini"       # Fast, cheap — context gathering, summaries
+medium = "openai-codex/gpt-5.3-codex"    # Balanced — coding tasks, IDE-grade speed
+high = "openai-codex/gpt-5.4"            # Best — complex planning, orchestration
+oracle = "openai-codex/gpt-5.4"          # Deep reasoning — architecture, hard debugging
+
+# =============================================================================
+# Pi Runtime Defaults
+# =============================================================================
+# Generated into .pi/settings.json, which overrides ~/.pi/agent/settings.json
+# for this project only.
+# If omitted, Bosun infers defaults from the default agent's resolved model tier
+# and thinking level.
+# [pi]
+# default_provider = "azure-openai-responses"
+# default_model = "gpt-5.4"             # or provider-qualified: "azure-openai-responses/gpt-5.4"
+# default_thinking_level = "medium"     # off | minimal | low | medium | high | xhigh
 
 # =============================================================================
 # Workspace

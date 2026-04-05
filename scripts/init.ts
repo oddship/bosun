@@ -50,6 +50,10 @@ if (!existsSync(CONFIG_PATH)) {
 const configContent = readFileSync(CONFIG_PATH, "utf-8");
 const configHash = createHash("sha256").update(configContent).digest("hex");
 const config = parseToml(configContent) as Record<string, unknown>;
+const models = (config.models as Record<string, string>) || {};
+const agents = (config.agents as Record<string, unknown>) || {};
+const backend = (config.backend as Record<string, unknown>) || {};
+const pi = (config.pi as Record<string, unknown>) || {};
 
 console.log("Loaded config.toml");
 
@@ -60,6 +64,37 @@ function writeJson(name: string, data: unknown): void {
   const path = join(piDir, name);
   writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
   console.log(`  Generated .pi/${name}`);
+}
+
+interface PiProjectDefaults {
+  defaultProvider?: string;
+  defaultModel?: string;
+  defaultThinkingLevel?: string;
+}
+
+function getString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function splitProviderQualifiedModel(value: string | undefined): { provider?: string; model?: string } {
+  if (!value) return {};
+  const slash = value.indexOf("/");
+  if (slash === -1) return { model: value };
+  return {
+    provider: value.slice(0, slash),
+    model: value.slice(slash + 1),
+  };
+}
+
+function loadAgentFrontmatterDefaults(agentFile: string): { model?: string; thinking?: string } {
+  const content = readFileSync(agentFile, "utf-8");
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return {};
+  const fm = fmMatch[1];
+  return {
+    model: getString(fm.match(/^model:\s*(.+)$/m)?.[1]),
+    thinking: getString(fm.match(/^thinking:\s*(.+)$/m)?.[1]),
+  };
 }
 
 // --- settings.json ---
@@ -169,22 +204,7 @@ if (isDependencyMode && activeBosunRoot && existsSync(join(activeBosunRoot, ".pi
 // The current project's .pi/slots/ is always checked first by template.ts,
 // so we don't need to include it here.
 
-writeJson("settings.json", {
-  _configHash: configHash,
-  packages: [
-    ...localPackages.map((p) => `../packages/${p}`),
-    ...filteredBosunPackages.map((p) => `${bosunRelativePrefix}/packages/${p}`),
-    ...npmPackages.map((p) => `npm:${p}`),
-  ],
-  ...(slotPaths.length > 0 ? { slotPaths } : {}),
-  ...(slotRoots.length > 0 ? { slotRoots } : {}),
-  ...(skillsPaths.length > 0 ? { skills: skillsPaths } : {}),
-});
-
 // --- agents.json ---
-const models = (config.models as Record<string, string>) || {};
-const agents = (config.agents as Record<string, unknown>) || {};
-const backend = (config.backend as Record<string, unknown>) || {};
 
 // Auto-discover agent directories from all packages (local + bosun dep)
 const discoveredAgentPaths: string[] = [];
@@ -203,12 +223,62 @@ if (bosunPackagesDir) {
   }
 }
 
+function inferPiProjectDefaults(agentPaths: string[]): PiProjectDefaults {
+  const explicitProvider = getString(pi.default_provider);
+  const explicitModelValue = getString(pi.default_model);
+  const explicitThinking = getString(pi.default_thinking_level);
+  const explicitModel = splitProviderQualifiedModel(explicitModelValue);
+
+  let inferredProvider: string | undefined;
+  let inferredModel: string | undefined;
+  let inferredThinking: string | undefined;
+
+  const defaultAgent = getString(agents.default_agent) || "bosun";
+  for (const agentPath of agentPaths) {
+    const candidate = join(ROOT, agentPath, `${defaultAgent}.md`);
+    if (!existsSync(candidate)) continue;
+    const agentDefaults = loadAgentFrontmatterDefaults(candidate);
+    const resolvedModel = agentDefaults.model ? (models[agentDefaults.model] || agentDefaults.model) : undefined;
+    const splitModel = splitProviderQualifiedModel(resolvedModel);
+    inferredProvider = splitModel.provider;
+    inferredModel = splitModel.model;
+    inferredThinking = agentDefaults.thinking;
+    break;
+  }
+
+  return {
+    defaultProvider: explicitProvider || explicitModel.provider || inferredProvider,
+    defaultModel: explicitModel.model || inferredModel,
+    defaultThinkingLevel: explicitThinking || inferredThinking,
+  };
+}
+
+const projectPiDefaults = inferPiProjectDefaults([
+  ...(Array.isArray(agents.extra_paths) ? (agents.extra_paths as string[]) : []),
+  ...discoveredAgentPaths,
+]);
+
+writeJson("settings.json", {
+  _configHash: configHash,
+  packages: [
+    ...localPackages.map((p) => `../packages/${p}`),
+    ...filteredBosunPackages.map((p) => `${bosunRelativePrefix}/packages/${p}`),
+    ...npmPackages.map((p) => `npm:${p}`),
+  ],
+  ...(slotPaths.length > 0 ? { slotPaths } : {}),
+  ...(slotRoots.length > 0 ? { slotRoots } : {}),
+  ...(skillsPaths.length > 0 ? { skills: skillsPaths } : {}),
+  ...(projectPiDefaults.defaultProvider ? { defaultProvider: projectPiDefaults.defaultProvider } : {}),
+  ...(projectPiDefaults.defaultModel ? { defaultModel: projectPiDefaults.defaultModel } : {}),
+  ...(projectPiDefaults.defaultThinkingLevel ? { defaultThinkingLevel: projectPiDefaults.defaultThinkingLevel } : {}),
+});
+
 writeJson("agents.json", {
   models: {
-    lite: models.lite || "gpt-5.4-mini",
-    medium: models.medium || "gpt-5.3-codex",
-    high: models.high || "gpt-5.4",
-    oracle: models.oracle || "gpt-5.4",
+    lite: models.lite || "openai-codex/gpt-5.4-mini",
+    medium: models.medium || "openai-codex/gpt-5.3-codex",
+    high: models.high || "openai-codex/gpt-5.4",
+    oracle: models.oracle || "openai-codex/gpt-5.4",
   },
   defaultAgent: agents.default_agent || "bosun",
   agentPaths: [

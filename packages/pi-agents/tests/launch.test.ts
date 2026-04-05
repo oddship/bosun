@@ -19,7 +19,7 @@ describe("buildLaunchSpec", () => {
   it("resolves the default agent via agents.json and maps its model tier", () => {
     fs.writeFileSync(path.join(tmpDir, ".pi", "agents.json"), JSON.stringify({
       defaultAgent: "captain",
-      models: { high: "gpt-5.4" },
+      models: { high: "openai-codex/gpt-5.4" },
       agentPaths: [],
       backend: { type: "tmux" },
     }));
@@ -27,7 +27,7 @@ describe("buildLaunchSpec", () => {
 
     const spec = buildLaunchSpec(tmpDir);
     expect(spec.agentName).toBe("captain");
-    expect(spec.model).toBe("gpt-5.4");
+    expect(spec.model).toBe("openai-codex/gpt-5.4");
     expect(spec.thinking).toBe("medium");
     expect(spec.agentFile).toContain(path.join(".pi", "agents", "captain.md"));
   });
@@ -35,16 +35,16 @@ describe("buildLaunchSpec", () => {
   it("allows overriding the agent name for child launches", () => {
     fs.writeFileSync(path.join(tmpDir, ".pi", "agents.json"), JSON.stringify({
       defaultAgent: "captain",
-      models: { lite: "gpt-5.4-mini" },
+      models: { lite: "openai-codex/gpt-5.4-mini" },
       agentPaths: [],
       backend: { type: "tmux" },
     }));
     fs.writeFileSync(path.join(tmpDir, ".pi", "agents", "captain.md"), `---\nmodel: lite\n---\nCaptain`);
-    fs.writeFileSync(path.join(tmpDir, ".pi", "agents", "scout.md"), `---\nmodel: gpt-5.3-codex\n---\nScout`);
+    fs.writeFileSync(path.join(tmpDir, ".pi", "agents", "scout.md"), `---\nmodel: openai-codex/gpt-5.3-codex\n---\nScout`);
 
     const spec = buildLaunchSpec(tmpDir, { agentName: "scout" });
     expect(spec.agentName).toBe("scout");
-    expect(spec.model).toBe("gpt-5.3-codex");
+    expect(spec.model).toBe("openai-codex/gpt-5.3-codex");
   });
 
   it("falls back to package-provided agents when no .pi/agents.json is present", () => {
@@ -53,7 +53,7 @@ describe("buildLaunchSpec", () => {
 
     const spec = buildLaunchSpec(tmpDir);
     expect(spec.agentName).toBe("bosun");
-    expect(spec.model).toBe("gpt-5.4-mini");
+    expect(spec.model).toBe("openai-codex/gpt-5.4-mini");
     expect(spec.thinking).toBe("high");
     expect(spec.agentFile).toContain(path.join("packages", "pi-bosun", "agents", "bosun.md"));
   });

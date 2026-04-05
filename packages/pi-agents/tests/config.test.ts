@@ -18,10 +18,10 @@ describe("loadConfig", () => {
   it("returns built-in defaults when no config file exists", () => {
     const config = loadConfig(tmpDir);
     expect(config.models).toEqual({
-      lite: "gpt-5.4-mini",
-      medium: "gpt-5.3-codex",
-      high: "gpt-5.4",
-      oracle: "gpt-5.4",
+      lite: "openai-codex/gpt-5.4-mini",
+      medium: "openai-codex/gpt-5.3-codex",
+      high: "openai-codex/gpt-5.4",
+      oracle: "openai-codex/gpt-5.4",
     });
     expect(config.defaultAgent).toBe("bosun");
     expect(config.agentPaths).toEqual([]);
@@ -49,9 +49,9 @@ describe("loadConfig", () => {
     const config = loadConfig(tmpDir);
     expect(config.models).toEqual({
       lite: "haiku-123",
-      medium: "gpt-5.3-codex",
+      medium: "openai-codex/gpt-5.3-codex",
       high: "opus-456",
-      oracle: "gpt-5.4",
+      oracle: "openai-codex/gpt-5.4",
     });
     expect(config.defaultAgent).toBe("myagent");
     expect(config.agentPaths).toEqual(["extra/agents"]);
@@ -68,10 +68,10 @@ describe("loadConfig", () => {
 
     const config = loadConfig(tmpDir);
     expect(config.models).toEqual({
-      lite: "gpt-5.4-mini",
-      medium: "gpt-5.3-codex",
-      high: "gpt-5.4",
-      oracle: "gpt-5.4",
+      lite: "openai-codex/gpt-5.4-mini",
+      medium: "openai-codex/gpt-5.3-codex",
+      high: "openai-codex/gpt-5.4",
+      oracle: "openai-codex/gpt-5.4",
     });
     expect(config.defaultAgent).toBe("bosun");
   });
@@ -87,9 +87,9 @@ describe("loadConfig", () => {
     const config = loadConfig(tmpDir);
     expect(config.models).toEqual({
       lite: "fast-model",
-      medium: "gpt-5.3-codex",
-      high: "gpt-5.4",
-      oracle: "gpt-5.4",
+      medium: "openai-codex/gpt-5.3-codex",
+      high: "openai-codex/gpt-5.4",
+      oracle: "openai-codex/gpt-5.4",
     });
     expect(config.defaultAgent).toBe("bosun");
     expect(config.agentPaths).toEqual([]);

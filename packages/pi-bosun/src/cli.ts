@@ -127,9 +127,22 @@ function printUsage(): void {
   console.log("Usage: bosun <start|start-unsandboxed|run|attach|stop|init|doctor|onboard>");
 }
 
+function splitModelReference(model: string): { provider?: string; modelId: string } {
+  const slash = model.indexOf("/");
+  if (slash === -1) return { modelId: model };
+  return {
+    provider: model.slice(0, slash),
+    modelId: model.slice(slash + 1),
+  };
+}
+
 function buildPiCommand(projectRoot: string, sessionName: string, promptArgs: string[], spec: ReturnType<typeof buildLaunchSpec>): string {
   const args: string[] = ["pi"];
-  if (spec.model) args.push("--model", spec.model);
+  if (spec.model) {
+    const resolvedModel = splitModelReference(spec.model);
+    if (resolvedModel.provider) args.push("--provider", resolvedModel.provider);
+    args.push("--model", resolvedModel.modelId);
+  }
   if (spec.thinking) args.push("--thinking", spec.thinking);
   args.push(...promptArgs);
 

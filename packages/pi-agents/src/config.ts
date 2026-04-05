@@ -28,10 +28,10 @@ export interface AgentsConfig {
 }
 
 const DEFAULT_MODEL_TIERS: Record<string, string> = {
-  lite: "gpt-5.4-mini",
-  medium: "gpt-5.3-codex",
-  high: "gpt-5.4",
-  oracle: "gpt-5.4",
+  lite: "openai-codex/gpt-5.4-mini",
+  medium: "openai-codex/gpt-5.3-codex",
+  high: "openai-codex/gpt-5.4",
+  oracle: "openai-codex/gpt-5.4",
 };
 
 const DEFAULTS: AgentsConfig = {
