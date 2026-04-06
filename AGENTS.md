@@ -1,5 +1,7 @@
 # AGENTS.md
 
+Repo-level guidance for agents working in bosun. Keep agent behavior, orchestration rules, and delegation policy in packaged agent definitions and slots under `packages/`.
+
 For architecture, package details, and development workflows see `docs/`.
 
 ## Commits
