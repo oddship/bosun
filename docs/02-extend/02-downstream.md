@@ -58,9 +58,16 @@ cd node_modules/@tobilu/qmd && bun run build
 ### Upgrades
 
 ```bash
-bun update bosun    # pulls latest from GitHub (or pinned tag)
-just init           # regenerate .pi/*.json
+bun update bosun          # pulls latest from GitHub (or pinned tag)
+just init                 # regenerate .pi/*.json
+just stop && just start   # restart tmux server so new sandbox/runtime config takes effect
 ```
+
+Recommended smoke check after upgrading:
+
+- `just start` should open your configured default agent session, not `bosun`
+- `spawn_agent({ agent: "lite", task: "send one concise mesh_send report back" })` should create a helper that joins the mesh
+- verify `.pi/settings.json` and `.pi/agents.json` reflect the expected models, default agent, and backend paths
 
 ## Option B: bun link (for bosun co-development)
 

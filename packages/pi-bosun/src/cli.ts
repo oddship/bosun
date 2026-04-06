@@ -110,6 +110,12 @@ function keepAliveCommand(command: string): string {
   return `${command}; EXIT=$?; if [ $EXIT -ne 0 ]; then echo \"=== PI EXITED ($EXIT) ===\"; sleep 300; fi`;
 }
 
+export function getStartSessionName(projectRoot: string): string {
+  const config = loadConfig(projectRoot);
+  const spec = buildLaunchSpec(projectRoot, { config });
+  return spec.agentName;
+}
+
 function attachOrReport(projectRoot: string, bosunPkg: string, targetSession: string): void {
   if (!stdin.isTTY || !stdout.isTTY) {
     console.log(`Session ready: ${targetSession}`);
@@ -253,9 +259,9 @@ async function cmdStart(projectRoot: string, bosunPkg: string, opts: { sandboxed
   ensureDirs(projectRoot);
   checkInsideTmux(projectRoot, bosunPkg);
 
+  const targetSession = getStartSessionName(projectRoot);
   const config = loadConfig(projectRoot);
   const spec = buildLaunchSpec(projectRoot, { config });
-  const targetSession = "bosun";
 
   if (tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", targetSession])) {
     if (opts.sandboxed) checkSandboxVersion(projectRoot, bosunPkg, "2");
@@ -326,11 +332,11 @@ async function cmdAttach(projectRoot: string, bosunPkg: string, session?: string
   const sessions = listBosunSessions(projectRoot, bosunPkg);
   if (sessions.length === 0) {
     if (tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-daemon"])) {
-      console.log("No bosun sessions running (daemon is active). Starting one...");
+      console.log("No agent sessions running (daemon is active). Starting one...");
       await cmdStart(projectRoot, bosunPkg, { sandboxed: true, promptArgs: [] });
       return;
     }
-    throw new Error("No bosun sessions running. Start one with: bosun start");
+    throw new Error("No agent sessions running. Start one with: bosun start");
   }
 
   if (sessions.length === 1) {
@@ -359,7 +365,7 @@ async function cmdAttach(projectRoot: string, bosunPkg: string, session?: string
 function cmdStop(projectRoot: string, bosunPkg: string): void {
   const sessions = listBosunSessions(projectRoot, bosunPkg);
   if (sessions.length === 0 && !tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-daemon"])) {
-    console.log("No bosun sessions running");
+    console.log("No agent sessions running");
     return;
   }
 
@@ -429,4 +435,6 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+if (import.meta.main) {
+  await main();
+}
