@@ -9,6 +9,37 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import matter from "gray-matter";
 
+function getConfiguredAgentFile(cwd: string, agentPaths: string[], name: string): string | null {
+  const standardPath = path.join(cwd, ".pi", "agents", `${name}.md`);
+  if (fs.existsSync(standardPath)) return standardPath;
+
+  for (const p of agentPaths) {
+    const dir = path.isAbsolute(p) ? p : path.join(cwd, p);
+    const filePath = path.join(dir, `${name}.md`);
+    if (fs.existsSync(filePath)) return filePath;
+  }
+
+  return null;
+}
+
+function findFallbackPackageAgent(cwd: string, agentName: string): string | null {
+  const packageRoots = [
+    path.join(cwd, "packages"),
+    path.join(cwd, "node_modules", "bosun", "packages"),
+    process.env.BOSUN_PKG ? path.join(process.env.BOSUN_PKG, "packages") : null,
+  ].filter((value): value is string => Boolean(value));
+
+  for (const root of packageRoots) {
+    if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) continue;
+    for (const entry of fs.readdirSync(root)) {
+      const candidate = path.join(root, entry, "agents", `${agentName}.md`);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  }
+
+  return null;
+}
+
 export interface AgentDef {
   /** Agent identifier (derived from filename if not in frontmatter). */
   name: string;
@@ -74,18 +105,15 @@ export function discoverAgents(cwd: string, agentPaths: string[]): string[] {
  * Searches `.pi/agents/` first, then `agentPaths` in order.
  */
 export function findAgentFile(cwd: string, agentPaths: string[], name: string): string | null {
-  // Standard path first
-  const standardPath = path.join(cwd, ".pi", "agents", `${name}.md`);
-  if (fs.existsSync(standardPath)) return standardPath;
+  return getConfiguredAgentFile(cwd, agentPaths, name);
+}
 
-  // Extra paths
-  for (const p of agentPaths) {
-    const dir = path.isAbsolute(p) ? p : path.join(cwd, p);
-    const filePath = path.join(dir, `${name}.md`);
-    if (fs.existsSync(filePath)) return filePath;
-  }
-
-  return null;
+/**
+ * Find the file path for a named agent, including package fallback discovery.
+ * Searches `.pi/agents/` first, then configured `agentPaths`, then packaged agents.
+ */
+export function resolveAgentFile(cwd: string, agentPaths: string[], name: string): string | null {
+  return getConfiguredAgentFile(cwd, agentPaths, name) ?? findFallbackPackageAgent(cwd, name);
 }
 
 /**

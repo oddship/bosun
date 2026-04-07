@@ -11,7 +11,7 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { loadConfig, type AgentsConfig } from "../src/config.js";
-import { findAgentFile, loadAgent } from "../src/agents.js";
+import { resolveAgentFile, loadAgent } from "../src/agents.js";
 import { registerSpawnAgent } from "./spawn-tool.js";
 import { processTemplate } from "../src/template.js";
 
@@ -37,7 +37,7 @@ export default function (pi: ExtensionAPI) {
     if (agentName === "none") return {};
 
     const config = getConfig(ctx.cwd);
-    const agentFile = findAgentFile(ctx.cwd, config.agentPaths, agentName);
+    const agentFile = resolveAgentFile(ctx.cwd, config.agentPaths, agentName);
     if (!agentFile) return {};
 
     const agent = loadAgent(agentFile);
@@ -69,7 +69,7 @@ export default function (pi: ExtensionAPI) {
     // Update TUI with the runtime instance name rather than the persona name.
     // Load emoji from agent frontmatter and expose via env for other extensions.
     const config = getConfig(ctx.cwd);
-    const agentFile = findAgentFile(ctx.cwd, config.agentPaths, agentName);
+    const agentFile = resolveAgentFile(ctx.cwd, config.agentPaths, agentName);
     const agentEmoji = agentFile ? loadAgent(agentFile).emoji || "🤖" : "🤖";
     process.env.PI_AGENT_EMOJI = agentEmoji;
 

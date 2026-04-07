@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { discoverAgents, findAgentFile, loadAgent } from "../src/agents.js";
+import { discoverAgents, findAgentFile, loadAgent, resolveAgentFile } from "../src/agents.js";
 
 describe("discoverAgents", () => {
   let tmpDir: string;
@@ -119,6 +119,40 @@ describe("findAgentFile", () => {
 
     const file = findAgentFile(tmpDir, ["node_modules/pi-q/agents"], "q");
     expect(file).toBe(path.join(extraDir, "q.md"));
+  });
+});
+
+describe("resolveAgentFile", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-agents-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("falls back to packaged agents when configured paths miss", () => {
+    const packageAgentDir = path.join(tmpDir, "node_modules", "bosun", "packages", "pi-q", "agents");
+    fs.mkdirSync(packageAgentDir, { recursive: true });
+    fs.writeFileSync(path.join(packageAgentDir, "q.md"), "q agent");
+
+    const file = resolveAgentFile(tmpDir, ["../node_modules/bosun/packages/pi-q/agents"], "q");
+    expect(file).toBe(path.join(packageAgentDir, "q.md"));
+  });
+
+  it("prefers configured agent paths over package fallback", () => {
+    const configuredDir = path.join(tmpDir, "packages", "custom", "agents");
+    fs.mkdirSync(configuredDir, { recursive: true });
+    fs.writeFileSync(path.join(configuredDir, "q.md"), "configured q agent");
+
+    const packageAgentDir = path.join(tmpDir, "node_modules", "bosun", "packages", "pi-q", "agents");
+    fs.mkdirSync(packageAgentDir, { recursive: true });
+    fs.writeFileSync(path.join(packageAgentDir, "q.md"), "packaged q agent");
+
+    const file = resolveAgentFile(tmpDir, ["./packages/custom/agents"], "q");
+    expect(file).toBe(path.join(configuredDir, "q.md"));
   });
 });
 

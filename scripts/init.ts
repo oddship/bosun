@@ -34,7 +34,8 @@ const isDependencyMode = !localBosunRepo && activeBosunRoot !== null;
 
 // Resolve the bosun packages directory
 const bosunPackagesDir = activeBosunRoot ? join(activeBosunRoot, "packages") : null;
-const bosunRelativePrefix = activeBosunRoot === bosunDepDir ? "../node_modules/bosun" : activeBosunRoot;
+const bosunPiRelativePrefix = activeBosunRoot === bosunDepDir ? "../node_modules/bosun" : activeBosunRoot;
+const bosunRootRelativePrefix = activeBosunRoot === bosunDepDir ? "./node_modules/bosun" : activeBosunRoot;
 
 // Import memory defaults — resolve relative to this script's location (works in both modes)
 const { DEFAULT_MEMORY_COLLECTIONS, DEFAULT_MEMORY_CONFIG } = await import(
@@ -209,7 +210,7 @@ for (const pkg of localPackages) {
 if (bosunPackagesDir) {
   for (const pkg of filteredBosunPackages) {
     if (existsSync(join(bosunPackagesDir, pkg, "slots"))) {
-      slotPaths.push(`${bosunRelativePrefix}/packages/${pkg}`);
+      slotPaths.push(`${bosunPiRelativePrefix}/packages/${pkg}`);
     }
   }
 }
@@ -236,7 +237,7 @@ if (bosunPackagesDir) {
   for (const pkg of filteredBosunPackages) {
     const agentsDir = join(bosunPackagesDir, pkg, "agents");
     if (existsSync(agentsDir)) {
-      discoveredAgentPaths.push(`${bosunRelativePrefix}/packages/${pkg}/agents`);
+      discoveredAgentPaths.push(`${bosunRootRelativePrefix}/packages/${pkg}/agents`);
     }
   }
 }
@@ -280,7 +281,7 @@ writeJson("settings.json", {
   _configHash: configHash,
   packages: [
     ...localPackages.map((p) => `../packages/${p}`),
-    ...filteredBosunPackages.map((p) => `${bosunRelativePrefix}/packages/${p}`),
+    ...filteredBosunPackages.map((p) => `${bosunPiRelativePrefix}/packages/${p}`),
     ...npmPackages.map((p) => `npm:${p}`),
   ],
   ...(slotPaths.length > 0 ? { slotPaths } : {}),

@@ -58,6 +58,22 @@ describe("buildLaunchSpec", () => {
     expect(spec.agentFile).toContain(path.join("packages", "pi-bosun", "agents", "bosun.md"));
   });
 
+  it("falls back to packaged agents when configured dependency paths are wrong", () => {
+    fs.writeFileSync(path.join(tmpDir, ".pi", "agents.json"), JSON.stringify({
+      defaultAgent: "q",
+      models: { high: "openai-codex/gpt-5.4" },
+      agentPaths: ["../node_modules/bosun/packages/pi-q/agents"],
+      backend: { type: "tmux" },
+    }));
+    fs.mkdirSync(path.join(tmpDir, "node_modules", "bosun", "packages", "pi-q", "agents"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, "node_modules", "bosun", "packages", "pi-q", "agents", "q.md"), `---\nmodel: high\nemoji: 📊\n---\nQ`);
+
+    const spec = buildLaunchSpec(tmpDir);
+    expect(spec.agentName).toBe("q");
+    expect(spec.model).toBe("openai-codex/gpt-5.4");
+    expect(spec.agentFile).toContain(path.join("node_modules", "bosun", "packages", "pi-q", "agents", "q.md"));
+  });
+
   it("throws when the requested agent does not exist", () => {
     fs.writeFileSync(path.join(tmpDir, ".pi", "agents.json"), JSON.stringify({
       defaultAgent: "missing",
