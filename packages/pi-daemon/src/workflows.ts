@@ -7,7 +7,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, resolve } from "node:path";
 import { info, debug, error } from "./logger.js";
 
 // --- Types ---
@@ -209,6 +209,40 @@ function scanWorkflowsIn(baseDir: string, source: "package" | "repo" | "user"): 
 
 // --- Discovery ---
 
+function discoverPackageWorkflowDirs(cwd: string): string[] {
+  const discovered = new Set<string>();
+
+  const packagesDir = join(cwd, "packages");
+  if (existsSync(packagesDir)) {
+    try {
+      for (const pkg of readdirSync(packagesDir)) {
+        const wfDir = join(packagesDir, pkg, "workflows");
+        if (existsSync(wfDir)) discovered.add(wfDir);
+      }
+    } catch {}
+  }
+
+  const settingsPath = join(cwd, ".pi", "settings.json");
+  if (existsSync(settingsPath)) {
+    try {
+      const settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as { packages?: unknown };
+      const piDir = join(cwd, ".pi");
+      if (Array.isArray(settings.packages)) {
+        for (const pkg of settings.packages) {
+          if (typeof pkg !== "string" || pkg.startsWith("npm:")) continue;
+          const pkgDir = resolve(piDir, pkg);
+          const wfDir = join(pkgDir, "workflows");
+          if (existsSync(wfDir)) discovered.add(wfDir);
+        }
+      }
+    } catch (err) {
+      debug(`Failed to read workflow packages from .pi/settings.json: ${err}`);
+    }
+  }
+
+  return Array.from(discovered);
+}
+
 /**
  * Discover all workflows from three locations.
  * Later sources override earlier ones (by workflow name).
@@ -216,17 +250,11 @@ function scanWorkflowsIn(baseDir: string, source: "package" | "repo" | "user"): 
 export function discoverWorkflows(cwd: string): WorkflowConfig[] {
   const byName = new Map<string, WorkflowConfig>();
 
-  // 1. Packages — scan packages/*/workflows/
-  const packagesDir = join(cwd, "packages");
-  if (existsSync(packagesDir)) {
-    try {
-      for (const pkg of readdirSync(packagesDir)) {
-        const wfDir = join(packagesDir, pkg, "workflows");
-        for (const wf of scanWorkflowsIn(wfDir, "package")) {
-          byName.set(wf.name, wf);
-        }
-      }
-    } catch {}
+  // 1. Packages — scan packages/*/workflows/ and any registered package paths from .pi/settings.json
+  for (const wfDir of discoverPackageWorkflowDirs(cwd)) {
+    for (const wf of scanWorkflowsIn(wfDir, "package")) {
+      byName.set(wf.name, wf);
+    }
   }
 
   // 2. Repo — .pi/workflows/

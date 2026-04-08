@@ -55,6 +55,37 @@ prompt = "Do stuff"
     expect(workflows[0].agent?.systemPromptFile).toContain("agent.md");
   });
 
+  it("discovers workflows from package paths registered in .pi/settings.json", () => {
+    const depPkgDir = path.join(tmpDir, "node_modules", "bosun", "packages", "pi-chronicles");
+    const depWorkflowsDir = path.join(depPkgDir, "workflows");
+    createWorkflow(depWorkflowsDir, "chronicle-scribe", `
+[workflow]
+name = "chronicle-scribe"
+type = "agent"
+
+[trigger]
+watcher = "workspace/users/*/analysis/**/*.md"
+
+[agent]
+model = "lite"
+prompt = "Write chronicle"
+`, "# Agent\nWrite chronicle.");
+
+    fs.mkdirSync(path.join(tmpDir, ".pi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "settings.json"),
+      JSON.stringify({
+        packages: ["../node_modules/bosun/packages/pi-chronicles", "npm:pi-web-access@0.10.2"],
+      }),
+    );
+
+    const workflows = discoverWorkflows(tmpDir);
+    expect(workflows).toHaveLength(1);
+    expect(workflows[0].name).toBe("chronicle-scribe");
+    expect(workflows[0].source).toBe("package");
+    expect(workflows[0].trigger.watcher).toBe("workspace/users/*/analysis/**/*.md");
+  });
+
   it("discovers workflows from .pi/workflows", () => {
     const repoDir = path.join(tmpDir, ".pi", "workflows");
     createWorkflow(repoDir, "repo-wf", `
