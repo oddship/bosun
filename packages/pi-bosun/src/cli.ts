@@ -72,12 +72,18 @@ function checkSandboxVersion(projectRoot: string, bosunPkg: string, expected: "1
   }
 }
 
+function resolveBundledBinary(bosunPkg: string, name: string): string | undefined {
+  const localBin = path.join(bosunPkg, "node_modules", ".bin", name);
+  if (fs.existsSync(localBin)) return localBin;
+  return undefined;
+}
+
 function setTmuxEnv(projectRoot: string, bosunPkg: string, defaultAgent: string): void {
   const socket = getTmuxSocket(projectRoot, bosunPkg);
   const entries: Array<[string, string | undefined]> = [
     ["BOSUN_ROOT", projectRoot],
     ["BOSUN_PKG", bosunPkg],
-    ["BOSUN_PI_PATH", process.env.BOSUN_PI_PATH || execFileSync("bash", ["-lc", "command -v pi"], { encoding: "utf-8" }).trim()],
+    ["BOSUN_PI_PATH", process.env.BOSUN_PI_PATH || resolveBundledBinary(bosunPkg, "pi") || execFileSync("bash", ["-lc", "command -v pi"], { encoding: "utf-8" }).trim()],
     ["BOSUN_BUN_PATH", process.env.BOSUN_BUN_PATH || execFileSync("bash", ["-lc", "command -v bun"], { encoding: "utf-8" }).trim()],
     ["BOSUN_BWRAP_PATH", process.env.BOSUN_BWRAP_PATH || execFileSync("bash", ["-lc", "command -v bwrap || true"], { encoding: "utf-8" }).trim() || undefined],
     ["BOSUN_DEFAULT_AGENT", defaultAgent],
