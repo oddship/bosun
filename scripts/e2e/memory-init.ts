@@ -22,6 +22,9 @@ async function run(): Promise<void> {
     if (memory.defaultMode !== "keyword") {
       throw new Error(`expected defaultMode=keyword, got ${String(memory.defaultMode)}`);
     }
+    if (memory.allowHybridSearch !== true) {
+      throw new Error(`expected allowHybridSearch=true, got ${String(memory.allowHybridSearch)}`);
+    }
     if (typeof memory.dbPath !== "string" || !String(memory.dbPath).includes(".bosun-home/.cache/qmd/index.sqlite")) {
       throw new Error(`unexpected dbPath: ${String(memory.dbPath)}`);
     }
@@ -40,6 +43,7 @@ async function run(): Promise<void> {
       name: "init generates camelCase pi-memory config",
       details: JSON.stringify({
         dbPath: memory.dbPath,
+        allowHybridSearch: memory.allowHybridSearch,
         sessions: collections.sessions,
       }),
     });

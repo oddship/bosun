@@ -31,6 +31,7 @@ Example generated config:
   "enabled": true,
   "dbPath": ".bosun-home/.cache/qmd/index.sqlite",
   "autoUpdateOnOpen": true,
+  "allowHybridSearch": true,
   "defaultMode": "keyword",
   "defaultLimit": 5,
   "collections": {
@@ -65,6 +66,11 @@ memory({
 - `keyword` uses BM25-style lookup and is the default because it is fast and
   works without embeddings.
 - `hybrid` uses qmd's broader search pipeline and can benefit from embeddings.
+- `allowHybridSearch` controls whether hybrid mode is permitted at all. When it
+  is `false`, explicit `mode: "hybrid"` calls fail with an actionable error
+  instead of falling into the hybrid path.
+- Invalid config is rejected: `defaultMode: "hybrid"` requires
+  `allowHybridSearch: true`.
 
 ### `memory` with `action: "get"`
 

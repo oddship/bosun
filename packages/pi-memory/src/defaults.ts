@@ -28,6 +28,7 @@ export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   gpu: false,
   dbPath: ".bosun-home/.cache/qmd/index.sqlite",
   autoUpdateOnOpen: true,
+  allowHybridSearch: true,
   defaultMode: "keyword",
   defaultLimit: 5,
   globalContext: undefined,

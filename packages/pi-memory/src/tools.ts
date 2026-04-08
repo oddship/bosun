@@ -10,6 +10,7 @@ import {
 } from "./format.js";
 import { getMemoryRuntime } from "./store.js";
 import type {
+  LoadedMemoryConfig,
   MemoryGetArgs,
   MemoryGetResult,
   MemoryMultiGetArgs,
@@ -22,6 +23,15 @@ import type {
 
 function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
+}
+
+function hybridSearchDisabledError(config: LoadedMemoryConfig): Error & { code: string } {
+  return Object.assign(
+    new Error(
+      `Hybrid memory search is disabled by project config (memory.allow_hybrid_search=false). Available options: use mode='keyword', omit mode to use the default ('${config.defaultMode}'), or enable memory.allow_hybrid_search=true in config.toml.`,
+    ),
+    { code: "hybrid_search_disabled" },
+  );
 }
 
 function rankAndTrim(results: MemorySearchResultItem[], limit: number, minScore: number): MemorySearchResultItem[] {
@@ -97,6 +107,10 @@ export async function executeMemorySearch(cwd: string, args: MemorySearchArgs): 
   const mode = args.mode || runtime.config.defaultMode;
   const limit = args.limit || runtime.config.defaultLimit;
   const minScore = args.minScore ?? runtime.config.searchDefaults.minScore;
+
+  if (mode === "hybrid" && !runtime.config.allowHybridSearch) {
+    throw hybridSearchDisabledError(runtime.config);
+  }
 
   const results = mode === "keyword"
     ? await keywordSearchAcrossCollections(cwd, {

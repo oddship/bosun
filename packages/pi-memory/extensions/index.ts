@@ -39,6 +39,18 @@ function asText(result: unknown): { type: "text"; text: string }[] {
   return [{ type: "text", text: JSON.stringify(result, null, 2) }];
 }
 
+function asToolError(error: unknown): { error: string; message: string } {
+  if (typeof error === "object" && error !== null) {
+    const code = "code" in error && typeof error.code === "string" ? error.code : "memory_error";
+    const message = "message" in error && typeof error.message === "string"
+      ? error.message
+      : "Memory tool execution failed";
+    return { error: code, message };
+  }
+
+  return { error: "memory_error", message: "Memory tool execution failed" };
+}
+
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "memory",
@@ -56,15 +68,22 @@ export default function (pi: ExtensionAPI) {
             isError: true,
           };
         }
-        const result = await executeMemorySearch(cwd, {
-          query: params.query,
-          mode: params.mode,
-          collections: params.collections,
-          limit: params.limit,
-          minScore: params.minScore,
-          intent: params.intent,
-        });
-        return { content: asText(result), details: result };
+        try {
+          const result = await executeMemorySearch(cwd, {
+            query: params.query,
+            mode: params.mode,
+            collections: params.collections,
+            limit: params.limit,
+            minScore: params.minScore,
+            intent: params.intent,
+          });
+          return { content: asText(result), details: result };
+        } catch (error) {
+          return {
+            content: asText(asToolError(error)),
+            isError: true,
+          };
+        }
       }
 
       if (params.action === "get") {
@@ -74,17 +93,24 @@ export default function (pi: ExtensionAPI) {
             isError: true,
           };
         }
-        const result = await executeMemoryGet(cwd, {
-          id: params.id,
-          full: params.full,
-          fromLine: params.fromLine,
-          maxLines: params.maxLines,
-        });
-        return {
-          content: asText(result),
-          details: result,
-          isError: "error" in (result as Record<string, unknown>),
-        };
+        try {
+          const result = await executeMemoryGet(cwd, {
+            id: params.id,
+            full: params.full,
+            fromLine: params.fromLine,
+            maxLines: params.maxLines,
+          });
+          return {
+            content: asText(result),
+            details: result,
+            isError: "error" in (result as Record<string, unknown>),
+          };
+        } catch (error) {
+          return {
+            content: asText(asToolError(error)),
+            isError: true,
+          };
+        }
       }
 
       if (params.action === "multi_get") {
@@ -94,16 +120,30 @@ export default function (pi: ExtensionAPI) {
             isError: true,
           };
         }
-        const result = await executeMemoryMultiGet(cwd, {
-          pattern: params.pattern,
-          maxBytes: params.maxBytes,
-        });
-        return { content: asText(result), details: result };
+        try {
+          const result = await executeMemoryMultiGet(cwd, {
+            pattern: params.pattern,
+            maxBytes: params.maxBytes,
+          });
+          return { content: asText(result), details: result };
+        } catch (error) {
+          return {
+            content: asText(asToolError(error)),
+            isError: true,
+          };
+        }
       }
 
       if (params.action === "status") {
-        const result = await executeMemoryStatus(cwd);
-        return { content: asText(result), details: result };
+        try {
+          const result = await executeMemoryStatus(cwd);
+          return { content: asText(result), details: result };
+        } catch (error) {
+          return {
+            content: asText(asToolError(error)),
+            isError: true,
+          };
+        }
       }
 
       return {

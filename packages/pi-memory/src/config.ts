@@ -44,6 +44,10 @@ function resolvePath(cwd: string, input: string): string {
   return isAbsolute(input) ? input : resolve(cwd, input);
 }
 
+function invalidMemoryConfig(message: string): Error & { code: string } {
+  return Object.assign(new Error(message), { code: "invalid_memory_config" });
+}
+
 function buildQmdConfig(cwd: string, collections: Record<string, MemoryCollectionConfig>, globalContext?: string): CollectionConfig {
   return {
     global_context: globalContext,
@@ -95,6 +99,7 @@ export function loadMemoryConfig(cwd: string): LoadedMemoryConfig {
     gpu: asBoolean(raw.gpu, DEFAULT_MEMORY_CONFIG.gpu),
     dbPath: asString(raw.dbPath, DEFAULT_MEMORY_CONFIG.dbPath) || DEFAULT_MEMORY_CONFIG.dbPath,
     autoUpdateOnOpen: asBoolean(raw.autoUpdateOnOpen, DEFAULT_MEMORY_CONFIG.autoUpdateOnOpen),
+    allowHybridSearch: asBoolean(raw.allowHybridSearch, DEFAULT_MEMORY_CONFIG.allowHybridSearch),
     defaultMode: raw.defaultMode === "hybrid" ? "hybrid" : DEFAULT_MEMORY_CONFIG.defaultMode,
     defaultLimit: asNumber(raw.defaultLimit, DEFAULT_MEMORY_CONFIG.defaultLimit),
     globalContext: asString(raw.globalContext, DEFAULT_MEMORY_CONFIG.globalContext),
@@ -109,6 +114,12 @@ export function loadMemoryConfig(cwd: string): LoadedMemoryConfig {
       defaultGetMaxLines: asNumber(isObject(raw.formatting) ? raw.formatting.defaultGetMaxLines : undefined, DEFAULT_MEMORY_CONFIG.formatting.defaultGetMaxLines),
     },
   };
+
+  if (!config.allowHybridSearch && config.defaultMode === "hybrid") {
+    throw invalidMemoryConfig(
+      "Invalid memory config: defaultMode='hybrid' requires allowHybridSearch=true. Set default_mode='keyword' or enable memory.allow_hybrid_search.",
+    );
+  }
 
   const qmdConfig = buildQmdConfig(cwd, config.collections, config.globalContext);
 

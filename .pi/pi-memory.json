@@ -3,6 +3,7 @@
   "gpu": false,
   "dbPath": ".bosun-home/.cache/qmd/index.sqlite",
   "autoUpdateOnOpen": true,
+  "allowHybridSearch": true,
   "defaultMode": "keyword",
   "defaultLimit": 5,
   "searchDefaults": {

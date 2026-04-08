@@ -24,6 +24,7 @@ export interface MemoryConfig {
   gpu: boolean;
   dbPath: string;
   autoUpdateOnOpen: boolean;
+  allowHybridSearch: boolean;
   defaultMode: "keyword" | "hybrid";
   defaultLimit: number;
   globalContext?: string;
@@ -126,6 +127,7 @@ export interface MemoryStatusResult {
   enabled: boolean;
   gpu: boolean;
   autoUpdateOnOpen: boolean;
+  allowHybridSearch: boolean;
   dbPath: string;
   defaultMode: "keyword" | "hybrid";
   defaultLimit: number;

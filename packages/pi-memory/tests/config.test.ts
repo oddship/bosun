@@ -25,6 +25,7 @@ describe("loadMemoryConfig", () => {
     const config = loadMemoryConfig(cwd);
 
     expect(config.enabled).toBe(true);
+    expect(config.allowHybridSearch).toBe(true);
     expect(config.defaultMode).toBe("keyword");
     expect(config.collections.sessions.path).toBe("workspace/users");
     expect(config.resolvedDbPath).toBe(join(cwd, ".bosun-home", ".cache", "qmd", "index.sqlite"));
@@ -37,6 +38,7 @@ describe("loadMemoryConfig", () => {
     writeFileSync(join(cwd, ".pi", "pi-memory.json"), JSON.stringify({
       enabled: true,
       dbPath: ".cache/custom-memory.sqlite",
+      allowHybridSearch: true,
       defaultMode: "hybrid",
       defaultLimit: 9,
       autoUpdateOnOpen: false,
@@ -50,11 +52,38 @@ describe("loadMemoryConfig", () => {
     }, null, 2));
 
     const config = loadMemoryConfig(cwd);
+    expect(config.allowHybridSearch).toBe(true);
     expect(config.defaultMode).toBe("hybrid");
     expect(config.defaultLimit).toBe(9);
     expect(config.autoUpdateOnOpen).toBe(false);
     expect(config.resolvedDbPath).toBe(join(cwd, ".cache", "custom-memory.sqlite"));
     expect(config.resolvedCollections.notes.path).toBe(join(cwd, "notes"));
     expect(config.qmdConfig.collections.notes.includeByDefault).toBe(true);
+  });
+
+  it("loads allowHybridSearch=false when configured", () => {
+    const cwd = makeTempDir();
+    mkdirSync(join(cwd, ".pi"), { recursive: true });
+    writeFileSync(join(cwd, ".pi", "pi-memory.json"), JSON.stringify({
+      allowHybridSearch: false,
+      defaultMode: "keyword",
+    }, null, 2));
+
+    const config = loadMemoryConfig(cwd);
+    expect(config.allowHybridSearch).toBe(false);
+    expect(config.defaultMode).toBe("keyword");
+  });
+
+  it("rejects hybrid default mode when hybrid search is disabled", () => {
+    const cwd = makeTempDir();
+    mkdirSync(join(cwd, ".pi"), { recursive: true });
+    writeFileSync(join(cwd, ".pi", "pi-memory.json"), JSON.stringify({
+      allowHybridSearch: false,
+      defaultMode: "hybrid",
+    }, null, 2));
+
+    expect(() => loadMemoryConfig(cwd)).toThrow(
+      "Invalid memory config: defaultMode='hybrid' requires allowHybridSearch=true. Set default_mode='keyword' or enable memory.allow_hybrid_search.",
+    );
   });
 });

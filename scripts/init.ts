@@ -522,13 +522,19 @@ const mergedMemoryCollections = {
       }),
   ),
 };
+const allowHybridSearch = memory.allow_hybrid_search ?? DEFAULT_MEMORY_CONFIG.allowHybridSearch;
+const defaultMemoryMode = memory.default_mode === "hybrid" ? "hybrid" : DEFAULT_MEMORY_CONFIG.defaultMode;
+if (!allowHybridSearch && defaultMemoryMode === "hybrid") {
+  throw new Error("Invalid memory config: default_mode='hybrid' requires allow_hybrid_search=true. Set default_mode='keyword' or enable memory.allow_hybrid_search.");
+}
 
 writeJson("pi-memory.json", {
   enabled: memory.enabled ?? DEFAULT_MEMORY_CONFIG.enabled,
   gpu: memory.gpu ?? DEFAULT_MEMORY_CONFIG.gpu,
   dbPath: memory.db_path || DEFAULT_MEMORY_CONFIG.dbPath,
   autoUpdateOnOpen: memory.auto_update_on_open ?? DEFAULT_MEMORY_CONFIG.autoUpdateOnOpen,
-  defaultMode: memory.default_mode === "hybrid" ? "hybrid" : DEFAULT_MEMORY_CONFIG.defaultMode,
+  allowHybridSearch,
+  defaultMode: defaultMemoryMode,
   defaultLimit: memory.default_limit || DEFAULT_MEMORY_CONFIG.defaultLimit,
   globalContext: memory.global_context,
   searchDefaults: {

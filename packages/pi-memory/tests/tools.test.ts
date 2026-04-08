@@ -24,6 +24,7 @@ function makeRepo(): string {
     enabled: true,
     dbPath: ".cache/memory.sqlite",
     autoUpdateOnOpen: true,
+    allowHybridSearch: true,
     defaultMode: "keyword",
     defaultLimit: 5,
     collections: {
@@ -102,11 +103,44 @@ describe("pi-memory tools", () => {
     expect(result.errors).toEqual([]);
   });
 
+  it("rejects hybrid search when disabled by config", async () => {
+    const cwd = makeRepo();
+    writeFileSync(join(cwd, ".pi", "pi-memory.json"), JSON.stringify({
+      enabled: true,
+      dbPath: ".cache/memory.sqlite",
+      autoUpdateOnOpen: true,
+      allowHybridSearch: false,
+      defaultMode: "keyword",
+      defaultLimit: 5,
+      collections: {
+        sessions: {
+          path: "workspace/users",
+          pattern: "**/*.md",
+          includeByDefault: true,
+        },
+        docs: {
+          path: "docs",
+          pattern: "**/*.md",
+          includeByDefault: true,
+        },
+      },
+    }, null, 2));
+
+    await expect(executeMemorySearch(cwd, {
+      query: "memory qmd",
+      mode: "hybrid",
+      limit: 5,
+    })).rejects.toThrow(
+      "Hybrid memory search is disabled by project config (memory.allow_hybrid_search=false). Available options: use mode='keyword', omit mode to use the default ('keyword'), or enable memory.allow_hybrid_search=true in config.toml.",
+    );
+  });
+
   it("reports memory status", async () => {
     const cwd = makeRepo();
     const status = await executeMemoryStatus(cwd);
 
     expect(status.enabled).toBe(true);
+    expect(status.allowHybridSearch).toBe(true);
     expect(status.collections.some((collection) => collection.name === "sessions")).toBe(true);
     expect(status.totalDocuments).toBeGreaterThanOrEqual(2);
   });
