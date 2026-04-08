@@ -148,7 +148,8 @@ poll_interval_ms = 2000
 enabled = true
 db_path = ".bosun-home/.cache/qmd/index.sqlite"
 auto_update_on_open = true
-default_mode = "keyword"                 # keyword | hybrid
+allow_hybrid_search = true               # set false to block hybrid search entirely
+default_mode = "keyword"                 # keyword | hybrid (requires allow_hybrid_search=true for hybrid)
 default_limit = 5
 # global_context = "Bosun sessions, docs, plans, and skills"
 
@@ -240,9 +241,11 @@ cooldown_seconds = 60                     # Min seconds between auto-resumes (0 
 # compact_threshold = 50          # default % for all models (uncomment to enable)
 
 # Per-model overrides (model string → threshold %). Takes precedence over compact_threshold.
+# We pin the configured GPT models to 50% so bosun/zero and spawned GPT agents compact early.
 # [auto_resume.compact_thresholds]
-# "gpt-5.4" = 30                  # GPT-5.4 — compact early for long orchestration
-# "gpt-5.3-codex" = 40
+# "gpt-5.4" = 60                  # GPT-5.4 — compact early for long orchestration
+# "gpt-5.4-mini" = 60             # GPT-5.4-mini — keep helper agents compact too
+# "gpt-5.3-codex" = 60            # GPT-5.3-codex — keep medium agents on the same threshold
 
 # =============================================================================
 # Pi Keybindings (overrides Pi TUI defaults)
