@@ -14,7 +14,7 @@ The `cdp-client` library lets agents write browser automation scripts in TypeScr
 
 ```typescript
 // From workspace/scratch/ (the standard place for agent scripts)
-import { connect, run, devices } from "../../.pi/skills/cdp-browser/scripts/cdp-client";
+import { attach, connect, createWindowTarget, run, devices } from "../../.pi/skills/cdp-browser/scripts/cdp-client";
 ```
 
 Save scripts to `workspace/scratch/` and run with `bun workspace/scratch/my-script.ts`.
@@ -50,13 +50,43 @@ browser.close();
 ```typescript
 const browser = await connect({
   host: "localhost",    // default
-  port: 9222,           // default
-  timeout: 30_000,      // per-command timeout in ms
+  port: 9222,            // default
+  timeout: 30_000,       // command/attach timeout in ms
   tab: "my-app",        // select tab by title substring
+  // targetId: "ABC123...", // exact target id (use instead of tab)
 });
 ```
 
+### Target lifecycle (new window + attach by id)
+
+```typescript
+const { targetId } = await createWindowTarget({
+  url: "http://localhost:8080",
+  width: 1440,
+  height: 900,
+});
+
+const browser = await attach(targetId);
+// Equivalent: const browser = await connect({ targetId });
+
+await browser.screenshot("workspace/scratch/new-window.png");
+browser.close();
+```
+
 ## API Reference
+
+### Targets
+
+```typescript
+const created = await createWindowTarget({
+  url: "about:blank", // default
+  width: 1280,         // optional
+  height: 800,         // optional
+});
+
+const b1 = await attach(created.targetId);
+const b2 = await connect({ targetId: created.targetId });
+```
 
 ### Navigation
 

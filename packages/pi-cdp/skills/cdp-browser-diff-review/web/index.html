@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bosun Diff Review</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f17;
+      --panel: #121826;
+      --panel-2: #0f1421;
+      --border: #263041;
+      --muted: #95a2b8;
+      --text: #e7edf7;
+      --accent: #67b3ff;
+      --accent-2: #3ddc97;
+      --warn: #f0b429;
+      --danger: #ff6b81;
+      --shadow: 0 14px 40px rgba(0, 0, 0, 0.36);
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); }
+    button, input, textarea, select { font: inherit; }
+    button {
+      cursor: pointer;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 8px 12px;
+    }
+    button:hover:enabled { background: #192235; }
+    button:disabled { opacity: 0.55; cursor: default; }
+    button.primary { background: #1a4f82; border-color: #3978b5; }
+    button.primary:hover:enabled { background: #21639f; }
+    button.success { background: #174c37; border-color: #2f8b65; }
+    button.success:hover:enabled { background: #1d6145; }
+    button.ghost { background: transparent; }
+    .hidden { display: none !important; }
+
+    #app {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      height: 100%;
+      width: 100%;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #0d1320;
+    }
+
+    .title-block { min-width: 0; }
+    .title-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      margin-bottom: 4px;
+    }
+    .title-line h1 {
+      margin: 0;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .pill.alert { color: #ffd58a; border-color: #6a5422; }
+    .pill.ready { color: #9ce4c1; border-color: #236949; }
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .round-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(20, 26, 39, 0.96), rgba(18, 24, 38, 0.96));
+    }
+    .round-summary { min-width: 0; }
+    .round-summary strong { display: block; margin-bottom: 4px; }
+    .round-summary span { color: var(--muted); font-size: 12px; }
+    .round-actions { display: flex; align-items: center; gap: 10px; }
+
+    .content {
+      display: grid;
+      grid-template-columns: 290px minmax(0, 1fr) 320px;
+      min-height: 0;
+      height: 100%;
+    }
+
+    .panel {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--panel-2);
+    }
+    .panel:last-child {
+      border-right: none;
+      border-left: 1px solid var(--border);
+    }
+
+    .panel-header {
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .panel-header h2 {
+      margin: 0;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .search-input, .reply-input, .modal textarea, .modal input, .inline-editor textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #0d1320;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    .search-input:focus, .reply-input:focus, .modal textarea:focus, .modal input:focus, .inline-editor textarea:focus {
+      border-color: #4f8dd1;
+      box-shadow: 0 0 0 1px rgba(79, 141, 209, 0.35);
+    }
+
+    .segmented {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .segmented button {
+      border: none;
+      border-right: 1px solid var(--border);
+      border-radius: 0;
+      background: transparent;
+      padding: 8px 11px;
+      font-size: 12px;
+    }
+    .segmented button:last-child { border-right: none; }
+    .segmented button.active { background: #1b2a42; color: #dff0ff; }
+
+    .nav-scroll, .thread-scroll, .draft-scroll {
+      overflow: auto;
+      min-height: 0;
+      padding: 10px;
+    }
+
+    .section {
+      margin-bottom: 16px;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+
+    .file-item, .thread-item, .draft-item {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+      text-align: left;
+      margin-bottom: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(16, 22, 34, 0.88);
+    }
+    .file-item.active { border-color: #4173aa; background: #152132; }
+    .file-meta, .thread-meta, .draft-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .file-path {
+      font-size: 13px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .badge-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .badge.changed { color: #b8ddff; border-color: #34597f; }
+    .badge.open { color: #ffd58a; border-color: #695322; }
+    .badge.stale { color: #ffb4c0; border-color: #804352; }
+    .badge.reviewed { color: #a4f1ca; border-color: #2e7f58; }
+
+    .main-panel {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      min-width: 0;
+      min-height: 0;
+      background: #0d1320;
+    }
+    .main-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .main-toolbar .left, .main-toolbar .right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .file-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      min-width: 0;
+    }
+    .file-head .name {
+      font-size: 14px;
+      font-weight: 600;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .file-head .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    #editor {
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .draft-dock {
+      border-top: 1px solid var(--border);
+      background: #101726;
+      min-height: 0;
+      max-height: 220px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    .draft-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .draft-header strong { font-size: 13px; }
+    .draft-actions { display: flex; gap: 8px; }
+
+    .thread-item.active { border-color: #4173aa; }
+    .thread-body, .draft-body {
+      color: #dbe4f3;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .thread-actions, .draft-actions-row, .inline-editor-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .empty {
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      background: rgba(12, 16, 24, 0.75);
+    }
+
+    .toast-stack {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      max-width: 360px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: #0f1522;
+      box-shadow: var(--shadow);
+      padding: 12px 14px;
+    }
+    .toast strong {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 5px;
+      color: #dfeeff;
+    }
+    .toast span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 9, 15, 0.76);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      backdrop-filter: blur(4px);
+    }
+    .modal {
+      width: min(640px, calc(100vw - 28px));
+      max-height: calc(100vh - 40px);
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: #0f1522;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    .modal h3 { margin: 0 0 8px; }
+    .modal p { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .modal textarea { min-height: 150px; resize: vertical; }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .editor-loading {
+      padding: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1200px) {
+      .content { grid-template-columns: 250px minmax(0, 1fr) 280px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="topbar">
+      <div class="title-block">
+        <div class="title-line">
+          <h1 id="session-title">Bosun Diff Review</h1>
+          <span class="pill" id="session-status">loading</span>
+          <span class="pill ready hidden" id="round-ready-pill">new round ready</span>
+        </div>
+        <div class="subtitle" id="session-subtitle">Loading session…</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="pill" id="target-agent-pill">agent —</span>
+        <span class="pill" id="round-pill">round —</span>
+        <button class="ghost" id="refresh-button">Refresh</button>
+        <button class="primary" id="submit-batch-button" disabled>Submit review batch</button>
+      </div>
+    </div>
+
+    <div class="round-banner">
+      <div class="round-summary">
+        <strong id="round-heading">Loading round…</strong>
+        <span id="round-detail">Waiting for review state.</span>
+      </div>
+      <div class="round-actions">
+        <div class="segmented" id="mode-switch">
+          <button data-mode="delta" class="active">Delta</button>
+          <button data-mode="cumulative">Cumulative</button>
+          <button data-mode="initial">Initial</button>
+        </div>
+        <button id="open-related-threads-button">Focus related threads</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <aside class="panel">
+        <div class="panel-header">
+          <h2>Review Navigator</h2>
+          <input id="file-search" class="search-input" type="text" autocomplete="off" placeholder="Search reviewed files">
+        </div>
+        <div class="nav-scroll" id="navigator"></div>
+      </aside>
+
+      <main class="main-panel">
+        <div class="main-toolbar">
+          <div class="left">
+            <button id="add-file-comment-button">Add file comment</button>
+            <button id="toggle-reviewed-button">Mark reviewed</button>
+          </div>
+          <div class="right">
+            <button id="toggle-wrap-button">Wrap: on</button>
+            <button id="toggle-unchanged-button">Hide unchanged</button>
+          </div>
+        </div>
+
+        <div class="file-head">
+          <div style="min-width:0;">
+            <div class="name" id="active-file-label">No file selected</div>
+            <div class="hint" id="active-file-hint">Select a file from the review navigator.</div>
+          </div>
+          <div class="badge-row" id="active-file-badges"></div>
+        </div>
+
+        <div id="editor">
+          <div class="editor-loading">Loading editor…</div>
+        </div>
+
+        <section class="draft-dock">
+          <div class="draft-header">
+            <strong>Draft batch</strong>
+            <div class="draft-actions">
+              <button id="clear-drafts-button">Clear drafts</button>
+              <button class="primary" id="submit-drafts-inline-button" disabled>Submit batch</button>
+            </div>
+          </div>
+          <div class="draft-scroll" id="drafts"></div>
+        </section>
+      </main>
+
+      <aside class="panel">
+        <div class="panel-header">
+          <h2>Open & stale threads</h2>
+          <input id="thread-search" class="search-input" type="text" autocomplete="off" placeholder="Search threads">
+        </div>
+        <div class="thread-scroll" id="threads"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toasts"></div>
+  <div id="modal-root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

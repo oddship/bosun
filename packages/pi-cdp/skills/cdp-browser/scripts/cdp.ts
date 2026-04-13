@@ -3,10 +3,10 @@
  * CDP CLI — thin wrapper over cdp-client library.
  * Zero dependencies. Bun native.
  *
- * Usage: cdp <command> [args] [--json] [--tab=<id|title>]
+ * Usage: cdp <command> [args] [--json] [--tab=<id|title>|--target=<id>]
  */
 
-import { connect, devices, type Browser } from "./cdp-client";
+import { connect, createWindowTarget, devices, type Browser } from "./cdp-client";
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -14,10 +14,12 @@ import { connect, devices, type Browser } from "./cdp-client";
 
 let jsonOutput = false;
 let tabSelector: string | undefined;
+let targetSelector: string | undefined;
 
 const args = process.argv.slice(2).filter((arg) => {
   if (arg === "--json") { jsonOutput = true; return false; }
   if (arg.startsWith("--tab=")) { tabSelector = arg.slice(6); return false; }
+  if (arg.startsWith("--target=")) { targetSelector = arg.slice(9); return false; }
   return true;
 });
 
@@ -36,9 +38,13 @@ function die(msg: string): never {
   process.exit(1);
 }
 
+if (tabSelector && targetSelector) {
+  die("Use either --tab=<id|title> or --target=<id>, not both.");
+}
+
 /** Run a command with auto-connect/close. */
 async function withBrowser<T>(fn: (b: Browser) => Promise<T>): Promise<T> {
-  const b = await connect({ tab: tabSelector });
+  const b = await connect({ tab: tabSelector, targetId: targetSelector });
   try { return await fn(b); }
   finally { b.close(); }
 }
@@ -61,6 +67,13 @@ const commands: Record<string, (...a: string[]) => Promise<unknown>> = {
     return pages.map((p: any, i: number) =>
       `${i}: ${p.id.slice(0, 8)} | ${(p.title ?? "").slice(0, 40).padEnd(40)} | ${p.url}`
     ).join("\n");
+  },
+
+  async newwindow(url?: string) {
+    const target = await createWindowTarget({ url });
+    return jsonOutput
+      ? { success: true, targetId: target.targetId }
+      : `Created window target: ${target.targetId}`;
   },
 
   async info() {
@@ -270,10 +283,11 @@ const commands: Record<string, (...a: string[]) => Promise<unknown>> = {
 
 const HELP = `\x1b[1mcdp\x1b[0m — Chrome DevTools Protocol CLI (Bun/TypeScript)
 
-\x1b[1mUsage:\x1b[0m cdp <command> [args] [--json] [--tab=<id|title>]
+\x1b[1mUsage:\x1b[0m cdp <command> [args] [--json] [--tab=<id|title>|--target=<id>]
 
 \x1b[1mNavigation\x1b[0m
   tabs                        List open browser tabs
+  newwindow [url]             Create a new browser window target
   info                        Current page title and URL
   navigate <url>              Go to URL (waits for load)
 
@@ -314,7 +328,8 @@ const HELP = `\x1b[1mcdp\x1b[0m — Chrome DevTools Protocol CLI (Bun/TypeScript
 
 \x1b[1mOptions\x1b[0m
   --json                      JSON output
-  --tab=<id|title>            Target tab
+  --tab=<id|title>            Target tab (id prefix or title)
+  --target=<id>               Attach to exact target id
 
 \x1b[1mLibrary usage:\x1b[0m
   import { connect, run, devices } from "./cdp-client";

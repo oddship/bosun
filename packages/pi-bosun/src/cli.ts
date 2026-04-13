@@ -148,9 +148,8 @@ function splitModelReference(model: string): { provider?: string; modelId: strin
   };
 }
 
-function buildPiCommand(projectRoot: string, bosunPkg: string, sessionName: string, promptArgs: string[], spec: ReturnType<typeof buildLaunchSpec>): string {
-  const piBinary = process.env.BOSUN_PI_PATH || resolveBundledBinary(bosunPkg, "pi") || "pi";
-  const args: string[] = [piBinary];
+function buildPiCommand(projectRoot: string, sessionName: string, promptArgs: string[], spec: ReturnType<typeof buildLaunchSpec>): string {
+  const args: string[] = ["pi"];
   if (spec.model) {
     const resolvedModel = splitModelReference(spec.model);
     if (resolvedModel.provider) args.push("--provider", resolvedModel.provider);
@@ -277,7 +276,7 @@ async function cmdStart(projectRoot: string, bosunPkg: string, opts: { sandboxed
     return;
   }
 
-  const command = buildPiCommand(projectRoot, bosunPkg, targetSession, opts.promptArgs, spec);
+  const command = buildPiCommand(projectRoot, targetSession, opts.promptArgs, spec);
   if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
     if (opts.sandboxed) checkSandboxVersion(projectRoot, bosunPkg, "2");
     tmux(projectRoot, bosunPkg, ["new-session", "-d", "-s", targetSession, "-n", targetSession, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
@@ -306,13 +305,13 @@ function cmdRun(projectRoot: string, bosunPkg: string, args: string[], flags: { 
   if (flags.window) {
     const sessionName = getGlobalEnv(projectRoot, bosunPkg, "BOSUN_DEFAULT_AGENT") || spec.agentName;
     const windowName = nextWindowName(projectRoot, bosunPkg, sessionName);
-    const command = buildPiCommand(projectRoot, bosunPkg, windowName, args, spec);
+    const command = buildPiCommand(projectRoot, windowName, args, spec);
     tmux(projectRoot, bosunPkg, ["new-window", "-n", windowName, "-c", projectRoot, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
     return;
   }
 
   const sessionName = nextSessionName(projectRoot, bosunPkg, spec.agentName);
-  const command = buildPiCommand(projectRoot, bosunPkg, sessionName, args, spec);
+  const command = buildPiCommand(projectRoot, sessionName, args, spec);
   if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
     checkSandboxVersion(projectRoot, bosunPkg, "2");
     tmux(projectRoot, bosunPkg, ["new-session", "-d", "-s", sessionName, "-n", sessionName, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });

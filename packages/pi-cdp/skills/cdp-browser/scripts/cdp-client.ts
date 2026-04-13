@@ -25,12 +25,32 @@
 // Types
 // ---------------------------------------------------------------------------
 
-export interface ConnectOptions {
+export interface EndpointOptions {
   host?: string;
   port?: number;
   timeout?: number;
+}
+
+export interface AttachOptions extends EndpointOptions {}
+
+export interface ConnectOptions extends EndpointOptions {
   /** Select tab by id prefix or title substring */
   tab?: string;
+  /** Attach to an exact target id from /json */
+  targetId?: string;
+}
+
+export interface CreateWindowTargetOptions extends EndpointOptions {
+  /** Initial URL for the new window target. Default: about:blank */
+  url?: string;
+  /** Optional window width in CSS pixels */
+  width?: number;
+  /** Optional window height in CSS pixels */
+  height?: number;
+}
+
+export interface CreateWindowTargetResult {
+  targetId: string;
 }
 
 export interface DevicePreset {
@@ -108,42 +128,169 @@ interface CDPTarget {
   webSocketDebuggerUrl?: string;
 }
 
-async function discoverTargets(
+interface CDPBrowserVersion {
+  webSocketDebuggerUrl?: string;
+}
+
+function resolveEndpointOptions(opts: EndpointOptions = {}): {
+  host: string;
+  port: number;
+  timeout: number;
+} {
+  return {
+    host: opts.host ?? process.env.CDP_HOST ?? "localhost",
+    port: opts.port ?? Number(process.env.CDP_PORT ?? 9222),
+    timeout: opts.timeout ?? Number(process.env.CDP_TIMEOUT ?? 30_000),
+  };
+}
+
+async function listTargets(host: string, port: number): Promise<CDPTarget[]> {
+  return (await fetch(`http://${host}:${port}/json`).then((r) =>
+    r.json()
+  )) as CDPTarget[];
+}
+
+function pickTarget(
+  targets: CDPTarget[],
+  opts: { tab?: string; targetId?: string }
+): CDPTarget | undefined {
+  if (opts.targetId) return targets.find((t) => t.id === opts.targetId);
+
+  if (opts.tab) {
+    return targets.find(
+      (t) =>
+        t.id === opts.tab ||
+        t.id.startsWith(opts.tab) ||
+        t.title?.toLowerCase().includes(opts.tab.toLowerCase())
+    );
+  }
+
+  return (
+    targets.find(
+      (t) => t.type === "page" && !t.url.startsWith("chrome-extension://")
+    ) ?? targets[0]
+  );
+}
+
+async function discoverTarget(
   host: string,
   port: number,
-  tab?: string
+  opts: { tab?: string; targetId?: string },
+  timeout: number
 ): Promise<CDPTarget> {
-  let pages: CDPTarget[];
+  const deadline = Date.now() + timeout;
+
+  while (true) {
+    let targets: CDPTarget[];
+    try {
+      targets = await listTargets(host, port);
+    } catch {
+      throw new Error(
+        `Cannot connect to Chrome at ${host}:${port}. ` +
+          `Is it running with --remote-debugging-port=${port}?`
+      );
+    }
+
+    const target = pickTarget(targets, opts);
+    if (target) {
+      if (!target.webSocketDebuggerUrl) {
+        throw new Error(
+          `Target ${target.id} has no WebSocket URL — may be a special page.`
+        );
+      }
+      return target;
+    }
+
+    if (opts.targetId && Date.now() < deadline) {
+      await Bun.sleep(100);
+      continue;
+    }
+
+    if (opts.targetId) throw new Error(`Target not found: "${opts.targetId}"`);
+    if (opts.tab) throw new Error(`Tab not found: "${opts.tab}"`);
+    throw new Error("No browser tabs found.");
+  }
+}
+
+async function discoverBrowserWebSocket(
+  host: string,
+  port: number
+): Promise<string> {
+  let version: CDPBrowserVersion;
   try {
-    pages = await fetch(`http://${host}:${port}/json`).then((r) => r.json());
-  } catch (e: any) {
+    version = (await fetch(`http://${host}:${port}/json/version`).then((r) =>
+      r.json()
+    )) as CDPBrowserVersion;
+  } catch {
     throw new Error(
       `Cannot connect to Chrome at ${host}:${port}. ` +
         `Is it running with --remote-debugging-port=${port}?`
     );
   }
 
-  if (!pages.length) throw new Error("No browser tabs found.");
-
-  let page: CDPTarget | undefined;
-  if (tab) {
-    page = pages.find(
-      (p) =>
-        p.id === tab ||
-        p.id.startsWith(tab) ||
-        p.title?.toLowerCase().includes(tab.toLowerCase())
-    );
-    if (!page) throw new Error(`Tab not found: "${tab}"`);
-  } else {
-    page =
-      pages.find(
-        (p) => p.type === "page" && !p.url.startsWith("chrome-extension://")
-      ) ?? pages[0];
+  if (!version.webSocketDebuggerUrl) {
+    throw new Error("Browser WebSocket URL not found at /json/version.");
   }
 
-  if (!page.webSocketDebuggerUrl)
-    throw new Error("Page has no WebSocket URL — may be a special page.");
-  return page;
+  return version.webSocketDebuggerUrl;
+}
+
+async function openWebSocket(url: string, timeout: number): Promise<WebSocket> {
+  const ws = new WebSocket(url);
+
+  await new Promise<void>((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error("WebSocket connect timeout")),
+      timeout
+    );
+    ws.onopen = () => {
+      clearTimeout(t);
+      resolve();
+    };
+    ws.onerror = (e: any) => {
+      clearTimeout(t);
+      reject(new Error(e.message ?? "WebSocket error"));
+    };
+  });
+
+  return ws;
+}
+
+async function sendSingleCommand(
+  ws: WebSocket,
+  method: string,
+  params: Record<string, unknown> = {},
+  timeout = 30_000
+): Promise<any> {
+  return await new Promise((resolve, reject) => {
+    const id = 1;
+    const t = setTimeout(() => {
+      ws.onmessage = null;
+      reject(new Error(`CDP timeout: ${method}`));
+    }, timeout);
+
+    ws.onmessage = (e) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(String(e.data));
+      } catch {
+        return;
+      }
+
+      if (msg.id !== id) return;
+
+      clearTimeout(t);
+      ws.onmessage = null;
+
+      if (msg.error) {
+        reject(new Error(msg.error.message ?? `CDP error: ${method}`));
+      } else {
+        resolve(msg.result ?? {});
+      }
+    };
+
+    ws.send(JSON.stringify({ id, method, params }));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -181,29 +328,60 @@ export class Browser {
 
   /** Connect to a running Chrome instance via CDP. */
   static async connect(opts: ConnectOptions = {}): Promise<Browser> {
-    const host = opts.host ?? process.env.CDP_HOST ?? "localhost";
-    const port = opts.port ?? Number(process.env.CDP_PORT ?? 9222);
-    const timeout = opts.timeout ?? Number(process.env.CDP_TIMEOUT ?? 30_000);
+    if (opts.tab && opts.targetId) {
+      throw new Error("Use either tab or targetId, not both.");
+    }
 
-    const target = await discoverTargets(host, port, opts.tab);
-    const ws = new WebSocket(target.webSocketDebuggerUrl!);
-
-    await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(
-        () => reject(new Error("WebSocket connect timeout")),
-        timeout
-      );
-      ws.onopen = () => {
-        clearTimeout(t);
-        resolve();
-      };
-      ws.onerror = (e: any) => {
-        clearTimeout(t);
-        reject(new Error(e.message ?? "WebSocket error"));
-      };
-    });
-
+    const { host, port, timeout } = resolveEndpointOptions(opts);
+    const target = await discoverTarget(
+      host,
+      port,
+      { tab: opts.tab, targetId: opts.targetId },
+      timeout
+    );
+    const ws = await openWebSocket(target.webSocketDebuggerUrl!, timeout);
     return new Browser(ws, timeout);
+  }
+
+  /** Attach to a specific CDP target id. */
+  static async attach(
+    targetId: string,
+    opts: AttachOptions = {}
+  ): Promise<Browser> {
+    return Browser.connect({ ...opts, targetId });
+  }
+
+  /** Create a new top-level browser window target. */
+  static async createWindowTarget(
+    opts: CreateWindowTargetOptions = {}
+  ): Promise<CreateWindowTargetResult> {
+    const { host, port, timeout } = resolveEndpointOptions(opts);
+    const browserWebSocketUrl = await discoverBrowserWebSocket(host, port);
+    const ws = await openWebSocket(browserWebSocketUrl, timeout);
+
+    try {
+      const params: Record<string, unknown> = {
+        url: opts.url ?? "about:blank",
+        newWindow: true,
+      };
+      if (opts.width != null) params.width = opts.width;
+      if (opts.height != null) params.height = opts.height;
+
+      const result = (await sendSingleCommand(
+        ws,
+        "Target.createTarget",
+        params,
+        timeout
+      )) as CreateWindowTargetResult;
+
+      if (!result?.targetId) {
+        throw new Error("Target.createTarget returned no targetId.");
+      }
+
+      return { targetId: result.targetId };
+    } finally {
+      ws.close();
+    }
   }
 
   /** Send a raw CDP method call. */
@@ -870,6 +1048,21 @@ export class Browser {
 /** Connect to Chrome/Chromium via CDP. Shorthand for Browser.connect(). */
 export function connect(opts?: ConnectOptions): Promise<Browser> {
   return Browser.connect(opts);
+}
+
+/** Attach to a specific CDP target id. */
+export function attach(
+  targetId: string,
+  opts?: AttachOptions
+): Promise<Browser> {
+  return Browser.attach(targetId, opts);
+}
+
+/** Create a new top-level browser window target. */
+export function createWindowTarget(
+  opts?: CreateWindowTargetOptions
+): Promise<CreateWindowTargetResult> {
+  return Browser.createWindowTarget(opts);
 }
 
 /** Connect, run a function, then close. */
