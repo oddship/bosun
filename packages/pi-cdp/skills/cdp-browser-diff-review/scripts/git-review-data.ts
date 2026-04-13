@@ -784,6 +784,29 @@ function findLatestRoundForPath(
   return fallback;
 }
 
+function resolveCumulativeBasePath(
+  rounds: ReviewRound[],
+  sourceRound: ReviewRound,
+  canonicalPath: string
+): string {
+  let currentPath = normalizeRepoPath(canonicalPath);
+  const sourceRoundIndex = rounds.findIndex((round) => round.id === sourceRound.id);
+  const startIndex = sourceRoundIndex >= 0 ? sourceRoundIndex : rounds.length - 1;
+
+  for (let index = startIndex; index >= 0; index -= 1) {
+    const change = findRoundFileChange(rounds[index], currentPath);
+    if (
+      change &&
+      (change.status === "renamed" || change.status === "copied") &&
+      change.previousPath
+    ) {
+      currentPath = normalizeRepoPath(change.previousPath);
+    }
+  }
+
+  return currentPath;
+}
+
 function readSnapshotText(
   sessionId: string,
   snapshotId: string,
@@ -791,21 +814,36 @@ function readSnapshotText(
   options: ReviewStateOptions
 ): string {
   const manifest = readReviewSnapshotManifest(sessionId, snapshotId, options);
+  const normalizedPath = normalizeRepoPath(requestedPath);
   const entry = manifest.files.find(
     (file) =>
-      file.canonicalPath === requestedPath ||
-      file.path === requestedPath ||
-      file.previousPath === requestedPath
+      file.canonicalPath === normalizedPath ||
+      file.path === normalizedPath ||
+      file.previousPath === normalizedPath
   );
 
-  if (!entry || !entry.present) return "";
+  const fallbackPath = normalizeRepoPath(entry?.path ?? normalizedPath);
+  if (!entry) {
+    const raw = readFromTarget(manifest.repoRoot, manifest.target, fallbackPath);
+    return raw ? decodeSnapshotContent(raw) : "";
+  }
+
+  if (!entry.present) return "";
 
   const paths = getReviewSnapshotPaths(sessionId, snapshotId, options);
   const relativePath = entry.storagePath ?? entry.path;
-  if (!relativePath) return "";
+  if (!relativePath) {
+    const raw = readFromTarget(manifest.repoRoot, manifest.target, fallbackPath);
+    return raw ? decodeSnapshotContent(raw) : "";
+  }
 
-  const raw = readSnapshotFile(paths.filesDir, relativePath);
-  return decodeSnapshotContent(raw);
+  try {
+    const raw = readSnapshotFile(paths.filesDir, relativePath);
+    return decodeSnapshotContent(raw);
+  } catch {
+    const raw = readFromTarget(manifest.repoRoot, manifest.target, fallbackPath);
+    return raw ? decodeSnapshotContent(raw) : "";
+  }
 }
 
 export function loadRoundFilePair(input: LoadRoundFilePairInput): RoundFilePair {
@@ -852,11 +890,15 @@ export function loadRoundFilePair(input: LoadRoundFilePairInput): RoundFilePair 
   const fileChange = findFileChange(rounds, mode, sourceRound, requestedPath);
   const canonicalPath = fileChange?.path ?? requestedPath;
   const previousPath = fileChange?.previousPath;
+  const baseLookupPath =
+    mode === "cumulative"
+      ? resolveCumulativeBasePath(rounds, sourceRound, canonicalPath)
+      : canonicalPath;
 
   const originalContent = readSnapshotText(
     loaded.session.id,
     baseSnapshotId,
-    canonicalPath,
+    baseLookupPath,
     sessionOptions
   );
   const modifiedContent = readSnapshotText(
