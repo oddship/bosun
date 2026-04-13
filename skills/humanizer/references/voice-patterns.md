@@ -1,12 +1,12 @@
 # Voice and Authenticity Patterns
 
-Additional patterns for voice consistency, concrete evidence, and technical writing. These complement the upstream patterns with observations from practical editing work.
+Additional Bosun-local patterns for voice consistency, concrete evidence, and technical writing. These complement the 29 upstream patterns with observations from practical editing work.
 
 ---
 
 ## VOICE PATTERNS
 
-### 25. Voice Drift and Inconsistency
+### 30. Voice Drift and Inconsistency
 
 **Problem:** Different sections sound like different writers. Tone shifts from formal to casual to formal again.
 
@@ -33,7 +33,7 @@ Additional patterns for voice consistency, concrete evidence, and technical writ
 
 ---
 
-### 26. Unsubstantiated Claims
+### 31. Unsubstantiated Claims
 
 **Problem:** Claims lack specific evidence or examples.
 
@@ -59,7 +59,7 @@ Additional patterns for voice consistency, concrete evidence, and technical writ
 
 ---
 
-### 27. Tech-Specific Overused Phrases
+### 32. Tech-Specific Overused Phrases
 
 **High-frequency tech clichés:**
 - leverage, synergy, cutting-edge, best-in-class
@@ -83,7 +83,7 @@ Additional patterns for voice consistency, concrete evidence, and technical writ
 
 ---
 
-### 28. Formulaic Sentence Openers
+### 33. Formulaic Sentence Openers
 
 **Problem:** Same opening patterns repeated throughout.
 
@@ -175,7 +175,7 @@ For each major claim in your text:
 When refining technical blog posts:
 
 ### Pass 1: Remove AI Patterns
-Load `references/upstream-patterns.md` and scan for the 24 patterns.
+Load `references/upstream-patterns.md` and scan for the 29 upstream patterns.
 
 ### Pass 2: Check Voice Consistency
 - Read intro and conclusion - do they match?

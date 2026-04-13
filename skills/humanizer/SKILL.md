@@ -5,10 +5,12 @@ description: |
   text to make it sound more natural and human-written. Based on Wikipedia's
   comprehensive "Signs of AI writing" guide. Detects and fixes patterns including:
   inflated symbolism, promotional language, superficial -ing analyses, vague
-  attributions, em dash overuse, rule of three, AI vocabulary words, negative
-  parallelisms, and excessive conjunctive phrases.
+  attributions, em dash overuse, rule of three, AI vocabulary words, passive
+  voice, negative parallelisms, and filler phrases.
+license: MIT
+compatibility: pi
 metadata:
-  version: 2.2.0
+  version: 2.5.1
 allowed-tools:
   - Read
   - Write
@@ -20,17 +22,39 @@ allowed-tools:
 
 # Humanizer: Remove AI Writing Patterns
 
-Identify and remove signs of AI-generated text to make writing sound natural and human.
+Identify and remove signs of AI-generated text so it sounds natural, human, and specific.
 
 ## Your Task
 
 When given text to humanize:
 
-1. **Identify AI patterns** - Scan for patterns in the references
+1. **Identify AI patterns** - Scan the references for the patterns that apply
 2. **Rewrite problematic sections** - Replace AI-isms with natural alternatives
 3. **Preserve meaning** - Keep the core message intact
 4. **Maintain voice** - Match the intended tone (formal, casual, technical)
 5. **Add soul** - Don't just remove bad patterns; inject actual personality
+6. **Do a final anti-AI pass** - Ask yourself what still sounds synthetic, then revise once more
+
+## Voice Calibration (Optional)
+
+If the user provides a writing sample, analyze it before rewriting.
+
+1. **Read the sample first.** Note:
+   - Sentence length patterns
+   - Word choice level
+   - How paragraphs open and transition
+   - Punctuation habits
+   - Recurring phrases or verbal tics
+   - How much personality or opinion shows up
+
+2. **Match that voice in the rewrite.** Don't just remove AI patterns. Replace them with patterns from the sample. If the sample is terse, stay terse. If it is chatty, loosen up.
+
+3. **When no sample is provided,** fall back to the default behavior from the personality guidance below.
+
+### How to provide a sample
+
+- Inline: "Humanize this text. Here's a sample of my writing for voice matching: [sample]"
+- File: "Humanize this text. Use my writing style from [file path] as a reference."
 
 ## Personality and Soul
 
@@ -64,45 +88,48 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 > The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
 
 **After (has a pulse):**
-> I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle - but I keep thinking about those agents working through the night.
+> I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle, but I keep thinking about those agents working through the night.
 
 ## Process
 
 1. Read the input text carefully
 2. Scan for AI patterns (load references as needed)
-3. Rewrite each problematic section
-4. Ensure the revised text:
+3. If the user provided a writing sample, extract voice markers before rewriting
+4. Rewrite each problematic section
+5. Run a final anti-AI audit: what still sounds too tidy, generic, overconfident, or padded?
+6. Ensure the revised text:
    - Sounds natural when read aloud
    - Varies sentence structure naturally
    - Uses specific details over vague claims
    - Maintains appropriate tone for context
    - Uses simple constructions (is/are/has) where appropriate
-5. Present the humanized version with brief summary of changes
+7. Present the humanized version with a brief summary of changes
 
 ## Quick Pattern Checklist
 
-**Content patterns:** Inflated significance, vague attributions, "-ing" analyses, promotional language
+**Content patterns:** Inflated significance, vague attributions, "-ing" analyses, promotional language, formulaic "challenges" sections
 
-**Language patterns:** AI vocabulary (crucial, delve, landscape, testament), copula avoidance, rule of three, negative parallelisms
+**Language patterns:** AI vocabulary (actually, crucial, delve, landscape, testament), copula avoidance, passive voice, rule of three, negative parallelisms, tailing negations, filler phrases
 
-**Style patterns:** Em dash overuse, mechanical boldface, inline-header lists, emojis
+**Style patterns:** Em dash overuse, mechanical boldface, inline-header lists, title case, emojis, curly quotes
 
-**Voice patterns:** Voice drift, unsubstantiated claims, tech clichés, formulaic openers
+**Voice patterns:** Voice drift, unsubstantiated claims, tech clichés, formulaic openers, signposting, fragmented headers
 
 ## References (Progressive Disclosure)
 
 Load detailed patterns on demand:
 
-- `references/upstream-patterns.md` - 24 patterns from Wikipedia (can be updated from upstream)
+- `references/upstream-patterns.md` - 29 upstream patterns extracted from the upstream `humanizer` skill
 - `references/voice-patterns.md` - Voice consistency, concrete evidence, tech clichés
 
 ### Upstream Source
 
-The upstream patterns are from [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing).
+The upstream patterns are based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing).
 
 To check for updates:
 - **Repository:** https://github.com/blader/humanizer
 - **Raw SKILL.md:** https://raw.githubusercontent.com/blader/humanizer/main/SKILL.md
-- **Last synced:** 2.1.1
+- **Note:** The upstream repo currently ships a single `SKILL.md`, so sync its pattern sections into `references/upstream-patterns.md`
+- **Last synced:** 2.5.1
 
-To update: Fetch upstream, compare with `references/upstream-patterns.md`, merge relevant changes.
+To update: Fetch upstream `SKILL.md`, compare its pattern sections with `references/upstream-patterns.md`, merge relevant changes, and keep Bosun-specific progressive disclosure plus local `voice-patterns.md` additions.
