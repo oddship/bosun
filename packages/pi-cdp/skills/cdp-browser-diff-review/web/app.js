@@ -12,6 +12,7 @@ const state = {
   selectedDraftIds: new Set(),
   loadingSession: false,
   unreadRoundReady: false,
+  pendingFileKey: null,
 };
 
 const dom = {
@@ -517,6 +518,7 @@ function fileCacheKey(path, mode, roundId) {
 
 async function loadFile(path) {
   if (!path) {
+    state.pendingFileKey = null;
     state.activeFileData = null;
     updateFileHeader();
     mountEditorData(null);
@@ -524,21 +526,27 @@ async function loadFile(path) {
   }
   const roundId = currentRound()?.id || "latest";
   const key = fileCacheKey(path, state.activeMode, roundId);
+  state.pendingFileKey = key;
   if (state.fileCache.has(key)) {
+    if (state.pendingFileKey !== key) return;
     state.activeFileData = state.fileCache.get(key);
     updateFileHeader();
     mountEditorData(state.activeFileData);
     return;
   }
-  dom.editor.innerHTML = `<div class="editor-loading">Loading ${escapeHtml(path)}…</div>`;
+  if (!diffEditor) {
+    dom.editor.innerHTML = `<div class="editor-loading">Loading ${escapeHtml(path)}…</div>`;
+  }
   try {
     const url = `/api/file?path=${encodeURIComponent(path)}&mode=${encodeURIComponent(state.activeMode)}&roundId=${encodeURIComponent(roundId)}`;
     const data = await fetchJson(url);
+    if (state.pendingFileKey !== key) return;
     state.fileCache.set(key, data);
     state.activeFileData = data;
     updateFileHeader();
     mountEditorData(data);
   } catch (error) {
+    if (state.pendingFileKey !== key) return;
     console.error(error);
     state.activeFileData = {
       path,
@@ -769,13 +777,19 @@ async function mountEditorData(data) {
   installInlineDraftActions(diffEditor.getOriginalEditor(), "original");
   installInlineDraftActions(diffEditor.getModifiedEditor(), "modified");
 
-  if (originalModel) originalModel.dispose();
-  if (modifiedModel) modifiedModel.dispose();
-
+  const previousOriginalModel = originalModel;
+  const previousModifiedModel = modifiedModel;
   const language = inferLanguage(data?.path || state.activePath, data?.language);
-  originalModel = monacoApi.editor.createModel(data?.originalContent || "", language);
-  modifiedModel = monacoApi.editor.createModel(data?.modifiedContent || "", language);
-  diffEditor.setModel({ original: originalModel, modified: modifiedModel });
+  const nextOriginalModel = monacoApi.editor.createModel(data?.originalContent || "", language);
+  const nextModifiedModel = monacoApi.editor.createModel(data?.modifiedContent || "", language);
+
+  diffEditor.setModel({ original: nextOriginalModel, modified: nextModifiedModel });
+  originalModel = nextOriginalModel;
+  modifiedModel = nextModifiedModel;
+
+  if (previousOriginalModel && previousOriginalModel !== nextOriginalModel) previousOriginalModel.dispose();
+  if (previousModifiedModel && previousModifiedModel !== nextModifiedModel) previousModifiedModel.dispose();
+
   applyEditorOptions();
   refreshDecorations();
 }
