@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import matter from "gray-matter";
 import { join, extname, normalize, relative, resolve, sep } from "node:path";
 import { resolveMarkdownPageTitle } from "./page-title";
+import { actorStateDir, actorStateFile, legacyStateFile, readPartitionedJsonRecords } from "./site-state";
 import { pathToFileURL } from "node:url";
 
 type GatewayConfig = {
@@ -984,12 +985,12 @@ function siteStateDir(site: SiteRegistration): string {
   return join(site.absDir, ".gateway");
 }
 
-function siteMessagesJsonPath(site: SiteRegistration): string {
-  return join(siteStateDir(site), "messages.json");
+function siteMessagesJsonPath(site: SiteRegistration, actorId?: string): string {
+  return actorStateFile(siteStateDir(site), actorId, "messages.json");
 }
 
-function siteMessagesMarkdownPath(site: SiteRegistration): string {
-  return join(siteStateDir(site), "messages.md");
+function siteMessagesMarkdownPath(site: SiteRegistration, actorId?: string): string {
+  return actorStateFile(siteStateDir(site), actorId, "messages.md");
 }
 
 function siteTerminalStatePath(site: SiteRegistration): string {
@@ -1000,8 +1001,8 @@ function siteRepliesJsonPath(site: SiteRegistration): string {
   return join(siteStateDir(site), "replies.json");
 }
 
-function siteActionsJsonPath(site: SiteRegistration): string {
-  return join(siteStateDir(site), "actions.json");
+function siteActionsJsonPath(site: SiteRegistration, actorId?: string): string {
+  return actorStateFile(siteStateDir(site), actorId, "actions.json");
 }
 
 function siteInboxJsonPath(site: SiteRegistration): string {
@@ -1072,17 +1073,17 @@ function stopManagedSiteAgentSessions(site: SiteRegistration): string[] {
   return killed;
 }
 
-function ensureSiteStateDir(site: SiteRegistration): void {
+function ensureSiteStateRoot(site: SiteRegistration): void {
   mkdirSync(siteStateDir(site), { recursive: true });
 }
 
-function resetSiteState(site: SiteRegistration): void {
-  rmSync(siteStateDir(site), { recursive: true, force: true });
-}
-
-function readSiteMessages(site: SiteRegistration): SiteMessage[] {
-  ensureSiteStateDir(site);
-  return readJsonFile<SiteMessage[]>(siteMessagesJsonPath(site)) || [];
+function sortRecordsByTimestamp<T extends { ts?: string; id?: string }>(records: T[]): T[] {
+  return [...records].sort((left, right) => {
+    const leftTs = left.ts || "";
+    const rightTs = right.ts || "";
+    if (leftTs !== rightTs) return leftTs.localeCompare(rightTs);
+    return (left.id || "").localeCompare(right.id || "");
+  });
 }
 
 function dedupeMessages(messages: SiteMessage[]): SiteMessage[] {
@@ -1097,15 +1098,123 @@ function dedupeMessages(messages: SiteMessage[]): SiteMessage[] {
   return deduped;
 }
 
-function writeSiteMessages(site: SiteRegistration, messages: SiteMessage[]): void {
-  ensureSiteStateDir(site);
-  const deduped = dedupeMessages(messages);
-  writeFileSync(siteMessagesJsonPath(site), `${JSON.stringify(deduped, null, 2)}\n`, "utf-8");
-  const transcript = deduped.map((message) => {
+function mergeRecordsById<T extends { id: string; ts?: string }>(existing: T[], incoming: T[]): T[] {
+  const merged = new Map<string, T>();
+  for (const record of existing) merged.set(record.id, record);
+  for (const record of incoming) merged.set(record.id, record);
+  return sortRecordsByTimestamp([...merged.values()]);
+}
+
+function renderMessageTranscript(messages: SiteMessage[]): string {
+  const transcript = messages.map((message) => {
     const heading = `## ${message.role} · ${message.ts}`;
     return `${heading}\n\n${message.content.trim()}\n`;
   }).join("\n");
-  writeFileSync(siteMessagesMarkdownPath(site), `# Message Transcript\n\n${transcript}`, "utf-8");
+  return `# Message Transcript\n\n${transcript}`;
+}
+
+function readActorSiteMessages(site: SiteRegistration, actorId?: string): SiteMessage[] {
+  ensureSiteStateRoot(site);
+  return readJsonFile<SiteMessage[]>(siteMessagesJsonPath(site, actorId)) || [];
+}
+
+function writeActorSiteMessages(site: SiteRegistration, actorId: string | undefined, messages: SiteMessage[]): void {
+  ensureSiteStateRoot(site);
+  mkdirSync(actorStateDir(siteStateDir(site), actorId), { recursive: true });
+  const deduped = dedupeMessages(sortRecordsByTimestamp(messages));
+  writeFileSync(siteMessagesJsonPath(site, actorId), `${JSON.stringify(deduped, null, 2)}\n`, "utf-8");
+  writeFileSync(siteMessagesMarkdownPath(site, actorId), renderMessageTranscript(deduped), "utf-8");
+}
+
+function mergeSiteMessages(site: SiteRegistration, actorId: string | undefined, incoming: SiteMessage[]): SiteMessage[] {
+  const merged = mergeRecordsById(readActorSiteMessages(site, actorId), incoming);
+  writeActorSiteMessages(site, actorId, merged);
+  return merged;
+}
+
+function readActorSiteActions(site: SiteRegistration, actorId?: string): SiteActionEvent[] {
+  ensureSiteStateRoot(site);
+  return readJsonFile<SiteActionEvent[]>(siteActionsJsonPath(site, actorId)) || [];
+}
+
+function writeActorSiteActions(site: SiteRegistration, actorId: string | undefined, actions: SiteActionEvent[]): void {
+  ensureSiteStateRoot(site);
+  mkdirSync(actorStateDir(siteStateDir(site), actorId), { recursive: true });
+  const sorted = sortRecordsByTimestamp(actions);
+  writeFileSync(siteActionsJsonPath(site, actorId), `${JSON.stringify(sorted, null, 2)}\n`, "utf-8");
+}
+
+function appendSiteAction(site: SiteRegistration, event: SiteActionEvent): SiteActionEvent[] {
+  const merged = mergeRecordsById(readActorSiteActions(site, event.actorId), [event]);
+  writeActorSiteActions(site, event.actorId, merged);
+  return merged;
+}
+
+function migrateLegacySiteMessages(site: SiteRegistration): void {
+  const legacyJsonPath = legacyStateFile(siteStateDir(site), "messages.json");
+  if (!existsSync(legacyJsonPath)) return;
+
+  const legacyMessages = readJsonFile<SiteMessage[]>(legacyJsonPath) || [];
+  const grouped = new Map<string, SiteMessage[]>();
+  for (const message of legacyMessages) {
+    const key = message.actorId?.trim() || "__shared__";
+    const bucket = grouped.get(key) || [];
+    bucket.push(message);
+    grouped.set(key, bucket);
+  }
+
+  for (const [key, messages] of grouped.entries()) {
+    mergeSiteMessages(site, key === "__shared__" ? undefined : messages[0]?.actorId, messages);
+  }
+
+  rmSync(legacyJsonPath, { force: true });
+  rmSync(legacyStateFile(siteStateDir(site), "messages.md"), { force: true });
+}
+
+function migrateLegacySiteActions(site: SiteRegistration): void {
+  const legacyJsonPath = legacyStateFile(siteStateDir(site), "actions.json");
+  if (!existsSync(legacyJsonPath)) return;
+
+  const legacyActions = readJsonFile<SiteActionEvent[]>(legacyJsonPath) || [];
+  const grouped = new Map<string, SiteActionEvent[]>();
+  for (const action of legacyActions) {
+    const key = action.actorId?.trim() || "__shared__";
+    const bucket = grouped.get(key) || [];
+    bucket.push(action);
+    grouped.set(key, bucket);
+  }
+
+  for (const [key, actions] of grouped.entries()) {
+    const actorId = key === "__shared__" ? undefined : actions[0]?.actorId;
+    const merged = mergeRecordsById(readActorSiteActions(site, actorId), actions);
+    writeActorSiteActions(site, actorId, merged);
+  }
+
+  rmSync(legacyJsonPath, { force: true });
+}
+
+function ensureSiteStateDir(site: SiteRegistration): void {
+  ensureSiteStateRoot(site);
+  migrateLegacySiteMessages(site);
+  migrateLegacySiteActions(site);
+}
+
+function resetSiteState(site: SiteRegistration): void {
+  rmSync(siteStateDir(site), { recursive: true, force: true });
+}
+
+function readAllSiteMessages(site: SiteRegistration): SiteMessage[] {
+  ensureSiteStateDir(site);
+  return readPartitionedJsonRecords<SiteMessage>(siteStateDir(site), "messages.json");
+}
+
+function readVisibleSiteMessages(site: SiteRegistration, actorId?: string): SiteMessage[] {
+  ensureSiteStateDir(site);
+  if (!actorId) return readAllSiteMessages(site);
+  return dedupeMessages(mergeRecordsById(
+    readActorSiteMessages(site),
+    readActorSiteMessages(site, actorId),
+  ));
 }
 
 function createMessage(
@@ -1143,25 +1252,22 @@ function readStructuredReplies(site: SiteRegistration): SiteMessage[] {
 }
 
 function writeStructuredReplies(site: SiteRegistration, messages: SiteMessage[]): void {
-  ensureSiteStateDir(site);
+  ensureSiteStateRoot(site);
   writeFileSync(siteRepliesJsonPath(site), `${JSON.stringify(messages, null, 2)}\n`, "utf-8");
 }
 
-function readSiteActions(site: SiteRegistration): SiteActionEvent[] {
+function readAllSiteActions(site: SiteRegistration): SiteActionEvent[] {
   ensureSiteStateDir(site);
-  return readJsonFile<SiteActionEvent[]>(siteActionsJsonPath(site)) || [];
+  return readPartitionedJsonRecords<SiteActionEvent>(siteStateDir(site), "actions.json");
 }
 
-function writeSiteActions(site: SiteRegistration, actions: SiteActionEvent[]): void {
+function readVisibleSiteActions(site: SiteRegistration, actorId?: string): SiteActionEvent[] {
   ensureSiteStateDir(site);
-  writeFileSync(siteActionsJsonPath(site), `${JSON.stringify(actions, null, 2)}\n`, "utf-8");
-}
-
-function appendSiteAction(site: SiteRegistration, event: SiteActionEvent): SiteActionEvent[] {
-  const actions = readSiteActions(site);
-  actions.push(event);
-  writeSiteActions(site, actions);
-  return actions;
+  if (!actorId) return readAllSiteActions(site);
+  return mergeRecordsById(
+    readActorSiteActions(site),
+    readActorSiteActions(site, actorId),
+  );
 }
 
 function writeTerminalState(site: SiteRegistration, state: { lastCapture: string }): void {
@@ -1192,18 +1298,18 @@ function deriveTerminalReply(previous: string, current: string): string | undefi
 function ingestTmuxOutput(site: SiteRegistration): SiteMessage[] {
   const sessionName = siteSessionName(site);
   if (!sessionName || siteInputMode(site) !== "tmux" || !tmuxOk(["has-session", "-t", sessionName])) {
-    return readSiteMessages(site);
+    return readAllSiteMessages(site);
   }
 
   const capture = tmux(["capture-pane", "-pt", sessionName, "-S", "-200"]);
   const terminalState = readTerminalState(site);
   const delta = deriveTerminalReply(terminalState.lastCapture, capture);
   writeTerminalState(site, { lastCapture: capture });
-  if (!delta) return readSiteMessages(site);
+  if (!delta) return readAllSiteMessages(site);
 
-  const messages = readSiteMessages(site);
+  const messages = readAllSiteMessages(site);
   const last = messages[messages.length - 1];
-  if (last?.source === "runtime" && last.content.trim() === delta.trim()) return messages;
+  if (last?.source === "runtime" && last.content.trim() === delta.trim()) return readAllSiteMessages(site);
 
   const recentUserInputs = new Set(
     messages
@@ -1219,49 +1325,49 @@ function ingestTmuxOutput(site: SiteRegistration): SiteMessage[] {
     .filter((line) => !recentUserInputs.has(line))
     .join("\n")
     .trim();
-  if (!cleaned) return messages;
+  if (!cleaned) return readAllSiteMessages(site);
 
-  messages.push(createMessage("assistant", cleaned, "runtime", {
+  mergeSiteMessages(site, last?.actorId, [createMessage("assistant", cleaned, "runtime", {
     actorId: last?.actorId,
     actorLogin: last?.actorLogin,
     visibility: last?.visibility,
-  }));
-  writeSiteMessages(site, messages);
-  return messages;
+  })]);
+  return readAllSiteMessages(site);
 }
 
-function syncRuntimeOutbox(site: SiteRegistration): SiteMessage[] {
+function mergeQueuedMessages(site: SiteRegistration, queued: SiteMessage[]): void {
+  const grouped = new Map<string, SiteMessage[]>();
+  for (const message of queued) {
+    const key = message.actorId?.trim() || "__shared__";
+    const bucket = grouped.get(key) || [];
+    bucket.push(message);
+    grouped.set(key, bucket);
+  }
+
+  for (const [key, messages] of grouped.entries()) {
+    mergeSiteMessages(site, key === "__shared__" ? undefined : messages[0]?.actorId, messages);
+  }
+}
+
+function syncRuntimeOutbox(site: SiteRegistration): void {
   ensureSiteStateDir(site);
   const outboxPath = siteOutboxJsonPath(site);
   const outbound = readSiteQueue(outboxPath);
-  let messages = readSiteMessages(site);
 
   if (outbound.length > 0) {
-    const existingIds = new Set(messages.map((message) => message.id));
-    for (const message of outbound) {
-      if (!existingIds.has(message.id)) messages.push(message);
-    }
-    writeSiteMessages(site, messages);
+    mergeQueuedMessages(site, outbound);
     writeSiteQueue(outboxPath, []);
-    messages = readSiteMessages(site);
   }
 
   const structuredReplies = readStructuredReplies(site);
   if (structuredReplies.length > 0) {
-    const existingIds = new Set(messages.map((message) => message.id));
-    for (const message of structuredReplies) {
-      if (!existingIds.has(message.id)) messages.push(message);
-    }
-    writeSiteMessages(site, messages);
+    mergeQueuedMessages(site, structuredReplies);
     writeStructuredReplies(site, []);
-    messages = readSiteMessages(site);
   }
 
   if (siteInputMode(site) === "tmux" && !site.manifest?.runtime?.framedReplies) {
-    messages = ingestTmuxOutput(site);
+    ingestTmuxOutput(site);
   }
-
-  return messages;
 }
 
 function queueRuntimeMessage(site: SiteRegistration, message: SiteMessage): void {
@@ -1277,12 +1383,13 @@ function listSiteMessages(
   viewer?: Pick<GatewayAuthzDecision, "actorId">,
   authModule?: SiteAuthModule,
 ): { messages: SiteMessage[]; transcriptPath: string } {
-  const messages = syncRuntimeOutbox(site);
+  syncRuntimeOutbox(site);
+  const messages = readVisibleSiteMessages(site, viewer?.actorId);
   return {
     messages: viewer?.actorId
       ? messages.filter((message) => canActorAccessVisibility(authModule, viewer.actorId, message.visibility, message.actorId))
       : messages,
-    transcriptPath: siteMessagesMarkdownPath(site),
+    transcriptPath: siteMessagesMarkdownPath(site, viewer?.actorId),
   };
 }
 
@@ -1291,12 +1398,12 @@ function listSiteActions(
   viewer?: Pick<GatewayAuthzDecision, "actorId">,
   authModule?: SiteAuthModule,
 ): { actions: SiteActionEvent[]; actionsPath: string } {
-  const actions = readSiteActions(site);
+  const actions = readVisibleSiteActions(site, viewer?.actorId);
   return {
     actions: viewer?.actorId
       ? actions.filter((event) => canActorAccessVisibility(authModule, viewer.actorId, event.visibility, event.actorId))
       : actions,
-    actionsPath: siteActionsJsonPath(site),
+    actionsPath: siteActionsJsonPath(site, viewer?.actorId),
   };
 }
 
@@ -1347,7 +1454,7 @@ function buildActionDispatchMessage(site: SiteRegistration, event: SiteActionEve
 }
 
 function dispatchSiteAction(site: SiteRegistration, event: SiteActionEvent): { event: SiteActionEvent; messages: SiteMessage[] } {
-  const messages = syncRuntimeOutbox(site);
+  syncRuntimeOutbox(site);
   const hasRuntime = Boolean((site.manifest?.runtime?.command || site.manifest?.runtime?.backend === "pi-agent") && siteSessionName(site));
   const runtimeRunning = Boolean(siteSessionName(site) && tmuxOk(["has-session", "-t", siteSessionName(site)!]));
   const dispatchContent = buildActionDispatchMessage(site, event);
@@ -1364,15 +1471,14 @@ function dispatchSiteAction(site: SiteRegistration, event: SiteActionEvent): { e
     event.status = "dispatched";
   } else {
     event.status = "failed";
-    messages.push(createMessage("assistant", `Action '${event.action}' was captured, but no running site runtime was available to handle it.`, "gateway", {
+    mergeSiteMessages(site, event.actorId, [createMessage("assistant", `Action '${event.action}' was captured, but no running site runtime was available to handle it.`, "gateway", {
       actorId: event.actorId,
       actorLogin: event.actorLogin,
       visibility: event.visibility,
-    }));
-    writeSiteMessages(site, messages);
+    })]);
   }
 
-  return { event, messages: syncRuntimeOutbox(site) };
+  return { event, messages: readVisibleSiteMessages(site, event.actorId) };
 }
 
 async function postSiteAction(site: SiteRegistration, req: Request, authz: GatewayAuthzDecision, authModule?: SiteAuthModule): Promise<{
@@ -1420,13 +1526,12 @@ async function postSiteAction(site: SiteRegistration, req: Request, authz: Gatew
     actorLogin: authz.actorLogin,
     visibility: normalizeVisibility(authz.visibility),
   });
-  const messages = syncRuntimeOutbox(site);
-  messages.push(createMessage("system", `Browser action: ${action}${target ? ` → ${target}` : ""}`, "gateway", {
+  syncRuntimeOutbox(site);
+  mergeSiteMessages(site, authz.actorId, [createMessage("system", `Browser action: ${action}${target ? ` → ${target}` : ""}`, "gateway", {
     actorId: authz.actorId,
     actorLogin: authz.actorLogin,
     visibility: normalizeVisibility(authz.visibility),
-  }));
-  writeSiteMessages(site, messages);
+  })]);
 
   const dispatched = dispatchSiteAction(site, event);
   const actions = appendSiteAction(site, dispatched.event);
@@ -1435,7 +1540,7 @@ async function postSiteAction(site: SiteRegistration, req: Request, authz: Gatew
     action: dispatched.event,
     actions,
     messages: listSiteMessages(site, authz, authModule).messages,
-    actionsPath: siteActionsJsonPath(site),
+    actionsPath: siteActionsJsonPath(site, authz.actorId),
   };
 }
 
@@ -1452,16 +1557,15 @@ async function postSiteMessage(site: SiteRegistration, req: Request, authz: Gate
     : "";
   if (!content) return { error: "Message content is required", status: 400 };
 
-  const messages = syncRuntimeOutbox(site);
+  syncRuntimeOutbox(site);
   const added: SiteMessage[] = [];
   const userMessage = createMessage("user", content, "browser", {
     actorId: authz.actorId,
     actorLogin: authz.actorLogin,
     visibility: normalizeVisibility(authz.visibility),
   });
-  messages.push(userMessage);
+  mergeSiteMessages(site, authz.actorId, [userMessage]);
   added.push(userMessage);
-  writeSiteMessages(site, messages);
 
   const hasRuntime = Boolean((site.manifest?.runtime?.command || site.manifest?.runtime?.backend === "pi-agent") && siteSessionName(site));
   const runtimeRunning = Boolean(siteSessionName(site) && tmuxOk(["has-session", "-t", siteSessionName(site)!]));
@@ -1476,9 +1580,8 @@ async function postSiteMessage(site: SiteRegistration, req: Request, authz: Gate
       actorLogin: authz.actorLogin,
       visibility: normalizeVisibility(authz.visibility),
     });
-    messages.push(dispatched);
+    mergeSiteMessages(site, authz.actorId, [dispatched]);
     added.push(dispatched);
-    writeSiteMessages(site, messages);
   } else {
     const assistantReply = createMessage(
       "assistant",
@@ -1498,15 +1601,14 @@ async function postSiteMessage(site: SiteRegistration, req: Request, authz: Gate
         visibility: normalizeVisibility(authz.visibility),
       },
     );
-    messages.push(assistantReply);
+    mergeSiteMessages(site, authz.actorId, [assistantReply]);
     added.push(assistantReply);
-    writeSiteMessages(site, messages);
   }
 
   return {
     messages: listSiteMessages(site, authz, authModule).messages,
     added,
-    transcriptPath: siteMessagesMarkdownPath(site),
+    transcriptPath: siteMessagesMarkdownPath(site, authz.actorId),
   };
 }
 
