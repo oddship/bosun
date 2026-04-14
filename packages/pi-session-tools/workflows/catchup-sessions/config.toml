@@ -13,6 +13,7 @@ prompt = "Check for unsummarized session JSONL files and generate markdown summa
 
 [validators]
 input = "validate-input.ts"
+output = "validate-output.ts"
 
 [retry]
 max_attempts = 2
