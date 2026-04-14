@@ -1,5 +1,5 @@
-import { afterAll, describe, expect, test } from "bun:test";
-import { writeFileSync, rmSync } from "node:fs";
+import { afterAll, afterEach, describe, expect, test } from "bun:test";
+import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ProcessBackend } from "../../pi-agents/src/backend";
 import {
@@ -7,9 +7,12 @@ import {
   formatMessageForAgent,
   latestAssistantReplyFromSession,
   parseStructuredSiteAction,
+  processInboxForTest,
   replyTextForRuntimeError,
+  resetQueueRuntimeForTest,
   runBrowserMessageHandler,
   selectRoutingForMessage,
+  setMessageProcessorForTest,
   setRuntimeBackendForTest,
   waitForAgentSessionReadyForTest,
   type QueueRoutingDecision,
@@ -23,6 +26,9 @@ const originalEnv = {
   PI_SITE_AUTOMATION_ACTIONS: process.env.PI_SITE_AUTOMATION_ACTIONS,
   PI_SITE_ACTION_AGENTS: process.env.PI_SITE_ACTION_AGENTS,
   PI_SITE_STATE_DIR: process.env.PI_SITE_STATE_DIR,
+  PI_SITE_INBOX_FILE: process.env.PI_SITE_INBOX_FILE,
+  PI_SITE_OUTBOX_FILE: process.env.PI_SITE_OUTBOX_FILE,
+  PI_SITE_REPLIES_FILE: process.env.PI_SITE_REPLIES_FILE,
   PI_SITE_SESSION_NAME: process.env.PI_SITE_SESSION_NAME,
   PI_SITE_AGENT_SESSION_PREFIX: process.env.PI_SITE_AGENT_SESSION_PREFIX,
   PI_SITE_BROWSER_MESSAGE_HANDLER: process.env.PI_SITE_BROWSER_MESSAGE_HANDLER,
@@ -61,6 +67,50 @@ function tempSessionPath(): string {
   const dir = createTempDir("pi-agent-queue-runtime-session-");
   tempDirs.push(dir);
   return join(dir, "session.jsonl");
+}
+
+function configureQueueRuntimeEnv(overrides: {
+  automationActions?: string;
+  actionAgents?: Record<string, string>;
+} = {}): { inboxFile: string; outboxFile: string; repliesFile: string } {
+  const dir = runtimeStateDir();
+  const inboxFile = join(dir, "inbox.json");
+  const outboxFile = join(dir, "outbox.json");
+  const repliesFile = join(dir, "replies.json");
+
+  process.env.PI_SITE_AGENT_NAME = "steward";
+  process.env.PI_SITE_AUTOMATION_AGENT_NAME = "steward-maintainer";
+  process.env.PI_SITE_AUTOMATION_ACTIONS = overrides.automationActions ?? "maintenance-pulse,surface-review";
+  process.env.PI_SITE_ACTION_AGENTS = JSON.stringify(overrides.actionAgents ?? {});
+  process.env.PI_SITE_STATE_DIR = dir;
+  process.env.PI_SITE_INBOX_FILE = inboxFile;
+  process.env.PI_SITE_OUTBOX_FILE = outboxFile;
+  process.env.PI_SITE_REPLIES_FILE = repliesFile;
+  process.env.PI_SITE_SESSION_NAME = "pi-steward-control";
+
+  return { inboxFile, outboxFile, repliesFile };
+}
+
+function readMessages(path: string): SiteMessage[] {
+  if (!existsSync(path)) return [];
+  return JSON.parse(readFileSync(path, "utf-8")) as SiteMessage[];
+}
+
+function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+async function waitFor(predicate: () => boolean, timeoutMs = 500): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("timed out waiting for condition");
 }
 
 describe("pi-agent queue runtime routing", () => {
@@ -242,6 +292,71 @@ describe("pi-agent queue runtime routing", () => {
     expect(replyTextForRuntimeError(error)).toBe("I couldn't process that request right now. Please try again.");
   });
 
+  test("keeps same-route turns serialized while the active route is still in flight", async () => {
+    const files = configureQueueRuntimeEnv();
+    const first = makeMessage({ id: "msg_same_1", role: "user", source: "browser", content: "first" });
+    const second = makeMessage({ id: "msg_same_2", role: "user", source: "browser", content: "second" });
+    writeFileSync(files.inboxFile, `${JSON.stringify([first, second], null, 2)}\n`, "utf-8");
+
+    const firstReply = createDeferred<string>();
+    const secondReply = createDeferred<string>();
+    const started: string[] = [];
+
+    setMessageProcessorForTest(async (message) => {
+      started.push(message.id);
+      if (message.id === first.id) return await firstReply.promise;
+      if (message.id === second.id) return await secondReply.promise;
+      throw new Error(`unexpected message ${message.id}`);
+    });
+
+    await processInboxForTest();
+
+    expect(started).toEqual([first.id]);
+    expect(readMessages(files.inboxFile).map((message) => message.id)).toEqual([second.id]);
+
+    firstReply.resolve("first reply");
+    await waitFor(() => started.includes(second.id));
+    expect(readMessages(files.repliesFile).map((message) => message.content)).toEqual(["first reply"]);
+
+    secondReply.resolve("second reply");
+    await waitFor(() => readMessages(files.repliesFile).length === 2);
+    expect(readMessages(files.repliesFile).map((message) => message.content)).toEqual(["first reply", "second reply"]);
+  });
+
+  test("does not let a stalled automation route block a default human route", async () => {
+    const files = configureQueueRuntimeEnv({ actionAgents: { "maintenance-pulse": "steward-pulse" } });
+    const maintenance = makeMessage({ id: "msg_auto_1" });
+    const owner = makeMessage({
+      id: "msg_owner_1",
+      role: "user",
+      source: "browser",
+      content: "I want to track my weight daily",
+      actorId: "actor_owner",
+      actorLogin: "rhnvrm@github",
+    });
+    writeFileSync(files.inboxFile, `${JSON.stringify([maintenance, owner], null, 2)}\n`, "utf-8");
+
+    const maintenanceReply = createDeferred<string>();
+    const started: string[] = [];
+
+    setMessageProcessorForTest(async (message, routing) => {
+      started.push(`${message.id}:${routing.agentName}`);
+      if (routing.agentName === "steward-pulse") return await maintenanceReply.promise;
+      if (routing.agentName === "steward") return "owner reply";
+      throw new Error(`unexpected route ${routing.agentName}`);
+    });
+
+    await processInboxForTest();
+
+    await waitFor(() => readMessages(files.repliesFile).some((message) => message.content === "owner reply"));
+    expect(started).toEqual(["msg_auto_1:steward-pulse", "msg_owner_1:steward"]);
+    expect(readMessages(files.repliesFile).map((message) => message.content)).toEqual(["owner reply"]);
+
+    maintenanceReply.resolve("maintenance reply");
+    await waitFor(() => readMessages(files.repliesFile).length === 2);
+    expect(readMessages(files.repliesFile).map((message) => message.content)).toEqual(["owner reply", "maintenance reply"]);
+  });
+
   test("prefers the final_answer text from session output", () => {
     const tempDir = createTempDir("pi-agent-queue-runtime-");
     tempDirs.push(tempDir);
@@ -332,16 +447,24 @@ describe("pi-agent queue runtime routing", () => {
   });
 });
 
-afterAll(() => {
+afterEach(() => {
   setRuntimeBackendForTest(undefined);
+  setMessageProcessorForTest(undefined);
+  resetQueueRuntimeForTest();
   process.env.PI_SITE_AGENT_NAME = originalEnv.PI_SITE_AGENT_NAME;
   process.env.PI_SITE_AUTOMATION_AGENT_NAME = originalEnv.PI_SITE_AUTOMATION_AGENT_NAME;
   process.env.PI_SITE_AUTOMATION_ACTIONS = originalEnv.PI_SITE_AUTOMATION_ACTIONS;
   process.env.PI_SITE_ACTION_AGENTS = originalEnv.PI_SITE_ACTION_AGENTS;
   process.env.PI_SITE_STATE_DIR = originalEnv.PI_SITE_STATE_DIR;
+  process.env.PI_SITE_INBOX_FILE = originalEnv.PI_SITE_INBOX_FILE;
+  process.env.PI_SITE_OUTBOX_FILE = originalEnv.PI_SITE_OUTBOX_FILE;
+  process.env.PI_SITE_REPLIES_FILE = originalEnv.PI_SITE_REPLIES_FILE;
   process.env.PI_SITE_SESSION_NAME = originalEnv.PI_SITE_SESSION_NAME;
   process.env.PI_SITE_AGENT_SESSION_PREFIX = originalEnv.PI_SITE_AGENT_SESSION_PREFIX;
   process.env.PI_SITE_BROWSER_MESSAGE_HANDLER = originalEnv.PI_SITE_BROWSER_MESSAGE_HANDLER;
   process.env.PI_SITE_BROWSER_MESSAGE_HANDLER_TIMEOUT_MS = originalEnv.PI_SITE_BROWSER_MESSAGE_HANDLER_TIMEOUT_MS;
+});
+
+afterAll(() => {
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
 });

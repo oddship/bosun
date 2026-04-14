@@ -630,51 +630,101 @@ async function invokePersistentPi(content: string, routing: QueueRoutingDecision
   return `Steward runtime timed out waiting for a structured reply from '${routing.tmuxSessionName}' after ${REPLY_WAIT_TIMEOUT_MS}ms.`;
 }
 
-let busy = false;
+let inboxScanBusy = false;
+const inFlightRoutes = new Set<string>();
 const knownRoutes = new Map<string, QueueRoutingDecision>();
+let messageProcessorForTest: ((message: SiteMessage, routing: QueueRoutingDecision) => Promise<string>) | undefined;
 
 function rememberRoute(route: QueueRoutingDecision): void {
   knownRoutes.set(route.agentName, route);
   writeRuntimeState(Array.from(knownRoutes.values()));
 }
 
+function routeKey(routing: QueueRoutingDecision): string {
+  return routing.backendTarget?.trim() || routing.tmuxSessionName.trim() || routing.agentName.trim();
+}
+
+function appendReply(reply: SiteMessage): void {
+  const replies = readQueue(repliesPath());
+  replies.push(reply);
+  writeQueue(repliesPath(), replies);
+}
+
+async function replyForMessage(message: SiteMessage, routing: QueueRoutingDecision): Promise<string> {
+  if (messageProcessorForTest) {
+    return await messageProcessorForTest(message, routing);
+  }
+
+  const directReply = runBrowserMessageHandler(message);
+  if (directReply) {
+    return directReply;
+  }
+
+  return await invokePersistentPi(formatMessageForAgent(message), routing);
+}
+
+async function processMessage(message: SiteMessage, routing: QueueRoutingDecision, key: string): Promise<void> {
+  try {
+    const reply = await replyForMessage(message, routing);
+    appendReply(createReply(reply, message));
+  } catch (error) {
+    appendReply(createReply(replyTextForRuntimeError(error), message));
+  } finally {
+    inFlightRoutes.delete(key);
+    writeRuntimeState(Array.from(knownRoutes.values()));
+    void processInbox();
+  }
+}
+
 async function processInbox(): Promise<void> {
-  if (busy) return;
+  if (inboxScanBusy) return;
   ensureStateDir();
   const inbox = readQueue(inboxPath());
   if (inbox.length === 0) return;
 
-  busy = true;
-  writeQueue(inboxPath(), []);
+  inboxScanBusy = true;
 
   try {
-    const replies = readQueue(repliesPath());
+    const retained: SiteMessage[] = [];
     for (const message of inbox) {
       const routing = selectRoutingForMessage(message);
       rememberRoute(routing);
+      const key = routeKey(routing);
+      if (inFlightRoutes.has(key)) {
+        retained.push(message);
+        continue;
+      }
 
+      inFlightRoutes.add(key);
       console.log(
         `[pi-agent-queue-runtime] processing ${message.role} ${message.id} mode=${routing.mode} agent=${routing.agentName} runtime=${routing.tmuxSessionName} action=${routing.actionName || "-"}`,
       );
-
-      try {
-        const directReply = runBrowserMessageHandler(message);
-        if (directReply) {
-          replies.push(createReply(directReply, message));
-          continue;
-        }
-
-        replies.push(createReply(await invokePersistentPi(formatMessageForAgent(message), routing), message));
-      } catch (error) {
-        replies.push(createReply(replyTextForRuntimeError(error), message));
-      }
+      void processMessage(message, routing, key);
     }
 
-    writeQueue(repliesPath(), replies);
+    writeQueue(inboxPath(), retained);
     writeRuntimeState(Array.from(knownRoutes.values()));
   } finally {
-    busy = false;
+    inboxScanBusy = false;
   }
+}
+
+export function setMessageProcessorForTest(
+  processor?: (message: SiteMessage, routing: QueueRoutingDecision) => Promise<string>,
+): void {
+  messageProcessorForTest = processor;
+}
+
+export async function processInboxForTest(): Promise<void> {
+  await processInbox();
+}
+
+export function resetQueueRuntimeForTest(): void {
+  inboxScanBusy = false;
+  inFlightRoutes.clear();
+  knownRoutes.clear();
+  messageProcessorForTest = undefined;
+  agentRuntimeOptionsCache.clear();
 }
 
 export function startQueueRuntime(): void {
