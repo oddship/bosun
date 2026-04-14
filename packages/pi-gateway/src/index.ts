@@ -37,6 +37,7 @@ type SiteManifest = {
     automationAgentName?: string;
     automationActions?: string[];
     actionAgents?: Record<string, string>;
+    browserMessageHandler?: string;
     framedReplies?: boolean;
     resetOnStart?: boolean;
   };
@@ -1596,6 +1597,7 @@ function buildSiteMaintainerPrompt(site: SiteRegistration): string {
     "Prefer improving the site and its flows over relying on repeated generic chat when the user is interacting with the same workflow repeatedly.",
     "Ordinary browsing is navigation. Reserve structured or audited actions for meaningful product intents.",
     "The browser is not a mesh peer. The gateway hosts the site and mediates browser interactions for you.",
+    "Browser user turns delivered through the queue runtime may include a small metadata wrapper with message id, actor identity, visibility, and the raw user text. Use that metadata for privacy-sensitive or owner-specific decisions, but answer the human request rather than restating the wrapper.",
     packageSpecific,
   ];
 
@@ -1632,6 +1634,9 @@ function buildSiteRuntimeEnv(site: SiteRegistration, sessionName: string): strin
   const automationAgentName = site.manifest?.runtime?.automationAgentName || "";
   const automationActions = site.manifest?.runtime?.automationActions?.join(",") || "";
   const actionAgents = JSON.stringify(site.manifest?.runtime?.actionAgents || {});
+  const browserMessageHandler = site.manifest?.runtime?.browserMessageHandler
+    ? resolve(site.absDir, site.manifest.runtime.browserMessageHandler)
+    : "";
   return [
     `BOSUN_ROOT=${shellEscape(ROOT)}`,
     `BOSUN_PKG=${shellEscape(BOSUN_PKG)}`,
@@ -1646,6 +1651,7 @@ function buildSiteRuntimeEnv(site: SiteRegistration, sessionName: string): strin
     `PI_SITE_AUTOMATION_AGENT_NAME=${shellEscape(automationAgentName)}`,
     `PI_SITE_AUTOMATION_ACTIONS=${shellEscape(automationActions)}`,
     `PI_SITE_ACTION_AGENTS=${shellEscape(actionAgents)}`,
+    `PI_SITE_BROWSER_MESSAGE_HANDLER=${shellEscape(browserMessageHandler)}`,
     `PI_SITE_SYSTEM_PROMPT=${shellEscape(prompt)}`,
     `PI_SITE_INBOX_FILE=${shellEscape(siteInboxJsonPath(site))}`,
     `PI_SITE_OUTBOX_FILE=${shellEscape(siteOutboxJsonPath(site))}`,

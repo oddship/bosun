@@ -4,8 +4,10 @@ import { join } from "node:path";
 import type { ProcessBackend } from "../../pi-agents/src/backend";
 import {
   assistantReplyCountFromSession,
+  formatMessageForAgent,
   latestAssistantReplyFromSession,
   parseStructuredSiteAction,
+  runBrowserMessageHandler,
   selectRoutingForMessage,
   setRuntimeBackendForTest,
   waitForAgentSessionReadyForTest,
@@ -22,6 +24,7 @@ const originalEnv = {
   PI_SITE_STATE_DIR: process.env.PI_SITE_STATE_DIR,
   PI_SITE_SESSION_NAME: process.env.PI_SITE_SESSION_NAME,
   PI_SITE_AGENT_SESSION_PREFIX: process.env.PI_SITE_AGENT_SESSION_PREFIX,
+  PI_SITE_BROWSER_MESSAGE_HANDLER: process.env.PI_SITE_BROWSER_MESSAGE_HANDLER,
 };
 
 function makeMessage(overrides: Partial<SiteMessage> = {}): SiteMessage {
@@ -125,6 +128,70 @@ describe("pi-agent queue runtime routing", () => {
     expect(routing.tmuxSessionName).toBe("pi-steward-control-steward");
   });
 
+  test("formats browser user messages with actor metadata before agent delivery", () => {
+    const formatted = formatMessageForAgent(makeMessage({
+      role: "user",
+      source: "browser",
+      content: "I want to track my weight daily",
+      actorId: "actor_owner",
+      actorLogin: "rhnvrm@github",
+      visibility: "household",
+    }));
+
+    expect(formatted).toContain("Website user turn:");
+    expect(formatted).toContain('"type": "website-user-message"');
+    expect(formatted).toContain('"messageId": "msg_1"');
+    expect(formatted).toContain('"actorId": "actor_owner"');
+    expect(formatted).toContain('"actorLogin": "rhnvrm@github"');
+    expect(formatted).toContain('"visibility": "household"');
+    expect(formatted).toContain("User says:\n\nI want to track my weight daily");
+  });
+
+  test("leaves non-browser messages unchanged when formatting for agent delivery", () => {
+    const content = makeMessage().content;
+    expect(formatMessageForAgent(makeMessage())).toBe(content);
+  });
+
+  test("runs the configured browser message handler before agent delivery", () => {
+    const dir = createTempDir("pi-agent-queue-runtime-handler-");
+    tempDirs.push(dir);
+    const handlerPath = join(dir, "handler.js");
+    writeFileSync(handlerPath, [
+      'const handled = JSON.stringify({ handled: true, reply: "handled directly" });',
+      'process.stdout.write(`${handled}\\n`);',
+    ].join("\n"), "utf-8");
+
+    process.env.PI_SITE_BROWSER_MESSAGE_HANDLER = handlerPath;
+
+    const reply = runBrowserMessageHandler(makeMessage({
+      role: "user",
+      source: "browser",
+      content: "I want to track my weight daily",
+      actorId: "actor_owner",
+      actorLogin: "rhnvrm@github",
+      visibility: "household",
+    }));
+
+    expect(reply).toBe("handled directly");
+  });
+
+  test("falls back to the agent when the browser message handler declines", () => {
+    const dir = createTempDir("pi-agent-queue-runtime-handler-");
+    tempDirs.push(dir);
+    const handlerPath = join(dir, "handler.js");
+    writeFileSync(handlerPath, 'process.stdout.write(`${JSON.stringify({ handled: false })}\\n`);', "utf-8");
+
+    process.env.PI_SITE_BROWSER_MESSAGE_HANDLER = handlerPath;
+
+    const reply = runBrowserMessageHandler(makeMessage({
+      role: "user",
+      source: "browser",
+      content: "hello",
+    }));
+
+    expect(reply).toBeNull();
+  });
+
   test("prefers the final_answer text from session output", () => {
     const tempDir = createTempDir("pi-agent-queue-runtime-");
     tempDirs.push(tempDir);
@@ -224,5 +291,6 @@ afterAll(() => {
   process.env.PI_SITE_STATE_DIR = originalEnv.PI_SITE_STATE_DIR;
   process.env.PI_SITE_SESSION_NAME = originalEnv.PI_SITE_SESSION_NAME;
   process.env.PI_SITE_AGENT_SESSION_PREFIX = originalEnv.PI_SITE_AGENT_SESSION_PREFIX;
+  process.env.PI_SITE_BROWSER_MESSAGE_HANDLER = originalEnv.PI_SITE_BROWSER_MESSAGE_HANDLER;
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
 });

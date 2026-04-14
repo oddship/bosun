@@ -36,6 +36,11 @@ type AgentRuntimeOptions = {
   thinking?: string;
 };
 
+interface BrowserMessageHandlerResult {
+  handled?: boolean;
+  reply?: string;
+}
+
 type SessionTextPart = {
   type?: string;
   text?: string;
@@ -135,6 +140,16 @@ function configuredActionAgents(): Map<string, string> {
   }
 
   return routes;
+}
+
+function browserMessageHandlerPath(): string {
+  return process.env.PI_SITE_BROWSER_MESSAGE_HANDLER?.trim() || "";
+}
+
+function spawnEnvironment(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  );
 }
 
 function runtimeStatePath(): string {
@@ -266,6 +281,64 @@ export function parseStructuredSiteAction(content: string): StructuredSiteAction
   } catch {
     return null;
   }
+}
+
+export function formatMessageForAgent(message: SiteMessage): string {
+  if (message.role !== "user" || message.source !== "browser") return message.content;
+
+  return [
+    "Website user turn:",
+    JSON.stringify({
+      type: "website-user-message",
+      messageId: message.id,
+      role: message.role,
+      source: message.source,
+      ts: message.ts,
+      actorId: message.actorId || null,
+      actorLogin: message.actorLogin || null,
+      visibility: message.visibility || null,
+    }, null, 2),
+    "User says:",
+    message.content,
+  ].join("\n\n");
+}
+
+export function runBrowserMessageHandler(message: SiteMessage): string | null {
+  if (message.role !== "user" || message.source !== "browser") return null;
+  const handlerPath = browserMessageHandlerPath();
+  if (!handlerPath) return null;
+
+  const args = ["bun", handlerPath, "--message-id", message.id, "--content", message.content, "--ts", message.ts];
+  if (message.actorId) args.push("--actor-id", message.actorId);
+  if (message.actorLogin) args.push("--actor-login", message.actorLogin);
+  if (message.visibility) args.push("--visibility", message.visibility);
+
+  const result = Bun.spawnSync(args, {
+    cwd: ROOT,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: spawnEnvironment(),
+  });
+  const stdout = new TextDecoder().decode(result.stdout).trim();
+  const stderr = new TextDecoder().decode(result.stderr).trim();
+
+  if (result.exitCode !== 0) {
+    throw new Error(stderr || stdout || `browser message handler failed with exit code ${result.exitCode}`);
+  }
+  if (!stdout) return null;
+
+  let parsed: BrowserMessageHandlerResult;
+  try {
+    parsed = JSON.parse(stdout) as BrowserMessageHandlerResult;
+  } catch {
+    throw new Error(`browser message handler emitted invalid JSON: ${stdout}`);
+  }
+
+  if (!parsed.handled) return null;
+  if (typeof parsed.reply !== "string" || !parsed.reply.trim()) {
+    throw new Error("browser message handler reported handled=true without a reply");
+  }
+  return parsed.reply.trim();
 }
 
 export function selectRoutingForMessage(message: SiteMessage): QueueRoutingDecision {
@@ -557,7 +630,13 @@ async function processInbox(): Promise<void> {
       );
 
       try {
-        replies.push(createReply(await invokePersistentPi(message.content, routing), message));
+        const directReply = runBrowserMessageHandler(message);
+        if (directReply) {
+          replies.push(createReply(directReply, message));
+          continue;
+        }
+
+        replies.push(createReply(await invokePersistentPi(formatMessageForAgent(message), routing), message));
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         replies.push(createReply(`Steward runtime error: ${detail}`, message));
