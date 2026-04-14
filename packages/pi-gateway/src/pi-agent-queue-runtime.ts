@@ -52,6 +52,16 @@ class BrowserMessageHandlerError extends Error {
   }
 }
 
+class PersistentAgentSessionError extends Error {
+  readonly publicMessage: string;
+
+  constructor(message: string, publicMessage = "I couldn't process that request right now. Please try again.") {
+    super(message);
+    this.name = "PersistentAgentSessionError";
+    this.publicMessage = publicMessage;
+  }
+}
+
 type SessionTextPart = {
   type?: string;
   text?: string;
@@ -75,6 +85,8 @@ type RuntimeStateRecord = {
 type SessionReplySnapshot = {
   replyCount: number;
   latestReply: string | null;
+  errorCount: number;
+  latestError: string | null;
 };
 
 const ROOT = process.env.BOSUN_ROOT || process.cwd();
@@ -364,7 +376,9 @@ export function runBrowserMessageHandler(message: SiteMessage): string | null {
 }
 
 export function replyTextForRuntimeError(error: unknown): string {
-  if (error instanceof BrowserMessageHandlerError) return error.publicMessage;
+  if (error instanceof BrowserMessageHandlerError || error instanceof PersistentAgentSessionError) {
+    return error.publicMessage;
+  }
   const detail = error instanceof Error ? error.message : String(error);
   return `Steward runtime error: ${detail}`;
 }
@@ -421,10 +435,19 @@ function extractAssistantReply(parts: SessionTextPart[] | undefined): string | n
 }
 
 function sessionReplySnapshot(sessionPath: string): SessionReplySnapshot {
-  if (!existsSync(sessionPath)) return { replyCount: 0, latestReply: null };
+  if (!existsSync(sessionPath)) {
+    return {
+      replyCount: 0,
+      latestReply: null,
+      errorCount: 0,
+      latestError: null,
+    };
+  }
 
   let replyCount = 0;
   let latestReply: string | null = null;
+  let errorCount = 0;
+  let latestError: string | null = null;
 
   for (const line of readFileSync(sessionPath, "utf-8").split(/\r?\n/)) {
     if (!line.trim()) continue;
@@ -434,9 +457,18 @@ function sessionReplySnapshot(sessionPath: string): SessionReplySnapshot {
         message?: {
           role?: string;
           content?: SessionTextPart[];
+          stopReason?: string;
+          errorMessage?: string;
         };
       };
       if (event.type !== "message" || event.message?.role !== "assistant") continue;
+
+      if (event.message.stopReason === "error" && typeof event.message.errorMessage === "string" && event.message.errorMessage.trim()) {
+        errorCount += 1;
+        latestError = event.message.errorMessage.trim();
+        continue;
+      }
+
       const text = extractAssistantReply(event.message.content);
       if (!text) continue;
       replyCount += 1;
@@ -449,6 +481,8 @@ function sessionReplySnapshot(sessionPath: string): SessionReplySnapshot {
   return {
     replyCount,
     latestReply,
+    errorCount,
+    latestError,
   };
 }
 
@@ -588,13 +622,16 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
-async function waitForStructuredReply(routing: QueueRoutingDecision, baselineReplyCount: number): Promise<string | null> {
+async function waitForStructuredReply(routing: QueueRoutingDecision, baseline: SessionReplySnapshot): Promise<string | null> {
   const backend = runtimeBackend();
   const deadline = Date.now() + REPLY_WAIT_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
     const snapshot = sessionReplySnapshot(routing.sessionPath);
-    if (snapshot.replyCount > baselineReplyCount && snapshot.latestReply) {
+    if (snapshot.errorCount > baseline.errorCount && snapshot.latestError) {
+      throw new PersistentAgentSessionError(snapshot.latestError);
+    }
+    if (snapshot.replyCount > baseline.replyCount && snapshot.latestReply) {
       return snapshot.latestReply;
     }
 
@@ -619,7 +656,7 @@ async function invokePersistentPi(content: string, routing: QueueRoutingDecision
 
   const startedAt = Date.now();
   await dispatchToAgentSession(routing, content);
-  const reply = await waitForStructuredReply(routing, baseline.replyCount);
+  const reply = await waitForStructuredReply(routing, baseline);
   const durationMs = Date.now() - startedAt;
 
   console.log(

@@ -357,6 +357,42 @@ describe("pi-agent queue runtime routing", () => {
     expect(readMessages(files.repliesFile).map((message) => message.content)).toEqual(["owner reply", "maintenance reply"]);
   });
 
+  test("surfaces persistent agent session errors immediately as a safe reply", async () => {
+    const files = configureQueueRuntimeEnv();
+    const userMessage = makeMessage({
+      id: "msg_err_1",
+      role: "user",
+      source: "browser",
+      content: "hello",
+    });
+    writeFileSync(files.inboxFile, `${JSON.stringify([userMessage], null, 2)}\n`, "utf-8");
+
+    const sessionPath = join(process.env.PI_SITE_STATE_DIR!, "pi-agent-session.jsonl");
+    setRuntimeBackendForTest({
+      type: "tmux",
+      hasSession: async () => true,
+      sendText: async () => {
+        writeFileSync(sessionPath, `${JSON.stringify({
+          type: "message",
+          message: {
+            role: "assistant",
+            content: [],
+            stopReason: "error",
+            errorMessage: "No API key for provider: openai-codex",
+          },
+        })}\n`, "utf-8");
+      },
+      sendKey: async () => {},
+    } as unknown as ProcessBackend);
+
+    await processInboxForTest();
+    await waitFor(() => readMessages(files.repliesFile).length === 1);
+
+    expect(readMessages(files.repliesFile).map((message) => message.content)).toEqual([
+      "I couldn't process that request right now. Please try again.",
+    ]);
+  });
+
   test("prefers the final_answer text from session output", () => {
     const tempDir = createTempDir("pi-agent-queue-runtime-");
     tempDirs.push(tempDir);
