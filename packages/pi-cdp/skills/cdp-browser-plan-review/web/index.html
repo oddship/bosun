@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bosun Plan Review</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a1120;
+        --panel: #10192b;
+        --panel-2: #131f35;
+        --panel-3: #0d1526;
+        --surface: rgba(255, 255, 255, 0.04);
+        --surface-2: rgba(255, 255, 255, 0.06);
+        --border: #26385e;
+        --border-strong: #345180;
+        --text: #e8efff;
+        --muted: #9cb0db;
+        --accent: #8db6ff;
+        --accent-2: rgba(141, 182, 255, 0.18);
+        --good: #3fb950;
+        --warn: #f2cc60;
+        --bad: #ff7b72;
+        --shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+        --page-bg: #f8fbff;
+        --page-text: #182238;
+        --page-muted: #5f6f91;
+        --page-border: #dde7f6;
+        --page-border-strong: #c6d5ee;
+        --page-accent: #4678d7;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.55 Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      body {
+        overflow: hidden;
+      }
+
+      button, textarea, input {
+        font: inherit;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        height: 100dvh;
+        min-height: 100dvh;
+        overflow: hidden;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        padding: 18px 22px 14px;
+        background: rgba(8, 13, 24, 0.94);
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: blur(16px);
+      }
+
+      .title-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .meta {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .layout {
+        min-height: 0;
+        height: 100%;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr) 410px;
+      }
+
+      .panel {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        border-right: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .panel:last-child {
+        border-right: 0;
+        background: var(--panel-2);
+      }
+
+      .panel-scroll {
+        min-height: 0;
+        height: 100%;
+        overflow: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+
+      .panel-inner {
+        padding: 18px;
+      }
+
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .section-title {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .card,
+      .navigator-card,
+      .composer-card,
+      .thread-card,
+      .draft-card,
+      .activity-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .card-body,
+      .navigator-card,
+      .composer-card,
+      .thread-card,
+      .draft-card,
+      .activity-card {
+        padding: 14px;
+      }
+
+      .muted,
+      .queue-meta,
+      .nav-item-meta,
+      .stat-label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .meta-pill,
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1;
+      }
+
+      .meta-pill strong,
+      .pill strong {
+        color: var(--text);
+      }
+
+      .pill.accent { border-color: rgba(141, 182, 255, 0.35); color: var(--accent); }
+      .pill.good { border-color: rgba(63, 185, 80, 0.35); color: var(--good); }
+      .pill.warn { border-color: rgba(242, 204, 96, 0.35); color: var(--warn); }
+      .pill.bad { border-color: rgba(255, 123, 114, 0.35); color: var(--bad); }
+
+      .mode-buttons,
+      .button-row,
+      .footer-actions,
+      .composer-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: background 120ms ease, transform 120ms ease, border-color 120ms ease;
+      }
+
+      button:hover { transform: translateY(-1px); }
+
+      button.primary {
+        background: var(--accent);
+        color: #09111f;
+      }
+
+      button.secondary {
+        background: #22324f;
+        color: var(--text);
+      }
+
+      button.ghost {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+      }
+
+      button.danger {
+        background: rgba(255, 123, 114, 0.16);
+        color: var(--bad);
+        border: 1px solid rgba(255, 123, 114, 0.22);
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.18);
+        color: var(--text);
+        padding: 11px 12px;
+      }
+
+      textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .stat-card {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .stat-value {
+        margin-top: 6px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .nav-list,
+      .queue-list,
+      .activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .nav-item,
+      .queue-item {
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: transparent;
+        color: inherit;
+        padding: 10px 12px;
+      }
+
+      .nav-item.active,
+      .queue-item.active {
+        border-color: rgba(141, 182, 255, 0.55);
+        background: var(--accent-2);
+      }
+
+      .nav-item-title,
+      .queue-title {
+        font-weight: 600;
+      }
+
+      .document-panel {
+        background:
+          radial-gradient(circle at top, rgba(141, 182, 255, 0.08), transparent 30%),
+          var(--panel-3);
+      }
+
+      .document-wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 24px 120px;
+      }
+
+      .document-hero {
+        margin-bottom: 10px;
+        padding: 18px 20px;
+      }
+
+      .document-hero h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .document-hero p {
+        margin: 8px 0 0;
+        color: var(--muted);
+      }
+
+      .document-surface {
+        background: var(--page-bg);
+        color: var(--page-text);
+        border: 1px solid var(--page-border);
+        border-radius: 22px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+      }
+
+      .plan-article {
+        padding: 40px 46px 56px;
+      }
+
+      .plan-article a {
+        color: var(--page-accent);
+        text-decoration: none;
+      }
+
+      .plan-article a:hover {
+        text-decoration: underline;
+      }
+
+      .doc-anchor,
+      .doc-list-group {
+        scroll-margin-top: 96px;
+      }
+
+      .doc-anchor {
+        position: relative;
+        margin: 0;
+      }
+
+      .doc-anchor + .doc-anchor {
+        margin-top: 2px;
+      }
+
+      .doc-anchor-inner {
+        position: relative;
+        padding: 8px 46px 8px 12px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+      }
+
+      .doc-anchor:hover .doc-anchor-inner {
+        background: rgba(70, 120, 215, 0.04);
+        border-color: rgba(70, 120, 215, 0.12);
+      }
+
+      .doc-anchor.active .doc-anchor-inner {
+        background: rgba(70, 120, 215, 0.08);
+        border-color: rgba(70, 120, 215, 0.32);
+        box-shadow: 0 0 0 1px rgba(70, 120, 215, 0.08);
+      }
+
+      .doc-anchor.has-draft .doc-anchor-inner {
+        border-left: 3px solid rgba(242, 204, 96, 0.75);
+      }
+
+      .doc-anchor.has-thread .doc-anchor-inner {
+        border-right: 2px solid rgba(63, 185, 80, 0.45);
+      }
+
+      .doc-anchor.has-stale-thread .doc-anchor-inner {
+        box-shadow: inset 0 0 0 1px rgba(255, 123, 114, 0.18);
+      }
+
+      .doc-comment-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--page-border-strong);
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--page-muted);
+        font-size: 12px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .doc-anchor:hover .doc-comment-button,
+      .doc-anchor.active .doc-comment-button {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .doc-anchor-flags,
+      .doc-anchor-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .doc-anchor-flags {
+        margin-bottom: 8px;
+      }
+
+      .doc-anchor-summary {
+        margin-top: 10px;
+      }
+
+      .doc-flag,
+      .summary-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--page-border-strong);
+        background: #ffffff;
+        color: var(--page-muted);
+        font-size: 11px;
+        line-height: 1;
+      }
+
+      .doc-flag.good,
+      .summary-chip.good { color: #2f8655; border-color: rgba(63, 185, 80, 0.34); }
+      .doc-flag.warn,
+      .summary-chip.warn { color: #946f16; border-color: rgba(242, 204, 96, 0.4); }
+      .doc-flag.bad,
+      .summary-chip.bad { color: #b53f38; border-color: rgba(255, 123, 114, 0.34); }
+      .doc-flag.accent,
+      .summary-chip.accent { color: var(--page-accent); border-color: rgba(70, 120, 215, 0.25); }
+
+      .summary-chip {
+        cursor: pointer;
+      }
+
+      .doc-anchor-body {
+        color: var(--page-text);
+      }
+
+      .doc-anchor-body h1,
+      .doc-anchor-body h2,
+      .doc-anchor-body h3,
+      .doc-anchor-body h4,
+      .doc-anchor-body h5,
+      .doc-anchor-body h6 {
+        margin: 0;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+      }
+
+      .doc-anchor-body h1 { font-size: 2rem; }
+      .doc-anchor-body h2 { font-size: 1.55rem; }
+      .doc-anchor-body h3 { font-size: 1.28rem; }
+      .doc-anchor-body h4,
+      .doc-anchor-body h5,
+      .doc-anchor-body h6 { font-size: 1.05rem; }
+
+      .doc-anchor-body p,
+      .doc-anchor-body blockquote,
+      .doc-anchor-body pre,
+      .doc-anchor-body table,
+      .doc-anchor-body ul,
+      .doc-anchor-body ol {
+        margin: 0;
+      }
+
+      .doc-anchor-body p,
+      .doc-anchor-body li,
+      .doc-anchor-body td,
+      .doc-anchor-body th,
+      .doc-anchor-body blockquote {
+        font-size: 15px;
+      }
+
+      .doc-anchor-body code {
+        padding: 0.12rem 0.34rem;
+        border-radius: 6px;
+        background: rgba(24, 34, 56, 0.08);
+        font-size: 0.92em;
+      }
+
+      .doc-anchor-body pre {
+        padding: 16px 18px;
+        border-radius: 14px;
+        background: #0f1728;
+        color: #edf2ff;
+        border: 1px solid #23324f;
+        overflow: auto;
+      }
+
+      .doc-anchor-body pre code {
+        padding: 0;
+        background: transparent;
+        color: inherit;
+      }
+
+      .doc-anchor-body blockquote {
+        padding-left: 14px;
+        border-left: 3px solid rgba(70, 120, 215, 0.35);
+        color: #31456b;
+      }
+
+      .doc-anchor-body table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 2px;
+      }
+
+      .doc-anchor-body th,
+      .doc-anchor-body td {
+        border: 1px solid var(--page-border-strong);
+        padding: 8px 10px;
+        text-align: left;
+      }
+
+      .doc-list,
+      .doc-list.checklist {
+        margin: 0;
+        padding-left: 1.35rem;
+      }
+
+      .doc-list.checklist {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .doc-list > li + li,
+      .doc-list.checklist > li + li {
+        margin-top: 4px;
+      }
+
+      .doc-check-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .doc-checkbox {
+        color: var(--page-accent);
+        min-width: 18px;
+      }
+
+      .selected-preview {
+        border: 1px solid var(--page-border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.7);
+        padding: 14px;
+      }
+
+      .selected-preview .doc-anchor-body,
+      .selected-preview .doc-anchor-body p,
+      .selected-preview .doc-anchor-body li,
+      .selected-preview .doc-anchor-body td,
+      .selected-preview .doc-anchor-body th,
+      .selected-preview .doc-anchor-body blockquote {
+        font-size: 14px;
+      }
+
+      .right-rail {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        min-height: 0;
+        height: 100%;
+      }
+
+      .right-rail-scroll {
+        min-height: 0;
+        overflow: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+
+      .sticky-footer {
+        position: static;
+        z-index: 5;
+        padding: 16px 18px 18px;
+        border-top: 1px solid var(--border);
+        background: rgba(14, 22, 38, 0.96);
+        backdrop-filter: blur(14px);
+      }
+
+      .status {
+        margin-top: 10px;
+        color: var(--muted);
+        min-height: 20px;
+      }
+
+      .success { color: var(--good); }
+      .error { color: var(--bad); }
+      .empty { color: var(--muted); }
+
+      @media (max-width: 1400px) {
+        .layout {
+          grid-template-columns: 250px minmax(0, 1fr) 370px;
+        }
+      }
+
+      @media (max-width: 1120px) {
+        body {
+          overflow: auto;
+        }
+
+        .app {
+          height: auto;
+          min-height: 100vh;
+          overflow: visible;
+        }
+
+        .layout {
+          height: auto;
+          overflow: visible;
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .panel {
+          overflow: visible;
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .panel:last-child {
+          border-bottom: 0;
+        }
+
+        .panel-scroll,
+        .right-rail-scroll {
+          height: auto;
+          overflow: visible;
+          overscroll-behavior: auto;
+          scrollbar-gutter: auto;
+        }
+
+        .right-rail {
+          display: block;
+          height: auto;
+        }
+
+        .plan-article {
+          padding: 28px 22px 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="title-row">
+          <div>
+            <h1 class="title" id="title">Bosun Plan Review</h1>
+            <div class="subtitle" id="subtitle">Readable markdown review with inline comments.</div>
+          </div>
+        </div>
+        <div class="meta" id="meta"></div>
+      </header>
+
+      <main class="layout">
+        <section class="panel">
+          <div class="panel-scroll">
+            <div class="panel-inner stack" id="navigator-pane"></div>
+          </div>
+        </section>
+
+        <section class="panel document-panel">
+          <div class="panel-scroll">
+            <div class="document-wrap stack">
+              <div class="card document-hero" id="document-hero"></div>
+              <div class="document-surface">
+                <article class="plan-article" id="document-pane"></article>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="right-rail">
+            <div class="right-rail-scroll">
+              <div class="panel-inner stack" id="sidebar-pane"></div>
+            </div>
+            <div class="sticky-footer">
+              <div class="section-title">Decision</div>
+              <div class="stack">
+                <label>
+                  <div class="muted" style="margin-bottom: 6px;">Submission summary</div>
+                  <input id="summary-input" placeholder="Optional summary for the target agent" />
+                </label>
+                <div class="footer-actions">
+                  <button class="primary" id="submit-request-changes">Request Changes</button>
+                  <button class="secondary" id="submit-approve">Approve</button>
+                </div>
+                <label>
+                  <div class="muted" style="margin-bottom: 6px;">Reround summary</div>
+                  <input id="reround-summary-input" placeholder="Optional note for the next reround" />
+                </label>
+                <div class="footer-actions">
+                  <button class="ghost" id="publish-reround">Reload plan from disk</button>
+                </div>
+                <div class="status" id="status"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
