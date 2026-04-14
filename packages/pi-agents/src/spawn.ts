@@ -2,7 +2,7 @@
  * Core agent spawning logic.
  *
  * Resolves agent definitions, builds pi commands, and spawns
- * agents in tmux windows/sessions. No Pi ExtensionAPI dependency —
+ * agents in backend-managed windows/sessions. No Pi ExtensionAPI dependency —
  * can be called from daemon workflows, scripts, or any Node/Bun process.
  */
 
@@ -13,14 +13,11 @@ import { discoverAgents, type AgentDef } from "./agents.js";
 import { buildLaunchSpec } from "./launch.js";
 import { buildAgentEnv } from "./env.js";
 import {
-  isInTmux,
-  getTmuxSocket,
-  getTmuxSessionSync,
-  windowExists,
-  sessionExists,
-  newWindow,
-  newSession,
-} from "../../pi-tmux/core.ts";
+  BackendError,
+  createBackendContract,
+  type ProcessBackend,
+  type SpawnDetachedResult,
+} from "./backend.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,14 +38,16 @@ export interface SpawnAgentOptions {
   parentAgent?: string;
   /** Pre-loaded config. If omitted, loaded from cwd. */
   config?: AgentsConfig;
+  /** Optional backend contract override (tests/harness). */
+  backendContract?: ProcessBackend;
 }
 
 export interface SpawnAgentResult {
   /** Whether the spawn succeeded. */
   success: boolean;
-  /** The tmux window name used. */
+  /** Runtime display name used for the spawned agent target. */
   windowName: string;
-  /** The tmux session name (if spawned as a session). */
+  /** Session name used by the selected backend (when session-scoped). */
   sessionName?: string;
   /** Resolved model string (after tier mapping). */
   model?: string;
@@ -78,6 +77,54 @@ function getOwnPackagesDir(): { dir: string; valid: boolean } {
   return { dir, valid };
 }
 
+function npmPackageName(spec: string): string | null {
+  if (!spec.startsWith("npm:")) return null;
+  const body = spec.slice(4).trim();
+  if (!body) return null;
+
+  if (body.startsWith("@")) {
+    const slash = body.indexOf("/");
+    if (slash === -1) return body;
+    const versionAt = body.indexOf("@", slash + 1);
+    return versionAt === -1 ? body : body.slice(0, versionAt);
+  }
+
+  const versionAt = body.lastIndexOf("@");
+  return versionAt === -1 ? body : body.slice(0, versionAt);
+}
+
+function readConfiguredPackageSources(cwd: string): Map<string, string> {
+  const settingsPath = path.join(cwd, ".pi", "settings.json");
+  const configured = new Map<string, string>();
+  if (!fs.existsSync(settingsPath)) return configured;
+
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8")) as { packages?: unknown[] };
+    const piDir = path.join(cwd, ".pi");
+
+    for (const entry of Array.isArray(settings.packages) ? settings.packages : []) {
+      if (typeof entry !== "string") continue;
+
+      if (entry.startsWith("npm:")) {
+        const name = npmPackageName(entry);
+        if (name && !configured.has(name)) configured.set(name, entry);
+        continue;
+      }
+
+      const absPath = path.resolve(piDir, entry);
+      const packageName = path.basename(absPath);
+      if (!packageName || configured.has(packageName)) continue;
+      if (fs.existsSync(path.join(absPath, "package.json"))) {
+        configured.set(packageName, absPath);
+      }
+    }
+  } catch {
+    return configured;
+  }
+
+  return configured;
+}
+
 /**
  * Resolve extension paths for the pi command.
  * Returns [extensionFlags, skippedExtensions].
@@ -87,6 +134,7 @@ function resolveExtensions(
   cwd: string,
 ): { flags: string[]; skipped: string[] } {
   const { dir: ownPackagesDir, valid: ownPackagesValid } = getOwnPackagesDir();
+  const configuredPackageSources = readConfiguredPackageSources(cwd);
   const flags: string[] = [];
   const skipped: string[] = [];
 
@@ -94,6 +142,7 @@ function resolveExtensions(
     const localPath = path.join(cwd, "packages", ext);
     const nmPath = path.join(cwd, "node_modules", ext);
     const ownSiblingPath = path.join(ownPackagesDir, ext);
+    const configuredSource = configuredPackageSources.get(ext);
 
     if (fs.existsSync(path.join(localPath, "package.json"))) {
       flags.push("-e", localPath);
@@ -101,6 +150,8 @@ function resolveExtensions(
       flags.push("-e", nmPath);
     } else if (ownPackagesValid && fs.existsSync(path.join(ownSiblingPath, "package.json"))) {
       flags.push("-e", ownSiblingPath);
+    } else if (configuredSource) {
+      flags.push("-e", configuredSource);
     } else {
       skipped.push(ext);
     }
@@ -134,29 +185,37 @@ function buildExtensionList(agent: AgentDef): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Spawn a Pi agent in a tmux window or session.
- *
- * Resolves the agent definition, maps model tiers, builds the pi command,
- * and launches it via tmux. Can be called from anywhere — daemon workflows,
- * scripts, or Pi extensions.
- *
- * Requires the process to be running inside tmux.
+ * Spawn a Pi agent via the selected backend contract (tmux or zmux).
  */
 export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgentResult> {
   const { agent: agentName, task, cwd } = options;
   const windowName = options.name || agentName;
+  const config = options.config || loadConfig(cwd);
 
-  // Must be inside tmux
-  if (!isInTmux()) {
+  let backend: ProcessBackend;
+  try {
+    backend = options.backendContract || createBackendContract({
+      cwd,
+      backend: config.backend,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
       windowName,
       skippedExtensions: [],
-      error: "Not running inside tmux. Start with `just start` to use agent spawning.",
+      error: message,
     };
   }
 
-  const config = options.config || loadConfig(cwd);
+  if (backend.type === "tmux" && !backend.isInteractiveContext()) {
+    return {
+      success: false,
+      windowName,
+      skippedExtensions: [],
+      error: "Not running inside tmux. Start with `just start` to use tmux-backed agent spawning.",
+    };
+  }
 
   let agent: AgentDef;
   let resolvedModel: string | undefined;
@@ -173,30 +232,44 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
       error: `Agent '${agentName}' not found. Available: ${available.join(", ") || "(none)"}`,
     };
   }
+
   const wantsSession = options.session !== undefined && options.session !== false;
-  const targetSessionName = typeof options.session === "string"
+  const explicitSessionName = typeof options.session === "string"
     ? options.session
     : (wantsSession ? windowName : undefined);
 
-  const socket = getTmuxSocket();
-  const currentSession = getTmuxSessionSync({ socket });
+  const implicitSession = backend.currentSessionName()
+    || process.env.PI_BACKEND_SESSION
+    || process.env.PI_AGENT_NAME
+    || "bosun";
+  const targetSessionName = explicitSessionName || implicitSession;
 
-  // Check for conflicts
-  if (wantsSession && targetSessionName && sessionExists(targetSessionName, { socket })) {
+  try {
+    if (wantsSession && await backend.hasSession(targetSessionName)) {
+      return {
+        success: false,
+        windowName,
+        sessionName: targetSessionName,
+        skippedExtensions: [],
+        error: `Session '${targetSessionName}' already exists.`,
+      };
+    }
+
+    if (!wantsSession && await backend.hasWindow(windowName, { sessionName: targetSessionName })) {
+      return {
+        success: false,
+        windowName,
+        skippedExtensions: [],
+        error: `Window '${windowName}' already exists.`,
+      };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
       windowName,
-      sessionName: targetSessionName,
       skippedExtensions: [],
-      error: `Session '${targetSessionName}' already exists.`,
-    };
-  }
-  if (!wantsSession && windowExists(windowName, { socket, session: currentSession })) {
-    return {
-      success: false,
-      windowName,
-      skippedExtensions: [],
-      error: `Window '${windowName}' already exists.`,
+      error: message,
     };
   }
 
@@ -220,7 +293,6 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
   const rawCommand = config.backend.command_prefix
     ? `${config.backend.command_prefix} pi ${piArgsStr}`
     : `pi ${piArgsStr}`;
-  // Keep window open on failure for debugging
   const command = `${rawCommand}; EXIT=$?; if [ $EXIT -ne 0 ]; then echo "=== AGENT EXITED ($EXIT) ==="; sleep 30; fi`;
 
   const agentEnv = buildAgentEnv({
@@ -230,34 +302,46 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
     emoji: agent.emoji,
   });
 
-  // Spawn via tmux
-  const result = wantsSession
-    ? await newSession({
-        name: targetSessionName!,
-        windowName,
-        command,
-        socket,
-        cwd,
-        env: agentEnv,
-      })
-    : await newWindow({
-        name: windowName,
-        command,
-        socket,
-        session: currentSession,
-        background: true,
-        cwd,
-        env: agentEnv,
-      });
+  agentEnv.PI_RUNTIME_BACKEND = backend.type;
+  agentEnv.PI_BACKEND_SESSION = targetSessionName;
+  agentEnv.PI_BACKEND_TARGET = windowName;
 
-  if (result.code !== 0) {
+  let spawned: SpawnDetachedResult;
+  try {
+    spawned = await backend.spawnDetached({
+      createSession: wantsSession,
+      sessionName: targetSessionName,
+      windowName,
+      paneName: windowName,
+      command,
+      cwd,
+      env: agentEnv,
+      metadata: {
+        [`bosun.spawn.${windowName}.agent`]: agentName,
+        [`bosun.spawn.${windowName}.session`]: targetSessionName,
+      },
+    });
+
+    if (spawned.paneId) {
+      try {
+        await backend.writeMetadata(`bosun.identity.${windowName}.target`, spawned.paneId);
+      } catch {
+        // Best-effort metadata sync.
+      }
+    }
+  } catch (error) {
+    const backendError = error instanceof BackendError ? error : null;
+    const message = backendError
+      ? `${backend.type} error [${backendError.code}${backendError.backendCode ? `:${backendError.backendCode}` : ""}]: ${backendError.message}`
+      : (error instanceof Error ? error.message : String(error));
+
     return {
       success: false,
       windowName,
       sessionName: targetSessionName,
       model: resolvedModel,
       skippedExtensions,
-      error: `tmux error: ${result.stderr || result.stdout}`,
+      error: message,
     };
   }
 
@@ -269,12 +353,14 @@ export async function spawnAgent(options: SpawnAgentOptions): Promise<SpawnAgent
       child: windowName,
       agent: agentName,
       model: resolvedModel || null,
-      session: targetSessionName || undefined,
+      backend: backend.type,
+      session: targetSessionName,
+      target: spawned.paneId || spawned.target,
       ts: new Date().toISOString(),
     });
     fs.appendFileSync(treeFile, entry + "\n");
   } catch {
-    // Best-effort — don't fail the spawn if logging fails
+    // Best-effort — don't fail the spawn if logging fails.
   }
 
   return {

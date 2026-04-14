@@ -7,7 +7,7 @@ Agent identity, model tier resolution, and `spawn_agent` tool for [Pi](https://g
 - **Identity injection**: Reads `PI_AGENT` env var, loads the matching `.pi/agents/{name}.md` file, and injects the agent's persona into the system prompt via `before_agent_start`.
 - **Model tier resolution**: Maps tier names (`lite`, `medium`, `high`) from agent frontmatter to actual model strings defined in `.pi/agents.json`.
 - **Session tracking**: Writes `agent_identity` entries to session JSONL for daemon filtering and analytics.
-- **`spawn_agent` tool**: Launches new Pi agents in tmux windows with correct model, extensions, and environment variables.
+- **`spawn_agent` tool**: Launches new Pi agents via the configured backend (`tmux` default, `zmux` optional) with correct model, extensions, and environment variables.
 - **Agent discovery**: Scans `.pi/agents/` plus any additional `agentPaths` configured in `.pi/agents.json`.
 - **Bundled skill**: `meta-agent-creator` teaches agents how to create new agent definitions.
 
@@ -86,9 +86,17 @@ Extra directories to scan for agent `.md` files (relative to cwd or absolute). U
 
 Controls how `spawn_agent` launches processes:
 
-- `type`: `"tmux"` (only option today)
-- `socket`: Tmux socket path for `tmux -S`. Omit to auto-detect from `$TMUX`
+- `type`: `"tmux"` (default/reference) or `"zmux"`
 - `command_prefix`: Wraps spawned `pi` commands (e.g., sandbox script)
+
+When `type = "zmux"`, set at least one discovery input (fail-closed):
+
+- `state_dir` or `socket_path`
+- Optional transport fields: `transport`, `ssh_*`, `tcp_*`, `tls_*`
+
+tmux remains the default backend unless explicitly configured otherwise.
+
+See `designs/backend-parity-matrix.md` for dual-backend capability coverage and rollback notes.
 
 ## Environment variables
 
@@ -114,7 +122,7 @@ spawn_agent({ agent: "lite", task: "fix tests" })
   → resolves model: lite → <configured lite model>
   → reads extensions: pi-agents, pi-question
   → builds: [command_prefix] pi --no-extensions -e npm:pi-agents -e npm:pi-question --models <resolved-model> --thinking <level> 'fix tests'
-  → tmux -S <socket> new-window -d -n lite -e PI_AGENT=lite -e PI_AGENT_NAME=lite "<command>"
+  → backend.spawnDetached(...) creates a detached session/window/pane target
 ```
 
 ## License

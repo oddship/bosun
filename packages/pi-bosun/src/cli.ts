@@ -5,7 +5,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import { stdin, stdout, stderr, argv, exit } from "node:process";
-import { buildLaunchSpec, loadConfig } from "../../pi-agents/src/index.ts";
+import {
+  buildLaunchSpec,
+  createBackendContract,
+  loadConfig,
+  type ProcessBackend,
+} from "../../pi-agents/src/index.ts";
 
 function shellEscape(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -36,6 +41,15 @@ function findProjectRoot(startDir: string): string {
 
 function getTmuxSocket(projectRoot: string, bosunPkg: string): string {
   return execFileSync("bash", [path.join(bosunPkg, "scripts", "tmux-socket.sh"), projectRoot], { encoding: "utf-8" }).trim();
+}
+
+function resolveBackend(projectRoot: string, bosunPkg: string): ProcessBackend {
+  const config = loadConfig(projectRoot);
+  return createBackendContract({
+    cwd: projectRoot,
+    backend: config.backend,
+    tmuxSocket: config.backend.type === "tmux" ? getTmuxSocket(projectRoot, bosunPkg) : undefined,
+  });
 }
 
 function tmux(projectRoot: string, bosunPkg: string, args: string[], opts: { stdio?: "inherit" | "pipe" } = {}): string {
@@ -122,17 +136,28 @@ export function getStartSessionName(projectRoot: string): string {
   return spec.agentName;
 }
 
-function attachOrReport(projectRoot: string, bosunPkg: string, targetSession: string): void {
+async function attachOrReport(projectRoot: string, bosunPkg: string, targetSession: string): Promise<void> {
   if (!stdin.isTTY || !stdout.isTTY) {
     console.log(`Session ready: ${targetSession}`);
     console.log(`Attach interactively with: bosun attach ${targetSession}`);
     return;
   }
-  tmux(projectRoot, bosunPkg, ["attach", "-t", targetSession], { stdio: "inherit" });
+
+  const backend = resolveBackend(projectRoot, bosunPkg);
+  if (backend.type === "tmux") {
+    tmux(projectRoot, bosunPkg, ["attach", "-t", targetSession], { stdio: "inherit" });
+    return;
+  }
+
+  await backend.attachSession(targetSession, { stdio: "inherit" });
 }
 
-function sessionExists(projectRoot: string, bosunPkg: string, sessionName: string): boolean {
-  return tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", sessionName]);
+async function sessionExists(projectRoot: string, bosunPkg: string, sessionName: string): Promise<boolean> {
+  const backend = resolveBackend(projectRoot, bosunPkg);
+  if (backend.type === "tmux") {
+    return tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", sessionName]);
+  }
+  return backend.hasSession(sessionName);
 }
 
 function printUsage(): void {
@@ -169,13 +194,23 @@ function buildPiCommand(projectRoot: string, sessionName: string, promptArgs: st
   return keepAliveCommand(`cd ${shellEscape(projectRoot)} && ${env.join(" ")} ${args.map(shellEscape).join(" ")}`);
 }
 
-function listBosunSessions(projectRoot: string, bosunPkg: string): string[] {
+async function listBosunSessions(projectRoot: string, bosunPkg: string): Promise<string[]> {
+  const backend = resolveBackend(projectRoot, bosunPkg);
   try {
-    return tmux(projectRoot, bosunPkg, ["list-sessions", "-F", "#{session_name}"])
-      .split("\n")
-      .map((line) => line.trim())
+    if (backend.type === "tmux") {
+      return tmux(projectRoot, bosunPkg, ["list-sessions", "-F", "#{session_name}"])
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .filter((name) => name !== "bosun-daemon")
+        .filter((name) => name !== "bosun-gateway");
+    }
+
+    return (await backend.listSessionNames())
+      .map((name) => name.trim())
       .filter(Boolean)
-      .filter((name) => name !== "bosun-daemon");
+      .filter((name) => name !== "bosun-daemon")
+      .filter((name) => name !== "bosun-gateway");
   } catch {
     return [];
   }
@@ -207,6 +242,14 @@ function nextWindowName(projectRoot: string, bosunPkg: string, prefix: string): 
       if (name.trim()) existing.add(name.trim());
     }
   } catch {}
+  let n = 2;
+  while (existing.has(`${prefix}-${n}`)) n += 1;
+  return `${prefix}-${n}`;
+}
+
+async function nextBackendSessionName(backend: ProcessBackend, prefix: string): Promise<string> {
+  const existing = new Set(await backend.listSessionNames());
+  if (!existing.has(prefix)) return prefix;
   let n = 2;
   while (existing.has(`${prefix}-${n}`)) n += 1;
   return `${prefix}-${n}`;
@@ -252,6 +295,36 @@ function ensureDaemon(projectRoot: string, bosunPkg: string): void {
   tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_ROOT", projectRoot], { stdio: "inherit" });
 }
 
+function ensureGateway(projectRoot: string, bosunPkg: string): void {
+  const gatewayConfig = path.join(projectRoot, ".pi", "pi-gateway.json");
+  if (!fs.existsSync(gatewayConfig)) return;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(gatewayConfig, "utf-8")) as { enabled?: boolean; autoStart?: boolean };
+    if (!parsed.enabled || parsed.autoStart === false) return;
+  } catch {
+    return;
+  }
+
+  if (tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-gateway"])) return;
+
+  if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
+    checkSandboxVersion(projectRoot, bosunPkg, "2");
+    tmux(projectRoot, bosunPkg, [
+      "new-session", "-d", "-s", "bosun-gateway", "-n", "gateway",
+      `/bin/sh -c ${shellEscape(`cd ${shellEscape(projectRoot)} && bun ${shellEscape(path.join(bosunPkg, "packages", "pi-gateway", "src", "index.ts"))}; sleep 300`)}`,
+    ], { stdio: "inherit" });
+  } else {
+    execFileSync(path.join(bosunPkg, "scripts", "sandbox.sh"), [
+      "tmux", "-S", getTmuxSocket(projectRoot, bosunPkg), "-f", path.join(bosunPkg, "config", "tmux.conf"),
+      "new-session", "-d", "-s", "bosun-gateway", "-n", "gateway",
+      `/bin/sh -c ${shellEscape(`cd ${shellEscape(projectRoot)} && bun ${shellEscape(path.join(bosunPkg, "packages", "pi-gateway", "src", "index.ts"))}; sleep 300`)}`,
+    ], { stdio: "inherit" });
+    tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "2"], { stdio: "inherit" });
+  }
+
+  tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_ROOT", projectRoot], { stdio: "inherit" });
+}
+
 function runBosunScript(projectRoot: string, bosunPkg: string, scriptPath: string, extraArgs: string[] = []): void {
   execFileSync("bun", [scriptPath, ...extraArgs], {
     cwd: projectRoot,
@@ -263,81 +336,148 @@ function runBosunScript(projectRoot: string, bosunPkg: string, scriptPath: strin
 async function cmdStart(projectRoot: string, bosunPkg: string, opts: { sandboxed: boolean; promptArgs: string[] }): Promise<void> {
   ensureConfig(projectRoot, bosunPkg);
   ensureDirs(projectRoot);
-  checkInsideTmux(projectRoot, bosunPkg);
+
+  const backend = resolveBackend(projectRoot, bosunPkg);
+  if (backend.type === "tmux") {
+    checkInsideTmux(projectRoot, bosunPkg);
+  }
 
   const targetSession = getStartSessionName(projectRoot);
   const config = loadConfig(projectRoot);
   const spec = buildLaunchSpec(projectRoot, { config });
 
-  if (tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", targetSession])) {
-    if (opts.sandboxed) checkSandboxVersion(projectRoot, bosunPkg, "2");
+  if (await backend.hasSession(targetSession)) {
+    if (backend.type === "tmux" && opts.sandboxed) checkSandboxVersion(projectRoot, bosunPkg, "2");
     console.log(`Attaching to existing session '${targetSession}'...`);
-    attachOrReport(projectRoot, bosunPkg, targetSession);
+    await attachOrReport(projectRoot, bosunPkg, targetSession);
     return;
   }
 
   const command = buildPiCommand(projectRoot, targetSession, opts.promptArgs, spec);
-  if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
-    if (opts.sandboxed) checkSandboxVersion(projectRoot, bosunPkg, "2");
-    tmux(projectRoot, bosunPkg, ["new-session", "-d", "-s", targetSession, "-n", targetSession, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
-  } else if (opts.sandboxed) {
-    execFileSync(path.join(bosunPkg, "scripts", "sandbox.sh"), [
-      "tmux", "-S", getTmuxSocket(projectRoot, bosunPkg), "-f", path.join(bosunPkg, "config", "tmux.conf"),
-      "new-session", "-d", "-s", targetSession, "-n", targetSession, `/bin/sh -c ${shellEscape(command)}`,
-    ], { stdio: "inherit" });
-    tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "2"], { stdio: "inherit" });
+  if (backend.type === "tmux") {
+    if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
+      if (opts.sandboxed) checkSandboxVersion(projectRoot, bosunPkg, "2");
+      tmux(projectRoot, bosunPkg, ["new-session", "-d", "-s", targetSession, "-n", targetSession, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
+    } else if (opts.sandboxed) {
+      execFileSync(path.join(bosunPkg, "scripts", "sandbox.sh"), [
+        "tmux", "-S", getTmuxSocket(projectRoot, bosunPkg), "-f", path.join(bosunPkg, "config", "tmux.conf"),
+        "new-session", "-d", "-s", targetSession, "-n", targetSession, `/bin/sh -c ${shellEscape(command)}`,
+      ], { stdio: "inherit" });
+      tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "2"], { stdio: "inherit" });
+    } else {
+      tmux(projectRoot, bosunPkg, ["-f", path.join(bosunPkg, "config", "tmux.conf"), "new-session", "-d", "-s", targetSession, "-n", targetSession, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
+      tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "1"], { stdio: "inherit" });
+    }
+
+    setTmuxEnv(projectRoot, bosunPkg, spec.agentName);
+    if (opts.sandboxed) {
+      ensureDaemon(projectRoot, bosunPkg);
+      ensureGateway(projectRoot, bosunPkg);
+    }
   } else {
-    tmux(projectRoot, bosunPkg, ["-f", path.join(bosunPkg, "config", "tmux.conf"), "new-session", "-d", "-s", targetSession, "-n", targetSession, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
-    tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "1"], { stdio: "inherit" });
+    await backend.startServer();
+    await backend.spawnDetached({
+      createSession: true,
+      sessionName: targetSession,
+      windowName: targetSession,
+      paneName: targetSession,
+      command,
+      cwd: projectRoot,
+      env: {
+        BOSUN_ROOT: projectRoot,
+        BOSUN_WORKSPACE: path.join(projectRoot, "workspace"),
+        PI_CODING_AGENT_DIR: path.join(projectRoot, ".bosun-home", ".pi", "agent"),
+        PI_AGENT: spec.agentName,
+        PI_AGENT_NAME: targetSession,
+        PI_RUNTIME_BACKEND: backend.type,
+        PI_BACKEND_SESSION: targetSession,
+      },
+      metadata: {
+        "bosun.default_agent": spec.agentName,
+      },
+    });
+
+    if (opts.sandboxed) {
+      console.log("Note: daemon/gateway auto-start remains tmux-only in dual-backend mode.");
+    }
   }
 
-  setTmuxEnv(projectRoot, bosunPkg, spec.agentName);
-  if (opts.sandboxed) ensureDaemon(projectRoot, bosunPkg);
-  attachOrReport(projectRoot, bosunPkg, targetSession);
+  await attachOrReport(projectRoot, bosunPkg, targetSession);
 }
 
-function cmdRun(projectRoot: string, bosunPkg: string, args: string[], flags: { window: boolean }): void {
+async function cmdRun(projectRoot: string, bosunPkg: string, args: string[], flags: { window: boolean }): Promise<void> {
   ensureConfig(projectRoot, bosunPkg);
   ensureDirs(projectRoot);
   const config = loadConfig(projectRoot);
   const spec = buildLaunchSpec(projectRoot, { config });
+  const backend = resolveBackend(projectRoot, bosunPkg);
 
-  if (flags.window) {
-    const sessionName = getGlobalEnv(projectRoot, bosunPkg, "BOSUN_DEFAULT_AGENT") || spec.agentName;
-    const windowName = nextWindowName(projectRoot, bosunPkg, sessionName);
-    const command = buildPiCommand(projectRoot, windowName, args, spec);
-    tmux(projectRoot, bosunPkg, ["new-window", "-n", windowName, "-c", projectRoot, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
+  if (backend.type === "tmux") {
+    if (flags.window) {
+      const sessionName = getGlobalEnv(projectRoot, bosunPkg, "BOSUN_DEFAULT_AGENT") || spec.agentName;
+      const windowName = nextWindowName(projectRoot, bosunPkg, sessionName);
+      const command = buildPiCommand(projectRoot, windowName, args, spec);
+      tmux(projectRoot, bosunPkg, ["new-window", "-n", windowName, "-c", projectRoot, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
+      return;
+    }
+
+    const sessionName = nextSessionName(projectRoot, bosunPkg, spec.agentName);
+    const command = buildPiCommand(projectRoot, sessionName, args, spec);
+    if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
+      checkSandboxVersion(projectRoot, bosunPkg, "2");
+      tmux(projectRoot, bosunPkg, ["new-session", "-d", "-s", sessionName, "-n", sessionName, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
+    } else {
+      execFileSync(path.join(bosunPkg, "scripts", "sandbox.sh"), [
+        "tmux", "-S", getTmuxSocket(projectRoot, bosunPkg), "-f", path.join(bosunPkg, "config", "tmux.conf"),
+        "new-session", "-d", "-s", sessionName, "-n", sessionName, `/bin/sh -c ${shellEscape(command)}`,
+      ], { stdio: "inherit" });
+      tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "2"], { stdio: "inherit" });
+    }
+    setTmuxEnv(projectRoot, bosunPkg, spec.agentName);
+    await attachOrReport(projectRoot, bosunPkg, sessionName);
     return;
   }
 
-  const sessionName = nextSessionName(projectRoot, bosunPkg, spec.agentName);
-  const command = buildPiCommand(projectRoot, sessionName, args, spec);
-  if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
-    checkSandboxVersion(projectRoot, bosunPkg, "2");
-    tmux(projectRoot, bosunPkg, ["new-session", "-d", "-s", sessionName, "-n", sessionName, `/bin/sh -c ${shellEscape(command)}`], { stdio: "inherit" });
-  } else {
-    execFileSync(path.join(bosunPkg, "scripts", "sandbox.sh"), [
-      "tmux", "-S", getTmuxSocket(projectRoot, bosunPkg), "-f", path.join(bosunPkg, "config", "tmux.conf"),
-      "new-session", "-d", "-s", sessionName, "-n", sessionName, `/bin/sh -c ${shellEscape(command)}`,
-    ], { stdio: "inherit" });
-    tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "2"], { stdio: "inherit" });
+  if (flags.window) {
+    throw new Error("--window is currently only supported with backend.type=tmux.");
   }
-  setTmuxEnv(projectRoot, bosunPkg, spec.agentName);
-  attachOrReport(projectRoot, bosunPkg, sessionName);
+
+  const sessionName = await nextBackendSessionName(backend, spec.agentName);
+  const command = buildPiCommand(projectRoot, sessionName, args, spec);
+  await backend.startServer();
+  await backend.spawnDetached({
+    createSession: true,
+    sessionName,
+    windowName: sessionName,
+    paneName: sessionName,
+    command,
+    cwd: projectRoot,
+    env: {
+      BOSUN_ROOT: projectRoot,
+      BOSUN_WORKSPACE: path.join(projectRoot, "workspace"),
+      PI_CODING_AGENT_DIR: path.join(projectRoot, ".bosun-home", ".pi", "agent"),
+      PI_AGENT: spec.agentName,
+      PI_AGENT_NAME: sessionName,
+      PI_RUNTIME_BACKEND: backend.type,
+      PI_BACKEND_SESSION: sessionName,
+    },
+  });
+  await attachOrReport(projectRoot, bosunPkg, sessionName);
 }
 
 async function cmdAttach(projectRoot: string, bosunPkg: string, session?: string): Promise<void> {
   if (session) {
-    if (!sessionExists(projectRoot, bosunPkg, session)) {
+    if (!await sessionExists(projectRoot, bosunPkg, session)) {
       throw new Error(`Session '${session}' not found`);
     }
-    attachOrReport(projectRoot, bosunPkg, session);
+    await attachOrReport(projectRoot, bosunPkg, session);
     return;
   }
 
-  const sessions = listBosunSessions(projectRoot, bosunPkg);
+  const sessions = await listBosunSessions(projectRoot, bosunPkg);
   if (sessions.length === 0) {
-    if (tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-daemon"])) {
+    const backend = resolveBackend(projectRoot, bosunPkg);
+    if (backend.type === "tmux" && tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-daemon"])) {
       console.log("No agent sessions running (daemon is active). Starting one...");
       await cmdStart(projectRoot, bosunPkg, { sandboxed: true, promptArgs: [] });
       return;
@@ -346,7 +486,7 @@ async function cmdAttach(projectRoot: string, bosunPkg: string, session?: string
   }
 
   if (sessions.length === 1) {
-    attachOrReport(projectRoot, bosunPkg, sessions[0]);
+    await attachOrReport(projectRoot, bosunPkg, sessions[0]);
     return;
   }
 
@@ -365,32 +505,53 @@ async function cmdAttach(projectRoot: string, bosunPkg: string, session?: string
   const pick = Number(answer || "1");
   const target = sessions[pick - 1];
   if (!target) throw new Error("Invalid selection");
-  attachOrReport(projectRoot, bosunPkg, target);
+  await attachOrReport(projectRoot, bosunPkg, target);
 }
 
-function cmdStop(projectRoot: string, bosunPkg: string): void {
-  const sessions = listBosunSessions(projectRoot, bosunPkg);
-  if (sessions.length === 0 && !tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-daemon"])) {
+async function cmdStop(projectRoot: string, bosunPkg: string): Promise<void> {
+  const backend = resolveBackend(projectRoot, bosunPkg);
+  const sessions = await listBosunSessions(projectRoot, bosunPkg);
+
+  if (backend.type === "tmux") {
+    if (sessions.length === 0 && !tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-daemon"])) {
+      console.log("No agent sessions running");
+      return;
+    }
+
+    const pids = tmux(projectRoot, bosunPkg, ["list-panes", "-a", "-F", "#{pane_pid}"])
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    try {
+      tmux(projectRoot, bosunPkg, ["kill-server"], { stdio: "inherit" });
+    } catch {}
+
+    execFileSync("bash", ["-lc", "sleep 1"], { stdio: "inherit" });
+    for (const pid of pids) {
+      try {
+        process.kill(Number(pid), 0);
+        console.log(`Cleaning up orphan process ${pid}`);
+        process.kill(Number(pid), "SIGTERM");
+      } catch {}
+    }
+    console.log("Stopped.");
+    return;
+  }
+
+  if (sessions.length === 0) {
     console.log("No agent sessions running");
     return;
   }
 
-  const pids = tmux(projectRoot, bosunPkg, ["list-panes", "-a", "-F", "#{pane_pid}"])
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  try {
-    tmux(projectRoot, bosunPkg, ["kill-server"], { stdio: "inherit" });
-  } catch {}
-
-  execFileSync("bash", ["-lc", "sleep 1"], { stdio: "inherit" });
-  for (const pid of pids) {
+  for (const sessionName of sessions) {
     try {
-      process.kill(Number(pid), 0);
-      console.log(`Cleaning up orphan process ${pid}`);
-      process.kill(Number(pid), "SIGTERM");
-    } catch {}
+      await backend.killSession(sessionName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`Failed to stop ${sessionName}: ${message}`);
+    }
   }
+
   console.log("Stopped.");
 }
 
@@ -409,14 +570,14 @@ async function main(): Promise<void> {
         return;
       case "run": {
         const window = rest.includes("--window");
-        cmdRun(projectRoot, bosunPkg, rest.filter((arg) => arg !== "--window"), { window });
+        await cmdRun(projectRoot, bosunPkg, rest.filter((arg) => arg !== "--window"), { window });
         return;
       }
       case "attach":
         await cmdAttach(projectRoot, bosunPkg, rest[0]);
         return;
       case "stop":
-        cmdStop(projectRoot, bosunPkg);
+        await cmdStop(projectRoot, bosunPkg);
         return;
       case "init":
         runBosunScript(projectRoot, bosunPkg, path.join(bosunPkg, "scripts", "init.ts"), rest);

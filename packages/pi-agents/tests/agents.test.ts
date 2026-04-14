@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
 import { discoverAgents, findAgentFile, loadAgent, resolveAgentFile } from "../src/agents.js";
+import { createTempDir } from "./temp-dir";
 
 describe("discoverAgents", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-agents-test-"));
+    tmpDir = createTempDir("pi-agents-test-");
   });
 
   afterEach(() => {
@@ -70,7 +70,7 @@ describe("findAgentFile", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-agents-test-"));
+    tmpDir = createTempDir("pi-agents-test-");
   });
 
   afterEach(() => {
@@ -126,7 +126,7 @@ describe("resolveAgentFile", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-agents-test-"));
+    tmpDir = createTempDir("pi-agents-test-");
   });
 
   afterEach(() => {
@@ -160,7 +160,7 @@ describe("loadAgent", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-agents-test-"));
+    tmpDir = createTempDir("pi-agents-test-");
   });
 
   afterEach(() => {

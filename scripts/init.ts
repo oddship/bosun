@@ -292,6 +292,37 @@ writeJson("settings.json", {
   ...(projectPiDefaults.defaultThinkingLevel ? { defaultThinkingLevel: projectPiDefaults.defaultThinkingLevel } : {}),
 });
 
+const configuredBackendType = backend.type === "zmux" ? "zmux" : "tmux";
+const generatedBackendConfig: Record<string, unknown> = {
+  type: configuredBackendType,
+  command_prefix: backend.command_prefix || (isDependencyMode ? "node_modules/bosun/scripts/sandbox.sh" : "scripts/sandbox.sh"),
+};
+
+if (configuredBackendType === "zmux") {
+  for (const key of [
+    "binary",
+    "state_dir",
+    "socket_path",
+    "transport",
+    "ssh_host",
+    "ssh_user",
+    "ssh_port",
+    "ssh_command",
+    "ssh_bootstrap_timeout_ms",
+    "tcp_host",
+    "tcp_port",
+    "tls_server_name",
+    "tls_ca_cert",
+    "tls_client_cert",
+    "tls_client_key",
+    "tls_transport_version",
+  ]) {
+    if (backend[key] !== undefined && backend[key] !== "") {
+      generatedBackendConfig[key] = backend[key];
+    }
+  }
+}
+
 writeJson("agents.json", {
   models: {
     lite: models.lite || "openai-codex/gpt-5.4-mini",
@@ -304,11 +335,7 @@ writeJson("agents.json", {
     ...(Array.isArray(agents.extra_paths) ? agents.extra_paths : []),
     ...discoveredAgentPaths,
   ],
-  backend: {
-    type: backend.type || "tmux",
-    ...(backend.socket ? { socket: backend.socket } : {}),
-    command_prefix: backend.command_prefix || (isDependencyMode ? "node_modules/bosun/scripts/sandbox.sh" : "scripts/sandbox.sh"),
-  },
+  backend: generatedBackendConfig,
 });
 
 // --- .pi/prompts/spawn.md (generated from agent definitions) ---
@@ -493,6 +520,16 @@ const q = (config.q as Record<string, unknown>) || {};
 
 writeJson("pi-q.json", {
   data_dir: q.data_dir || "workspace/users",
+});
+
+// --- pi-gateway.json ---
+const gateway = (config.gateway as Record<string, unknown>) || {};
+
+writeJson("pi-gateway.json", {
+  enabled: gateway.enabled ?? false,
+  host: gateway.host || "127.0.0.1",
+  port: gateway.port || 3100,
+  autoStart: gateway.auto_start ?? true,
 });
 
 // --- pi-memory.json ---

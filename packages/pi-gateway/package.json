@@ -1,0 +1,26 @@
+{
+  "name": "pi-gateway",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Localhost web gateway for interactive pi.sites surfaces",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oddship/bosun",
+    "directory": "packages/pi-gateway"
+  },
+  "bin": {
+    "pi-gateway": "./src/index.ts"
+  },
+  "pi": {
+    "sites": {
+      "dashboard": {
+        "dir": "./sites/dashboard"
+      },
+      "agent-console": {
+        "dir": "./sites/agent-console"
+      }
+    }
+  }
+}

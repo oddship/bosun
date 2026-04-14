@@ -50,9 +50,28 @@ default_agent = "bosun"
 # =============================================================================
 
 [backend]
+# Supported values: "tmux" (default/reference) or "zmux"
 type = "tmux"
-# socket is auto-detected from $TMUX env or computed by scripts/tmux-socket.sh
+# tmux socket is auto-detected from $TMUX env or computed by scripts/tmux-socket.sh
 command_prefix = "scripts/sandbox.sh"
+
+# --- zmux optional configuration (used only when backend.type = "zmux") ---
+# binary = "zmux"
+# state_dir = "~/.local/state/zmux"      # required unless socket_path is set
+# socket_path = "~/.local/state/zmux/zmux.sock"
+# transport = "local"                     # local | ssh | tcp-tls
+# ssh_host = "example.com"
+# ssh_user = "you"
+# ssh_port = 22
+# ssh_command = "ssh"
+# ssh_bootstrap_timeout_ms = 12000
+# tcp_host = "127.0.0.1"
+# tcp_port = 18888
+# tls_server_name = "zmux.local"
+# tls_ca_cert = "/path/to/ca.pem"
+# tls_client_cert = "/path/to/client.pem"
+# tls_client_key = "/path/to/client-key.pem"
+# tls_transport_version = 1
 
 # =============================================================================
 # Environment Variables (passed into bwrap sandbox)
@@ -122,6 +141,19 @@ heartbeat_interval_seconds = 30
 log_level = "info"
 # Workflows are auto-discovered from packages/*/workflows/, .pi/workflows/,
 # and workspace/workflows/. No manual rules or watchers needed.
+
+# =============================================================================
+# Gateway (pi-gateway)
+# =============================================================================
+# Opt-in localhost gateway for interactive pi.sites surfaces.
+# Package site discovery is runtime-driven via package metadata (`pi.sites`),
+# not configured manually here.
+
+[gateway]
+enabled = false
+host = "127.0.0.1"
+port = 3100
+auto_start = true
 
 # =============================================================================
 # Mesh Coordination (pi-mesh)

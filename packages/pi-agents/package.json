@@ -18,7 +18,8 @@
     "./config": "./src/config.ts",
     "./template": "./src/template.ts",
     "./spawn": "./src/spawn.ts",
-    "./launch": "./src/launch.ts"
+    "./launch": "./src/launch.ts",
+    "./backend": "./src/backend.ts"
   },
   "pi": {
     "extensions": [

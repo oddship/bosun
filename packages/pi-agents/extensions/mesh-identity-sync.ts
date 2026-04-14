@@ -1,39 +1,21 @@
 /**
  * Mesh Identity Sync — lifecycle hooks for pi-mesh.
  *
- * Keeps the agent's runtime identity (PI_AGENT_NAME) in sync across
- * three surfaces: Pi UI, mesh peer registry, and tmux window name.
- *
- * Configured via the `identitySync` key in .pi/pi-mesh.json:
- *
- *   {
- *     "identitySync": {
- *       "enabled": true,
- *       "startupAlign": true,
- *       "meshToTmux": true,
- *       "tmuxToMesh": true,
- *       "pollIntervalMs": 2000
- *     }
- *   }
- *
- * Loaded by pi-mesh via hooksModule in the same config file.
+ * Keeps runtime identity (PI_AGENT_NAME) in sync across
+ * Pi UI, mesh peer registry, and the selected runtime backend.
  */
 
-import { readFileSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type {
   MeshConfig,
-  MeshState,
   MeshLifecycleHooks,
-  HookActions,
+  MeshState,
 } from "pi-mesh/types.js";
-import type { RenameResult } from "pi-mesh/registry.js";
-import {
-  isInTmux,
-  getWindowName,
-  renameWindow,
-} from "../../pi-tmux/core.ts";
+import { isInTmux } from "../../pi-tmux/core.ts";
+import { createBackendContract, type BackendEntityKind, type ProcessBackend } from "../src/backend.js";
+import { loadConfig } from "../src/config.js";
 
 // =============================================================================
 // Identity Sync Config
@@ -56,35 +38,35 @@ const DEFAULTS: IdentitySyncConfig = {
 };
 
 function loadIdentitySyncConfig(): IdentitySyncConfig {
-  // Walk up to find .pi/pi-mesh.json
   let dir = process.cwd();
   while (true) {
     const candidate = join(dir, ".pi", "pi-mesh.json");
     if (existsSync(candidate)) {
       try {
         const raw = JSON.parse(readFileSync(candidate, "utf-8"));
-        const is = raw?.identitySync;
-        if (is && typeof is === "object") {
+        const sync = raw?.identitySync;
+        if (sync && typeof sync === "object") {
           return {
-            enabled: typeof is.enabled === "boolean" ? is.enabled : DEFAULTS.enabled,
-            startupAlign: typeof is.startupAlign === "boolean" ? is.startupAlign : DEFAULTS.startupAlign,
-            meshToTmux: typeof is.meshToTmux === "boolean" ? is.meshToTmux : DEFAULTS.meshToTmux,
-            tmuxToMesh: typeof is.tmuxToMesh === "boolean" ? is.tmuxToMesh : DEFAULTS.tmuxToMesh,
-            pollIntervalMs:
-              typeof is.pollIntervalMs === "number" && is.pollIntervalMs >= 250
-                ? is.pollIntervalMs
-                : DEFAULTS.pollIntervalMs,
+            enabled: typeof sync.enabled === "boolean" ? sync.enabled : DEFAULTS.enabled,
+            startupAlign: typeof sync.startupAlign === "boolean" ? sync.startupAlign : DEFAULTS.startupAlign,
+            meshToTmux: typeof sync.meshToTmux === "boolean" ? sync.meshToTmux : DEFAULTS.meshToTmux,
+            tmuxToMesh: typeof sync.tmuxToMesh === "boolean" ? sync.tmuxToMesh : DEFAULTS.tmuxToMesh,
+            pollIntervalMs: typeof sync.pollIntervalMs === "number" && sync.pollIntervalMs >= 250
+              ? sync.pollIntervalMs
+              : DEFAULTS.pollIntervalMs,
           };
         }
       } catch {
-        // malformed, use defaults
+        // malformed config -> defaults
       }
       break;
     }
+
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
+
   return { ...DEFAULTS };
 }
 
@@ -109,48 +91,164 @@ function refreshRuntimeIdentity(state: MeshState, ctx: ExtensionContext): void {
 }
 
 // =============================================================================
-// Hook State Keys
+// Hook State
 // =============================================================================
 
-// We store sync-specific state in state.hookState to persist across hook calls.
 interface IdentitySyncState {
-  lastObservedTmuxWindowName?: string;
-  suppressTmuxRenameUntil: number;
+  lastObservedRuntimeName?: string;
+  suppressRuntimeRenameUntil: number;
 }
 
 function getSyncState(state: MeshState): IdentitySyncState {
   if (!state.hookState) state.hookState = {};
   if (!state.hookState._identitySync) {
     state.hookState._identitySync = {
-      suppressTmuxRenameUntil: 0,
+      suppressRuntimeRenameUntil: 0,
     };
   }
   return state.hookState._identitySync as IdentitySyncState;
 }
 
 // =============================================================================
+// Backend Adapter
+// =============================================================================
+
+export interface IdentityBackend {
+  backend?: ProcessBackend;
+  identityKind?: BackendEntityKind;
+  identityTarget?: string;
+  resolveIdentityTarget?: () => string | undefined;
+  available: boolean;
+  reason?: string;
+}
+
+let identityBackendOverride: IdentityBackend | undefined;
+
+export function setIdentityBackendForTest(backend?: IdentityBackend): void {
+  identityBackendOverride = backend;
+}
+
+function resolveIdentityBackend(): IdentityBackend {
+  if (identityBackendOverride) return identityBackendOverride;
+  const cwd = process.cwd();
+  const config = loadConfig(cwd);
+
+  try {
+    const backend = createBackendContract({
+      cwd,
+      backend: config.backend,
+    });
+
+    if (backend.type === "tmux" && !isInTmux()) {
+      return {
+        backend,
+        available: false,
+        reason: "tmux backend not active in this process",
+      };
+    }
+
+    const identityKind: BackendEntityKind = backend.type === "tmux" ? "window" : "pane";
+
+    return {
+      backend,
+      identityKind,
+      resolveIdentityTarget: () => {
+        if (backend.type === "zmux") {
+          return process.env.PI_BACKEND_SESSION
+            || process.env.PI_BACKEND_TARGET
+            || process.env.PI_AGENT_NAME
+            || process.env.PI_AGENT
+            || undefined;
+        }
+
+        return process.env.PI_BACKEND_TARGET
+          || process.env.PI_AGENT_NAME
+          || process.env.PI_AGENT
+          || undefined;
+      },
+      available: true,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function resolveIdentityTarget(identityBackend: IdentityBackend): string | undefined {
+  if (identityBackend.resolveIdentityTarget) {
+    return identityBackend.resolveIdentityTarget();
+  }
+
+  if (identityBackend.identityTarget) {
+    return identityBackend.identityTarget;
+  }
+
+  if (identityBackend.backend?.type === "zmux") {
+    return process.env.PI_BACKEND_SESSION
+      || process.env.PI_BACKEND_TARGET
+      || process.env.PI_AGENT_NAME
+      || process.env.PI_AGENT
+      || undefined;
+  }
+
+  return process.env.PI_BACKEND_TARGET
+    || process.env.PI_AGENT_NAME
+    || process.env.PI_AGENT
+    || undefined;
+}
+
+async function readRuntimeIdentityName(identityBackend: IdentityBackend): Promise<string | null> {
+  if (!identityBackend.available || !identityBackend.backend) return null;
+  try {
+    const target = resolveIdentityTarget(identityBackend);
+    return await identityBackend.backend.readIdentity({
+      kind: identityBackend.identityKind,
+      target,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function renameRuntimeIdentity(identityBackend: IdentityBackend, name: string): Promise<boolean> {
+  if (!identityBackend.available || !identityBackend.backend) return false;
+  try {
+    const target = resolveIdentityTarget(identityBackend);
+    await identityBackend.backend.renameIdentity(name, {
+      kind: identityBackend.identityKind,
+      target,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// =============================================================================
 // Sync Logic
 // =============================================================================
 
-async function syncTmuxWindowToAgentName(
-  state: MeshState,
+async function syncRuntimeNameToAgentName(
   syncState: IdentitySyncState,
   syncConfig: IdentitySyncConfig,
+  identityBackend: IdentityBackend,
   name: string,
 ): Promise<void> {
-  if (!syncConfig.meshToTmux || !isInTmux()) return;
+  if (!syncConfig.meshToTmux) return;
 
-  const renamed = await renameWindow(name);
+  const renamed = await renameRuntimeIdentity(identityBackend, name);
   if (!renamed) return;
 
-  const observedWindowName = await getWindowName();
-  syncState.lastObservedTmuxWindowName = observedWindowName ?? name;
-  syncState.suppressTmuxRenameUntil = Date.now() + syncConfig.pollIntervalMs * 2;
+  const observedName = await readRuntimeIdentityName(identityBackend);
+  syncState.lastObservedRuntimeName = observedName ?? name;
+  syncState.suppressRuntimeRenameUntil = Date.now() + syncConfig.pollIntervalMs * 2;
 }
 
 function notifyIdentitySyncFailure(
   ctx: ExtensionContext,
-  windowName: string,
+  runtimeName: string,
   error: string | undefined,
 ): void {
   if (!ctx.hasUI) return;
@@ -158,10 +256,10 @@ function notifyIdentitySyncFailure(
 
   const message =
     error === "invalid_name"
-      ? `Window name "${windowName}" is not a valid mesh name.`
+      ? `Runtime name "${runtimeName}" is not a valid mesh name.`
       : error === "name_taken"
-        ? `Window name "${windowName}" is already taken on the mesh.`
-        : `Couldn't sync window name "${windowName}" to the mesh.`;
+        ? `Runtime name "${runtimeName}" is already taken on the mesh.`
+        : `Couldn't sync runtime name "${runtimeName}" to the mesh.`;
 
   ctx.ui.notify(message, "warning");
 }
@@ -172,9 +270,9 @@ function notifyIdentitySyncFailure(
 
 export function createHooks(_meshConfig: MeshConfig): MeshLifecycleHooks {
   const syncConfig = loadIdentitySyncConfig();
+  const identityBackend = resolveIdentityBackend();
 
   if (!syncConfig.enabled) {
-    // Even when sync is disabled, set the runtime name for UI display.
     return {
       onRegistered(state, ctx) {
         refreshRuntimeIdentity(state, ctx);
@@ -183,21 +281,19 @@ export function createHooks(_meshConfig: MeshConfig): MeshLifecycleHooks {
   }
 
   return {
-    async onRegistered(state, ctx, actions) {
+    async onRegistered(state, ctx) {
       refreshRuntimeIdentity(state, ctx);
 
-      if (!isInTmux()) return;
+      if (!identityBackend.available) return;
 
       const syncState = getSyncState(state);
-      const currentWindowName = await getWindowName();
-      syncState.lastObservedTmuxWindowName = currentWindowName ?? state.agentName;
+      const currentName = await readRuntimeIdentityName(identityBackend);
+      syncState.lastObservedRuntimeName = currentName ?? state.agentName;
 
-      // Startup alignment: make tmux match the mesh name.
-      if (syncConfig.startupAlign && currentWindowName && currentWindowName !== state.agentName) {
-        await syncTmuxWindowToAgentName(state, syncState, syncConfig, state.agentName);
+      if (syncConfig.startupAlign && currentName && currentName !== state.agentName) {
+        await syncRuntimeNameToAgentName(syncState, syncConfig, identityBackend, state.agentName);
       }
 
-      // Set the poll interval for onPollTick.
       if (!state.hookState) state.hookState = {};
       state.hookState.pollIntervalMs = syncConfig.pollIntervalMs;
     },
@@ -205,7 +301,6 @@ export function createHooks(_meshConfig: MeshConfig): MeshLifecycleHooks {
     async onRenamed(state, ctx, _result, actions) {
       refreshRuntimeIdentity(state, ctx);
 
-      // Notify the LLM of the name change so it updates its self-reference.
       if (actions?.sendMessage) {
         actions.sendMessage(
           {
@@ -217,42 +312,37 @@ export function createHooks(_meshConfig: MeshConfig): MeshLifecycleHooks {
         );
       }
 
-      if (!isInTmux()) return;
+      if (!identityBackend.available) return;
 
       const syncState = getSyncState(state);
-      await syncTmuxWindowToAgentName(state, syncState, syncConfig, state.agentName);
+      await syncRuntimeNameToAgentName(syncState, syncConfig, identityBackend, state.agentName);
     },
 
     async onPollTick(state, ctx, actions) {
-      if (!syncConfig.tmuxToMesh || !isInTmux() || !state.registered) return;
+      if (!syncConfig.tmuxToMesh || !identityBackend.available || !state.registered) return;
 
       const syncState = getSyncState(state);
-      if (Date.now() < syncState.suppressTmuxRenameUntil) return;
+      if (Date.now() < syncState.suppressRuntimeRenameUntil) return;
 
-      const windowName = await getWindowName();
-      if (!windowName) return;
-      if (windowName === syncState.lastObservedTmuxWindowName) return;
+      const runtimeName = await readRuntimeIdentityName(identityBackend);
+      if (!runtimeName) return;
+      if (runtimeName === syncState.lastObservedRuntimeName) return;
 
-      syncState.lastObservedTmuxWindowName = windowName;
+      syncState.lastObservedRuntimeName = runtimeName;
+      if (runtimeName === state.agentName) return;
 
-      if (windowName === state.agentName) return;
-
-      // tmux window was renamed externally — push into mesh.
-      const renameResult = await actions.rename(windowName);
-
+      const renameResult = await actions.rename(runtimeName);
       if (!renameResult.success) {
-        notifyIdentitySyncFailure(ctx, windowName, renameResult.error);
+        notifyIdentitySyncFailure(ctx, runtimeName, renameResult.error);
 
-        // Revert tmux back to the current valid mesh name.
         if (renameResult.error !== "same_name") {
-          await syncTmuxWindowToAgentName(state, syncState, syncConfig, state.agentName);
+          await syncRuntimeNameToAgentName(syncState, syncConfig, identityBackend, state.agentName);
         }
       }
-      // On success, onRenamed fires automatically (actions.rename calls it).
     },
 
     onShutdown(_state) {
-      // No timers to clean up — pi-mesh manages the poll timer lifecycle.
+      // no-op
     },
   };
 }

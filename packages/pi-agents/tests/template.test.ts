@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
 import { processTemplate } from "../src/template.js";
+import { createTempDir } from "./temp-dir";
 
 describe("processTemplate", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-template-test-"));
+    tmpDir = createTempDir("pi-template-test-");
   });
 
   afterEach(() => {

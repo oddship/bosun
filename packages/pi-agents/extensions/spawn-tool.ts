@@ -22,7 +22,7 @@ export function registerSpawnAgent(
     name: "spawn_agent",
     label: "Spawn Agent",
     description: [
-      "Spawn a new Pi agent in a tmux window with its own identity, model, and extensions.",
+      "Spawn a new Pi agent in the configured backend runtime (tmux or zmux) with its own identity, model, and extensions.",
       "The agent loads its persona from .pi/agents/{name}.md and runs as an independent process.",
       "Use for parallel work, delegation, or specialist tasks.",
     ].join(" "),
@@ -38,15 +38,15 @@ export function registerSpawnAgent(
       ),
       name: Type.Optional(
         Type.String({
-          description: "Window/peer name (default: agent name)",
+          description: "Runtime target/peer name (default: agent name)",
         }),
       ),
       session: Type.Optional(
         Type.Union([
-          Type.Boolean({ description: "true to create a new tmux session (auto-named)" }),
-          Type.String({ description: "Named tmux session to create" }),
+          Type.Boolean({ description: "true to create a new backend session (auto-named)" }),
+          Type.String({ description: "Named backend session to create" }),
         ], {
-          description: "Create the agent in a new tmux session instead of a window. Pass true for auto-naming or a string for a specific session name.",
+          description: "Create the agent in a new backend session instead of reusing the current one. Pass true for auto-naming or a string for a specific session name.",
         }),
       ),
     }),
@@ -81,9 +81,10 @@ export function registerSpawnAgent(
       const skippedInfo = result.skippedExtensions.length
         ? `\nSkipped extensions (not installed): ${result.skippedExtensions.join(", ")}`
         : "";
+      const backendType = config.backend.type;
       const location = result.sessionName
-        ? `session '${result.sessionName}'`
-        : `tmux window '${result.windowName}'`;
+        ? `${backendType} session '${result.sessionName}'`
+        : `${backendType} target '${result.windowName}'`;
 
       return {
         content: [

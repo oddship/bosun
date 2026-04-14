@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { buildLaunchSpec } from "../src/launch.js";
+import { createTempDir } from "./temp-dir";
 
 describe("buildLaunchSpec", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-launch-spec-"));
+    tmpDir = createTempDir("pi-launch-spec-");
     fs.mkdirSync(path.join(tmpDir, ".pi", "agents"), { recursive: true });
   });
 

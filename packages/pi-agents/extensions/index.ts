@@ -13,6 +13,8 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { loadConfig, type AgentsConfig } from "../src/config.js";
 import { resolveAgentFile, loadAgent } from "../src/agents.js";
 import { registerSpawnAgent } from "./spawn-tool.js";
+import { resolveModel } from "../src/models.js";
+import { resolvePromptTuningProvider, resolveProviderPromptTuning } from "../src/prompt-tuning.js";
 import { processTemplate } from "../src/template.js";
 
 export default function (pi: ExtensionAPI) {
@@ -44,9 +46,13 @@ export default function (pi: ExtensionAPI) {
     if (!agent.body) return {};
 
     const processedBody = processTemplate(agent.body, { cwd: ctx.cwd });
+    const resolvedModel = agent.model ? resolveModel(agent.model, config.models) : undefined;
+    const provider = resolvePromptTuningProvider(ctx.model, resolvedModel);
+    const providerTuning = resolveProviderPromptTuning({ cwd: ctx.cwd, provider });
+    const promptParts = [processedBody, providerTuning, event.systemPrompt].filter(Boolean);
 
     return {
-      systemPrompt: processedBody + "\n\n" + event.systemPrompt,
+      systemPrompt: promptParts.join("\n\n"),
     };
   });
 

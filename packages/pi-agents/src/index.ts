@@ -11,7 +11,27 @@ export { discoverAgents, findAgentFile, loadAgent } from "./agents.js";
 export type { AgentDef } from "./agents.js";
 
 export { loadConfig } from "./config.js";
-export type { AgentsConfig, BackendConfig } from "./config.js";
+export type {
+  AgentsConfig,
+  BackendConfig,
+  TmuxBackendConfig,
+  ZmuxBackendConfig,
+} from "./config.js";
+
+export { createBackendContract, commandWithEnvAndCwd } from "./backend.js";
+export type {
+  BackendType,
+  BackendCapabilities,
+  BackendPolicy,
+  BackendErrorCode,
+  BackendEntity,
+  BackendListResult,
+  SpawnDetachedOptions,
+  SpawnDetachedResult,
+  CaptureTailResult,
+  ProcessBackend,
+} from "./backend.js";
+export { BackendError } from "./backend.js";
 
 export { processTemplate } from "./template.js";
 export type { TemplateContext } from "./template.js";
