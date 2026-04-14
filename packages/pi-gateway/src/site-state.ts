@@ -31,6 +31,17 @@ export function actorStateDir(stateDir: string, actorId?: string): string {
   return actor ? join(stateDir, ACTORS_DIR, safeStateKey(actor)) : join(stateDir, SHARED_DIR);
 }
 
+export function partitionTargets(actorId: string | undefined, visibility: string | undefined): Array<string | undefined> {
+  const actor = actorId?.trim() || undefined;
+  const targets: Array<string | undefined> = [];
+
+  if (visibility !== "private") targets.push(undefined);
+  if (actor) targets.push(actor);
+  if (targets.length === 0) targets.push(undefined);
+
+  return [...new Set(targets)];
+}
+
 export function actorStateFile(stateDir: string, actorId: string | undefined, filename: string): string {
   return join(actorStateDir(stateDir, actorId), filename);
 }

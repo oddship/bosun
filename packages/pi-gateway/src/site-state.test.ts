@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { actorStateDir, actorStateFile, partitionedStateFiles, readPartitionedJsonRecords, safeStateKey } from "./site-state";
+import { actorStateDir, actorStateFile, partitionTargets, partitionedStateFiles, readPartitionedJsonRecords, safeStateKey } from "./site-state";
 
 function makeTempStateDir(): string {
   return mkdtempSync(join(tmpdir(), "pi-gateway-site-state-"));
@@ -14,6 +14,13 @@ describe("site-state actor partitions", () => {
     expect(safeStateKey("actor_owner")).toBe("actor-owner");
     expect(actorStateDir(root, "actor_owner")).toBe(join(root, "actors", "actor-owner"));
     expect(actorStateDir(root)).toBe(join(root, "shared"));
+  });
+
+  test("routes private and shared visibility into the expected buckets", () => {
+    expect(partitionTargets("actor_owner", "household")).toEqual([undefined, "actor_owner"]);
+    expect(partitionTargets("actor_owner", "private")).toEqual(["actor_owner"]);
+    expect(partitionTargets(undefined, "household")).toEqual([undefined]);
+    expect(partitionTargets(undefined, "private")).toEqual([undefined]);
   });
 
   test("lists legacy, shared, and actor-partitioned state files", () => {

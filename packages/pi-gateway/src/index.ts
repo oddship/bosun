@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import matter from "gray-matter";
 import { join, extname, normalize, relative, resolve, sep } from "node:path";
 import { resolveMarkdownPageTitle } from "./page-title";
-import { actorStateDir, actorStateFile, legacyStateFile, readPartitionedJsonRecords } from "./site-state";
+import { actorStateDir, actorStateFile, legacyStateFile, partitionTargets, readPartitionedJsonRecords } from "./site-state";
 import { pathToFileURL } from "node:url";
 
 type GatewayConfig = {
@@ -1126,10 +1126,21 @@ function writeActorSiteMessages(site: SiteRegistration, actorId: string | undefi
   writeFileSync(siteMessagesMarkdownPath(site, actorId), renderMessageTranscript(deduped), "utf-8");
 }
 
-function mergeSiteMessages(site: SiteRegistration, actorId: string | undefined, incoming: SiteMessage[]): SiteMessage[] {
-  const merged = mergeRecordsById(readActorSiteMessages(site, actorId), incoming);
-  writeActorSiteMessages(site, actorId, merged);
-  return merged;
+function mergeSiteMessages(site: SiteRegistration, incoming: SiteMessage[]): void {
+  const grouped = new Map<string, { actorId: string | undefined; messages: SiteMessage[] }>();
+  for (const message of incoming) {
+    for (const target of partitionTargets(message.actorId, message.visibility)) {
+      const key = target || "__shared__";
+      const bucket = grouped.get(key) || { actorId: target, messages: [] };
+      bucket.messages.push(message);
+      grouped.set(key, bucket);
+    }
+  }
+
+  for (const bucket of grouped.values()) {
+    const merged = mergeRecordsById(readActorSiteMessages(site, bucket.actorId), bucket.messages);
+    writeActorSiteMessages(site, bucket.actorId, merged);
+  }
 }
 
 function readActorSiteActions(site: SiteRegistration, actorId?: string): SiteActionEvent[] {
@@ -1144,10 +1155,16 @@ function writeActorSiteActions(site: SiteRegistration, actorId: string | undefin
   writeFileSync(siteActionsJsonPath(site, actorId), `${JSON.stringify(sorted, null, 2)}\n`, "utf-8");
 }
 
+function writeSiteAction(site: SiteRegistration, event: SiteActionEvent): void {
+  for (const target of partitionTargets(event.actorId, event.visibility)) {
+    const merged = mergeRecordsById(readActorSiteActions(site, target), [event]);
+    writeActorSiteActions(site, target, merged);
+  }
+}
+
 function appendSiteAction(site: SiteRegistration, event: SiteActionEvent): SiteActionEvent[] {
-  const merged = mergeRecordsById(readActorSiteActions(site, event.actorId), [event]);
-  writeActorSiteActions(site, event.actorId, merged);
-  return merged;
+  writeSiteAction(site, event);
+  return readVisibleSiteActions(site, event.actorId);
 }
 
 function migrateLegacySiteMessages(site: SiteRegistration): void {
@@ -1155,17 +1172,7 @@ function migrateLegacySiteMessages(site: SiteRegistration): void {
   if (!existsSync(legacyJsonPath)) return;
 
   const legacyMessages = readJsonFile<SiteMessage[]>(legacyJsonPath) || [];
-  const grouped = new Map<string, SiteMessage[]>();
-  for (const message of legacyMessages) {
-    const key = message.actorId?.trim() || "__shared__";
-    const bucket = grouped.get(key) || [];
-    bucket.push(message);
-    grouped.set(key, bucket);
-  }
-
-  for (const [key, messages] of grouped.entries()) {
-    mergeSiteMessages(site, key === "__shared__" ? undefined : messages[0]?.actorId, messages);
-  }
+  if (legacyMessages.length > 0) mergeSiteMessages(site, legacyMessages);
 
   rmSync(legacyJsonPath, { force: true });
   rmSync(legacyStateFile(siteStateDir(site), "messages.md"), { force: true });
@@ -1176,18 +1183,8 @@ function migrateLegacySiteActions(site: SiteRegistration): void {
   if (!existsSync(legacyJsonPath)) return;
 
   const legacyActions = readJsonFile<SiteActionEvent[]>(legacyJsonPath) || [];
-  const grouped = new Map<string, SiteActionEvent[]>();
   for (const action of legacyActions) {
-    const key = action.actorId?.trim() || "__shared__";
-    const bucket = grouped.get(key) || [];
-    bucket.push(action);
-    grouped.set(key, bucket);
-  }
-
-  for (const [key, actions] of grouped.entries()) {
-    const actorId = key === "__shared__" ? undefined : actions[0]?.actorId;
-    const merged = mergeRecordsById(readActorSiteActions(site, actorId), actions);
-    writeActorSiteActions(site, actorId, merged);
+    writeSiteAction(site, action);
   }
 
   rmSync(legacyJsonPath, { force: true });
@@ -1327,7 +1324,7 @@ function ingestTmuxOutput(site: SiteRegistration): SiteMessage[] {
     .trim();
   if (!cleaned) return readAllSiteMessages(site);
 
-  mergeSiteMessages(site, last?.actorId, [createMessage("assistant", cleaned, "runtime", {
+  mergeSiteMessages(site, [createMessage("assistant", cleaned, "runtime", {
     actorId: last?.actorId,
     actorLogin: last?.actorLogin,
     visibility: last?.visibility,
@@ -1336,17 +1333,8 @@ function ingestTmuxOutput(site: SiteRegistration): SiteMessage[] {
 }
 
 function mergeQueuedMessages(site: SiteRegistration, queued: SiteMessage[]): void {
-  const grouped = new Map<string, SiteMessage[]>();
-  for (const message of queued) {
-    const key = message.actorId?.trim() || "__shared__";
-    const bucket = grouped.get(key) || [];
-    bucket.push(message);
-    grouped.set(key, bucket);
-  }
-
-  for (const [key, messages] of grouped.entries()) {
-    mergeSiteMessages(site, key === "__shared__" ? undefined : messages[0]?.actorId, messages);
-  }
+  if (queued.length === 0) return;
+  mergeSiteMessages(site, queued);
 }
 
 function syncRuntimeOutbox(site: SiteRegistration): void {
@@ -1471,7 +1459,7 @@ function dispatchSiteAction(site: SiteRegistration, event: SiteActionEvent): { e
     event.status = "dispatched";
   } else {
     event.status = "failed";
-    mergeSiteMessages(site, event.actorId, [createMessage("assistant", `Action '${event.action}' was captured, but no running site runtime was available to handle it.`, "gateway", {
+    mergeSiteMessages(site, [createMessage("assistant", `Action '${event.action}' was captured, but no running site runtime was available to handle it.`, "gateway", {
       actorId: event.actorId,
       actorLogin: event.actorLogin,
       visibility: event.visibility,
@@ -1527,7 +1515,7 @@ async function postSiteAction(site: SiteRegistration, req: Request, authz: Gatew
     visibility: normalizeVisibility(authz.visibility),
   });
   syncRuntimeOutbox(site);
-  mergeSiteMessages(site, authz.actorId, [createMessage("system", `Browser action: ${action}${target ? ` → ${target}` : ""}`, "gateway", {
+  mergeSiteMessages(site, [createMessage("system", `Browser action: ${action}${target ? ` → ${target}` : ""}`, "gateway", {
     actorId: authz.actorId,
     actorLogin: authz.actorLogin,
     visibility: normalizeVisibility(authz.visibility),
@@ -1564,7 +1552,7 @@ async function postSiteMessage(site: SiteRegistration, req: Request, authz: Gate
     actorLogin: authz.actorLogin,
     visibility: normalizeVisibility(authz.visibility),
   });
-  mergeSiteMessages(site, authz.actorId, [userMessage]);
+  mergeSiteMessages(site, [userMessage]);
   added.push(userMessage);
 
   const hasRuntime = Boolean((site.manifest?.runtime?.command || site.manifest?.runtime?.backend === "pi-agent") && siteSessionName(site));
@@ -1580,7 +1568,7 @@ async function postSiteMessage(site: SiteRegistration, req: Request, authz: Gate
       actorLogin: authz.actorLogin,
       visibility: normalizeVisibility(authz.visibility),
     });
-    mergeSiteMessages(site, authz.actorId, [dispatched]);
+    mergeSiteMessages(site, [dispatched]);
     added.push(dispatched);
   } else {
     const assistantReply = createMessage(
@@ -1601,7 +1589,7 @@ async function postSiteMessage(site: SiteRegistration, req: Request, authz: Gate
         visibility: normalizeVisibility(authz.visibility),
       },
     );
-    mergeSiteMessages(site, authz.actorId, [assistantReply]);
+    mergeSiteMessages(site, [assistantReply]);
     added.push(assistantReply);
   }
 
