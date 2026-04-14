@@ -529,12 +529,18 @@ async function resolveRoutingTarget(routing: QueueRoutingDecision): Promise<stri
 
 function buildAgentLaunchCommand(routing: QueueRoutingDecision): string {
   const runtime = resolveAgentRuntimeOptions(routing.agentName);
-  const args = ["pi", "--session", routing.sessionPath];
-  if (runtime.model) args.push("--model", runtime.model);
-  if (runtime.thinking) args.push("--thinking", runtime.thinking);
-  if (SYSTEM_PROMPT.trim()) args.push("--append-system-prompt", SYSTEM_PROMPT);
+  const config = loadAgentsConfig(ROOT);
+  const piArgs = ["--session", routing.sessionPath];
+  if (runtime.model) piArgs.push("--model", runtime.model);
+  if (runtime.thinking) piArgs.push("--thinking", runtime.thinking);
+  if (SYSTEM_PROMPT.trim()) piArgs.push("--append-system-prompt", SYSTEM_PROMPT);
 
-  return `cd ${shellEscape(ROOT)} && ${args.map(shellEscape).join(" ")}`;
+  const piArgsStr = piArgs.map(shellEscape).join(" ");
+  const rawCommand = config.backend.command_prefix
+    ? `${config.backend.command_prefix} pi ${piArgsStr}`
+    : `pi ${piArgsStr}`;
+
+  return `cd ${shellEscape(ROOT)} && ${rawCommand}`;
 }
 
 async function ensurePersistentAgentSession(routing: QueueRoutingDecision): Promise<boolean> {

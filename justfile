@@ -210,11 +210,11 @@ _ensure-daemon:
           exit 1
         fi
         {{tmux_cmd}} new-session -d -s bosun-daemon -n daemon \
-          "/bin/sh -c 'cd {{project_root}} && bun {{bosun_pkg}}/packages/pi-daemon/src/index.ts; sleep 300'"
+          "/bin/sh -c 'cd {{project_root}} && BOSUN_PKG={{bosun_pkg}} {{bosun_pkg}}/scripts/sandbox.sh bun {{bosun_pkg}}/packages/pi-daemon/src/index.ts; sleep 300'"
       else
         {{bosun_pkg}}/scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_pkg}}/config/tmux.conf" \
           new-session -d -s bosun-daemon -n daemon \
-          "/bin/sh -c 'cd {{project_root}} && bun {{bosun_pkg}}/packages/pi-daemon/src/index.ts; sleep 300'"
+          "/bin/sh -c 'cd {{project_root}} && BOSUN_PKG={{bosun_pkg}} {{bosun_pkg}}/scripts/sandbox.sh bun {{bosun_pkg}}/packages/pi-daemon/src/index.ts; sleep 300'"
         {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
       fi
       {{tmux_cmd}} set-environment -g BOSUN_ROOT "{{project_root}}"
@@ -226,13 +226,70 @@ _ensure-daemon:
       fi
     fi
 
+# Internal: start gateway if enabled. Pass FORCE=1 to ignore autoStart.
+_start-gateway FORCE="0":
+    #!/usr/bin/env bash
+    if [[ ! -f "{{project_root}}/.pi/pi-gateway.json" ]]; then exit 0; fi
+    ENABLED=$(jq -r '.enabled // false' "{{project_root}}/.pi/pi-gateway.json")
+    AUTOSTART=$(jq -r '.autoStart // true' "{{project_root}}/.pi/pi-gateway.json")
+    if [[ "$ENABLED" != "true" ]]; then exit 0; fi
+    if [[ "{{FORCE}}" != "1" && "$AUTOSTART" != "true" ]]; then exit 0; fi
+
+    if {{tmux_cmd}} has-session -t bosun-gateway 2>/dev/null; then
+      echo "Gateway already running"
+    else
+      echo "Starting gateway..."
+      if {{tmux_cmd}} has-session 2>/dev/null; then
+        VERSION=$({{tmux_cmd}} show-environment -g BOSUN_SANDBOX_VERSION 2>/dev/null | cut -d= -f2- || echo "1")
+        if [[ "$VERSION" != "2" ]]; then
+          echo "Security update: tmux server must run inside sandbox."
+          echo "Old session detected. Please restart: just stop && just start"
+          exit 1
+        fi
+        {{tmux_cmd}} new-session -d -s bosun-gateway -n gateway \
+          "/bin/sh -c 'cd {{project_root}} && BOSUN_PKG={{bosun_pkg}} {{bosun_pkg}}/scripts/sandbox.sh bun {{bosun_pkg}}/packages/pi-gateway/src/index.ts; sleep 300'"
+      else
+        {{bosun_pkg}}/scripts/sandbox.sh {{tmux_cmd}} -f "{{bosun_pkg}}/config/tmux.conf" \
+          new-session -d -s bosun-gateway -n gateway \
+          "/bin/sh -c 'cd {{project_root}} && BOSUN_PKG={{bosun_pkg}} {{bosun_pkg}}/scripts/sandbox.sh bun {{bosun_pkg}}/packages/pi-gateway/src/index.ts; sleep 300'"
+        {{tmux_cmd}} set-environment -g BOSUN_SANDBOX_VERSION "2"
+      fi
+      {{tmux_cmd}} set-environment -g BOSUN_ROOT "{{project_root}}"
+    fi
+
+# Internal: auto-start gateway only when enabled and autoStart=true
+_ensure-gateway:
+    @just _start-gateway FORCE=0
+
+# Start gateway explicitly (ignores auto_start but still requires enabled=true)
+gateway:
+    #!/usr/bin/env bash
+    if [[ ! -f "{{project_root}}/.pi/pi-gateway.json" ]]; then
+      echo "No generated gateway config found. Run: just init"
+      exit 1
+    fi
+    ENABLED=$(jq -r '.enabled // false' "{{project_root}}/.pi/pi-gateway.json")
+    if [[ "$ENABLED" != "true" ]]; then
+      echo "Gateway disabled in config.toml ([gateway].enabled = false)."
+      exit 1
+    fi
+    just _start-gateway FORCE=1
+
 # Stop just the daemon
 daemon-stop:
     {{tmux_cmd}} kill-session -t bosun-daemon 2>/dev/null || echo "Daemon not running"
 
+# Stop just the gateway
+gateway-stop:
+    {{tmux_cmd}} kill-session -t bosun-gateway 2>/dev/null || echo "Gateway not running"
+
 # View daemon logs
 daemon-logs:
     @tail -50 "{{project_root}}/.bosun-daemon/daemon.log" 2>/dev/null || echo "No logs found"
+
+# View gateway logs
+gateway-logs:
+    @{{tmux_cmd}} capture-pane -pt bosun-gateway:gateway -S -200 2>/dev/null || echo "Gateway not running"
 
 # Generate workflow DAG visualization
 workflow-dag:

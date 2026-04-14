@@ -1563,6 +1563,10 @@ function keepAliveCommand(command: string): string {
   return `${command}; EXIT=$?; if [ $EXIT -ne 0 ]; then echo "=== PI EXITED ($EXIT) ==="; sleep 300; fi`;
 }
 
+function sandboxedRuntimeCommand(command: string): string {
+  return `${shellEscape(join(BOSUN_PKG, "scripts", "sandbox.sh"))} /bin/sh -lc ${shellEscape(command)}`;
+}
+
 function listSiteContextFiles(site: SiteRegistration): string[] {
   const configured = site.manifest?.runtime?.contextFiles;
   const defaults = ["index.md", "site.json"];
@@ -1625,7 +1629,8 @@ function buildPiAgentRuntimeCommand(site: SiteRegistration, sessionName: string)
     `PI_AGENT_NAME=${shellEscape(sessionName)}`,
     ...buildSiteRuntimeEnv(site, sessionName),
   ];
-  return keepAliveCommand(`cd ${shellEscape(ROOT)} && ${env.join(" ")} ${args.map(shellEscape).join(" ")}`);
+  const innerCommand = `cd ${shellEscape(ROOT)} && ${env.join(" ")} ${args.map(shellEscape).join(" ")}`;
+  return keepAliveCommand(sandboxedRuntimeCommand(innerCommand));
 }
 
 function buildSiteRuntimeEnv(site: SiteRegistration, sessionName: string): string[] {
@@ -1665,7 +1670,8 @@ function buildSiteRuntimeCommand(site: SiteRegistration, sessionName: string): s
   if (command) {
     const env = buildSiteRuntimeEnv(site, sessionName);
     const exports = env.map((assignment) => `export ${assignment};`).join(" ");
-    return `/bin/sh -lc ${shellEscape(`cd ${shellEscape(ROOT)} && ${exports} ${command}`)}`;
+    const innerCommand = `cd ${shellEscape(ROOT)} && ${exports} ${command}`;
+    return keepAliveCommand(sandboxedRuntimeCommand(innerCommand));
   }
   if (site.manifest?.runtime?.backend === "pi-agent") {
     return buildPiAgentRuntimeCommand(site, sessionName);

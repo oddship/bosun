@@ -265,6 +265,10 @@ function ensureConfig(projectRoot: string, bosunPkg: string): void {
   }
 }
 
+function buildSandboxedServiceCommand(projectRoot: string, bosunPkg: string, scriptPath: string): string {
+  return `/bin/sh -c ${shellEscape(`cd ${shellEscape(projectRoot)} && BOSUN_PKG=${shellEscape(bosunPkg)} ${shellEscape(path.join(bosunPkg, "scripts", "sandbox.sh"))} bun ${shellEscape(scriptPath)}; sleep 300`)}`;
+}
+
 function ensureDaemon(projectRoot: string, bosunPkg: string): void {
   const daemonConfig = path.join(projectRoot, ".pi", "daemon.json");
   if (!fs.existsSync(daemonConfig)) return;
@@ -277,17 +281,19 @@ function ensureDaemon(projectRoot: string, bosunPkg: string): void {
 
   if (tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-daemon"])) return;
 
+  const daemonCommand = buildSandboxedServiceCommand(projectRoot, bosunPkg, path.join(bosunPkg, "packages", "pi-daemon", "src", "index.ts"));
+
   if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
     checkSandboxVersion(projectRoot, bosunPkg, "2");
     tmux(projectRoot, bosunPkg, [
       "new-session", "-d", "-s", "bosun-daemon", "-n", "daemon",
-      `/bin/sh -c ${shellEscape(`cd ${shellEscape(projectRoot)} && bun ${shellEscape(path.join(bosunPkg, "packages", "pi-daemon", "src", "index.ts"))}; sleep 300`)}`,
+      daemonCommand,
     ], { stdio: "inherit" });
   } else {
     execFileSync(path.join(bosunPkg, "scripts", "sandbox.sh"), [
       "tmux", "-S", getTmuxSocket(projectRoot, bosunPkg), "-f", path.join(bosunPkg, "config", "tmux.conf"),
       "new-session", "-d", "-s", "bosun-daemon", "-n", "daemon",
-      `/bin/sh -c ${shellEscape(`cd ${shellEscape(projectRoot)} && bun ${shellEscape(path.join(bosunPkg, "packages", "pi-daemon", "src", "index.ts"))}; sleep 300`)}`,
+      daemonCommand,
     ], { stdio: "inherit" });
     tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "2"], { stdio: "inherit" });
   }
@@ -307,17 +313,19 @@ function ensureGateway(projectRoot: string, bosunPkg: string): void {
 
   if (tmuxOk(projectRoot, bosunPkg, ["has-session", "-t", "bosun-gateway"])) return;
 
+  const gatewayCommand = buildSandboxedServiceCommand(projectRoot, bosunPkg, path.join(bosunPkg, "packages", "pi-gateway", "src", "index.ts"));
+
   if (tmuxOk(projectRoot, bosunPkg, ["has-session"])) {
     checkSandboxVersion(projectRoot, bosunPkg, "2");
     tmux(projectRoot, bosunPkg, [
       "new-session", "-d", "-s", "bosun-gateway", "-n", "gateway",
-      `/bin/sh -c ${shellEscape(`cd ${shellEscape(projectRoot)} && bun ${shellEscape(path.join(bosunPkg, "packages", "pi-gateway", "src", "index.ts"))}; sleep 300`)}`,
+      gatewayCommand,
     ], { stdio: "inherit" });
   } else {
     execFileSync(path.join(bosunPkg, "scripts", "sandbox.sh"), [
       "tmux", "-S", getTmuxSocket(projectRoot, bosunPkg), "-f", path.join(bosunPkg, "config", "tmux.conf"),
       "new-session", "-d", "-s", "bosun-gateway", "-n", "gateway",
-      `/bin/sh -c ${shellEscape(`cd ${shellEscape(projectRoot)} && bun ${shellEscape(path.join(bosunPkg, "packages", "pi-gateway", "src", "index.ts"))}; sleep 300`)}`,
+      gatewayCommand,
     ], { stdio: "inherit" });
     tmux(projectRoot, bosunPkg, ["set-environment", "-g", "BOSUN_SANDBOX_VERSION", "2"], { stdio: "inherit" });
   }
