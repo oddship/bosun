@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { createBackendContract, type ProcessBackend } from "../../pi-agents/src/backend";
@@ -39,6 +40,16 @@ type AgentRuntimeOptions = {
 interface BrowserMessageHandlerResult {
   handled?: boolean;
   reply?: string;
+}
+
+class BrowserMessageHandlerError extends Error {
+  readonly publicMessage: string;
+
+  constructor(message: string, publicMessage = "I couldn't process that request right now. Please try again.") {
+    super(message);
+    this.name = "BrowserMessageHandlerError";
+    this.publicMessage = publicMessage;
+  }
 }
 
 type SessionTextPart = {
@@ -144,6 +155,10 @@ function configuredActionAgents(): Map<string, string> {
 
 function browserMessageHandlerPath(): string {
   return process.env.PI_SITE_BROWSER_MESSAGE_HANDLER?.trim() || "";
+}
+
+function browserMessageHandlerTimeoutMs(): number {
+  return Number(process.env.PI_SITE_BROWSER_MESSAGE_HANDLER_TIMEOUT_MS || "15000");
 }
 
 function spawnEnvironment(): Record<string, string> {
@@ -308,22 +323,29 @@ export function runBrowserMessageHandler(message: SiteMessage): string | null {
   const handlerPath = browserMessageHandlerPath();
   if (!handlerPath) return null;
 
-  const args = ["bun", handlerPath, "--message-id", message.id, "--content", message.content, "--ts", message.ts];
+  const args = [handlerPath, "--message-id", message.id, "--content", message.content, "--ts", message.ts];
   if (message.actorId) args.push("--actor-id", message.actorId);
   if (message.actorLogin) args.push("--actor-login", message.actorLogin);
   if (message.visibility) args.push("--visibility", message.visibility);
 
-  const result = Bun.spawnSync(args, {
+  const timeoutMs = browserMessageHandlerTimeoutMs();
+  const result = spawnSync(process.execPath, args, {
     cwd: ROOT,
-    stdout: "pipe",
-    stderr: "pipe",
+    encoding: "utf-8",
+    timeout: timeoutMs,
     env: spawnEnvironment(),
   });
-  const stdout = new TextDecoder().decode(result.stdout).trim();
-  const stderr = new TextDecoder().decode(result.stderr).trim();
 
-  if (result.exitCode !== 0) {
-    throw new Error(stderr || stdout || `browser message handler failed with exit code ${result.exitCode}`);
+  if (result.error) {
+    if ((result.error as NodeJS.ErrnoException).code === "ETIMEDOUT") {
+      throw new BrowserMessageHandlerError(`browser message handler timed out after ${timeoutMs}ms`);
+    }
+    throw new BrowserMessageHandlerError("browser message handler execution failed");
+  }
+
+  const stdout = result.stdout.trim();
+  if (result.status !== 0) {
+    throw new BrowserMessageHandlerError(`browser message handler exited with status ${result.status ?? "unknown"}`);
   }
   if (!stdout) return null;
 
@@ -331,14 +353,20 @@ export function runBrowserMessageHandler(message: SiteMessage): string | null {
   try {
     parsed = JSON.parse(stdout) as BrowserMessageHandlerResult;
   } catch {
-    throw new Error(`browser message handler emitted invalid JSON: ${stdout}`);
+    throw new BrowserMessageHandlerError("browser message handler emitted invalid JSON");
   }
 
   if (!parsed.handled) return null;
   if (typeof parsed.reply !== "string" || !parsed.reply.trim()) {
-    throw new Error("browser message handler reported handled=true without a reply");
+    throw new BrowserMessageHandlerError("browser message handler reported handled=true without a reply");
   }
   return parsed.reply.trim();
+}
+
+export function replyTextForRuntimeError(error: unknown): string {
+  if (error instanceof BrowserMessageHandlerError) return error.publicMessage;
+  const detail = error instanceof Error ? error.message : String(error);
+  return `Steward runtime error: ${detail}`;
 }
 
 export function selectRoutingForMessage(message: SiteMessage): QueueRoutingDecision {
@@ -638,8 +666,7 @@ async function processInbox(): Promise<void> {
 
         replies.push(createReply(await invokePersistentPi(formatMessageForAgent(message), routing), message));
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        replies.push(createReply(`Steward runtime error: ${detail}`, message));
+        replies.push(createReply(replyTextForRuntimeError(error), message));
       }
     }
 

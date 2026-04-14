@@ -7,6 +7,7 @@ import {
   formatMessageForAgent,
   latestAssistantReplyFromSession,
   parseStructuredSiteAction,
+  replyTextForRuntimeError,
   runBrowserMessageHandler,
   selectRoutingForMessage,
   setRuntimeBackendForTest,
@@ -25,6 +26,7 @@ const originalEnv = {
   PI_SITE_SESSION_NAME: process.env.PI_SITE_SESSION_NAME,
   PI_SITE_AGENT_SESSION_PREFIX: process.env.PI_SITE_AGENT_SESSION_PREFIX,
   PI_SITE_BROWSER_MESSAGE_HANDLER: process.env.PI_SITE_BROWSER_MESSAGE_HANDLER,
+  PI_SITE_BROWSER_MESSAGE_HANDLER_TIMEOUT_MS: process.env.PI_SITE_BROWSER_MESSAGE_HANDLER_TIMEOUT_MS,
 };
 
 function makeMessage(overrides: Partial<SiteMessage> = {}): SiteMessage {
@@ -192,6 +194,54 @@ describe("pi-agent queue runtime routing", () => {
     expect(reply).toBeNull();
   });
 
+  test("sanitizes invalid browser message handler output for user-visible replies", () => {
+    const dir = createTempDir("pi-agent-queue-runtime-handler-");
+    tempDirs.push(dir);
+    const handlerPath = join(dir, "handler.js");
+    writeFileSync(handlerPath, 'process.stdout.write(`owner secret actor_owner raw stdout\\n`);', "utf-8");
+
+    process.env.PI_SITE_BROWSER_MESSAGE_HANDLER = handlerPath;
+
+    let error: unknown;
+    try {
+      runBrowserMessageHandler(makeMessage({
+        role: "user",
+        source: "browser",
+        content: "I want to track my weight daily",
+      }));
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeTruthy();
+    expect(replyTextForRuntimeError(error)).toBe("I couldn't process that request right now. Please try again.");
+    expect(replyTextForRuntimeError(error)).not.toContain("actor_owner");
+  });
+
+  test("times out hung browser message handlers and returns a safe reply", () => {
+    const dir = createTempDir("pi-agent-queue-runtime-handler-");
+    tempDirs.push(dir);
+    const handlerPath = join(dir, "handler.js");
+    writeFileSync(handlerPath, 'setTimeout(() => {}, 5000);', "utf-8");
+
+    process.env.PI_SITE_BROWSER_MESSAGE_HANDLER = handlerPath;
+    process.env.PI_SITE_BROWSER_MESSAGE_HANDLER_TIMEOUT_MS = "50";
+
+    let error: unknown;
+    try {
+      runBrowserMessageHandler(makeMessage({
+        role: "user",
+        source: "browser",
+        content: "I want to track my weight daily",
+      }));
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeTruthy();
+    expect(replyTextForRuntimeError(error)).toBe("I couldn't process that request right now. Please try again.");
+  });
+
   test("prefers the final_answer text from session output", () => {
     const tempDir = createTempDir("pi-agent-queue-runtime-");
     tempDirs.push(tempDir);
@@ -292,5 +342,6 @@ afterAll(() => {
   process.env.PI_SITE_SESSION_NAME = originalEnv.PI_SITE_SESSION_NAME;
   process.env.PI_SITE_AGENT_SESSION_PREFIX = originalEnv.PI_SITE_AGENT_SESSION_PREFIX;
   process.env.PI_SITE_BROWSER_MESSAGE_HANDLER = originalEnv.PI_SITE_BROWSER_MESSAGE_HANDLER;
+  process.env.PI_SITE_BROWSER_MESSAGE_HANDLER_TIMEOUT_MS = originalEnv.PI_SITE_BROWSER_MESSAGE_HANDLER_TIMEOUT_MS;
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
 });
