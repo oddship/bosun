@@ -15,6 +15,7 @@ import { info, error, debug } from "./logger.js";
 import { setTaskPid } from "./queue.js";
 import { loadConfig as loadAgentsConfig } from "../../pi-agents/src/config.js";
 import { resolveModel } from "../../pi-agents/src/models.js";
+import { resolvePromptTuningProvider, resolveProviderPromptTuning } from "../../pi-agents/src/prompt-tuning.js";
 import { buildAgentEnv } from "../../pi-agents/src/env.js";
 import { runValidators } from "./validators.js";
 import { processTemplate } from "../../pi-agents/src/template.js";
@@ -157,18 +158,18 @@ async function spawnAgent(
   // Daemon workflows are trusted system tasks — sandboxing blocks
   // filesystem writes that workflow agents need (e.g., writing analysis JSON).
   const args: string[] = ["--print", "--no-extensions", "--model", model];
+  if (workflow.agent?.thinking) args.push("--thinking", workflow.agent.thinking);
 
   // Agent system prompt — process Handlebars templates ({{> slot}} references)
   if (workflow.agent?.systemPromptFile && existsSync(workflow.agent.systemPromptFile)) {
     const raw = readFileSync(workflow.agent.systemPromptFile, "utf-8");
-    if (raw.includes("{{")) {
-      const processed = processTemplate(raw, { cwd: process.cwd() });
-      const tmpFile = workflow.agent.systemPromptFile + ".processed";
-      writeFileSync(tmpFile, processed);
-      args.push("--append-system-prompt", tmpFile);
-    } else {
-      args.push("--append-system-prompt", workflow.agent.systemPromptFile);
-    }
+    const processed = raw.includes("{{") ? processTemplate(raw, { cwd: process.cwd() }) : raw;
+    const provider = resolvePromptTuningProvider(undefined, model);
+    const providerTuning = resolveProviderPromptTuning({ cwd: process.cwd(), provider });
+    const finalPrompt = [processed.trimEnd(), providerTuning].filter(Boolean).join("\n\n");
+    const tmpFile = workflow.agent.systemPromptFile + ".processed";
+    writeFileSync(tmpFile, finalPrompt);
+    args.push("--append-system-prompt", tmpFile);
   }
 
   // Build task prompt

@@ -36,6 +36,7 @@ export interface WorkflowConfig {
   /** Agent configuration (type = "agent"). */
   agent?: {
     model?: string;
+    thinking?: string;
     prompt: string;
     systemPromptFile?: string;
   };
@@ -167,6 +168,7 @@ function parseWorkflowDir(dir: string, source: "package" | "repo" | "user"): Wor
     if (type === "agent") {
       config.agent = {
         model: agent.model as string | undefined,
+        thinking: agent.thinking as string | undefined,
         prompt: (agent.prompt as string) || "",
         systemPromptFile: hasAgentMd ? agentMdPath : undefined,
       };

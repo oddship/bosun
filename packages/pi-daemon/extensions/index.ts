@@ -107,7 +107,7 @@ export default function (pi: ExtensionAPI) {
     name: "daemon",
     label: "Daemon",
     description:
-      "Interact with the background daemon process. Actions: status (health and queue info), trigger (run a named handler with optional context), logs (view recent log lines), reload (clear handler cache), stop (shut down daemon).",
+      "Interact with the background daemon process. Actions: status (health and queue info), trigger (run a named handler with optional context), logs (view recent log lines), reload (rediscover workflows/watchers without restart), stop (shut down daemon).",
     promptSnippet: "Interact with the background daemon. Actions: status, trigger, logs, reload, stop.",
     parameters: Type.Object({
       action: StringEnum(["status", "trigger", "logs", "reload", "stop"] as const, {

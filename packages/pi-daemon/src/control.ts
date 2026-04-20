@@ -17,17 +17,20 @@ let controlDir: string;
 let responsesDir: string;
 let logFilePath: string;
 let statusGetter: (() => DaemonStatus) | null = null;
+let reloadHandler: (() => Promise<Record<string, unknown>>) | null = null;
 let controlWatcher: FSWatcher | null = null;
 
 export function initControl(
   stateDir: string,
   logFile: string,
   getStatus: () => DaemonStatus,
+  reloadWorkflows?: () => Promise<Record<string, unknown>>,
 ): void {
   controlDir = join(stateDir, "control");
   responsesDir = join(stateDir, "responses");
   logFilePath = logFile;
   statusGetter = getStatus;
+  reloadHandler = reloadWorkflows || null;
 
   mkdirSync(controlDir, { recursive: true });
   mkdirSync(responsesDir, { recursive: true });
@@ -104,8 +107,12 @@ async function handleCommand(
     }
 
     case "reload": {
-      // No-op — workflows are discovered fresh on each run
-      return { success: true, message: "Reload acknowledged (workflows are stateless)" };
+      if (!reloadHandler) return { success: false, error: "Reload handler not available" };
+      try {
+        return await reloadHandler();
+      } catch (err) {
+        return { success: false, error: `Reload failed: ${err}` };
+      }
     }
 
     case "stop": {

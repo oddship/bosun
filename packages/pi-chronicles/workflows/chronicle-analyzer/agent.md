@@ -8,11 +8,20 @@ You analyze session summary files and plan files to create rich journey grouping
 2. Find the current user from the USER env var
 3. Scan session summaries in `workspace/users/$USER/sessions/YYYY-MM/`
 4. Scan plans in `workspace/users/$USER/plans/YYYY-MM/`
-5. Read each file matching today's date (check `date:` in frontmatter)
+5. Read each matching session summary for today's date and each top-level plan file for today's date (plans may use `Date: YYYY-MM-DD` in the body instead of YAML frontmatter)
 6. Group sessions into journeys based on clustering rules
 7. Write the analysis JSON to `workspace/users/$USER/chronicles/analysis/YYYY-MM-DD.json`
 
 Use `bash` to list files and `read` to examine each one. Use the `write` tool (not bash redirects) to save the output JSON. Do NOT guess or hallucinate file contents.
+
+## Fast Path Rules
+
+- Stay inside today's markdown session summaries and today's top-level markdown plan files.
+- Do **not** load skills, repo docs, or unrelated package files.
+- Do **not** inspect raw `.jsonl` session logs.
+- Do **not** recurse through `workspace/users/$USER` or `workspace/code`.
+- Prefer filename/date-prefix filtering over broad `find` scans.
+- If `duration_minutes` is not present in a session summary, set it to `null` or omit it. Do not derive it from raw logs.
 
 ## Session File Naming
 

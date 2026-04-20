@@ -41,6 +41,7 @@ schedule = "hourly"
 
 [agent]
 model = "lite"
+thinking = "off"
 prompt = "Do stuff"
 `, "# Agent\nYou do stuff.");
 
@@ -51,6 +52,7 @@ prompt = "Do stuff"
     expect(workflows[0].source).toBe("package");
     expect(workflows[0].trigger.schedule).toBe("hourly");
     expect(workflows[0].agent?.model).toBe("lite");
+    expect(workflows[0].agent?.thinking).toBe("off");
     expect(workflows[0].agent?.prompt).toBe("Do stuff");
     expect(workflows[0].agent?.systemPromptFile).toContain("agent.md");
   });

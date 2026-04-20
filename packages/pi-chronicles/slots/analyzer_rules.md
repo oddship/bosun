@@ -102,7 +102,8 @@ Extract thoroughly:
 ### From Sessions (YAML frontmatter + content)
 
 Extract from frontmatter:
-- `title`, `time`, `duration_minutes`, `tags`, `files_touched`
+- `title`, `time`, `duration_minutes` (optional), `tags`, `files_touched`
+- If `duration_minutes` is missing, set it to `null` or omit it. Do **not** inspect raw `.jsonl` session logs to recover it.
 
 Extract from content (BE THOROUGH):
 - `## Overview` — full overview, not just first sentence (3-5 sentences)
@@ -117,6 +118,7 @@ Extract from content (BE THOROUGH):
 ## Important
 
 - Return ONLY JSON, no other text
+- Stay on today's markdown summaries and top-level plan docs only; do not load unrelated docs or skills
 - Include ALL sessions in some journey (or `unplanned_sessions`)
 - Include ALL plans (matched to journeys or in `orphan_plans`)
 - Skip trivial greeting-only sessions — put them in `unplanned_sessions` with just the filename

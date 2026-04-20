@@ -7,8 +7,9 @@ type = "agent"
 schedule = "hourly"
 
 [agent]
-model = "lite"
-prompt = "Analyze today's session summaries and generate a journey analysis. Check the current date, find session summaries, group them into journeys, and write the analysis JSON output."
+model = "medium"
+thinking = "off"
+prompt = "Analyze only today's markdown session summaries and today's top-level plan markdown files. Do not inspect raw .jsonl session logs. Write valid JSON to today's chronicle analysis output path."
 
 [retry]
 max_attempts = 2

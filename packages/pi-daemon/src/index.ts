@@ -18,7 +18,7 @@ import { initRulesState, evaluateRules, catchUpRules } from "./rules.js";
 import { initQueue, setHandlerRunner, enqueueTasks, processQueue } from "./queue.js";
 import { setupWatchers, closeWatchers } from "./watcher.js";
 import { initControl, startControl, stopControl } from "./control.js";
-import { discoverWorkflows, deriveWatchers, type WorkflowConfig } from "./workflows.js";
+import { discoverWorkflows, deriveWatchers, deriveRules, type WorkflowConfig } from "./workflows.js";
 import { runWorkflow as executeWorkflow } from "./agent-runner.js";
 import type { DaemonStatus, RuleConfig } from "./types.js";
 
@@ -38,6 +38,8 @@ let status: DaemonStatus = {
 };
 
 let statusFile: string;
+let workflowMap = new Map<string, WorkflowConfig>();
+let currentRules: RuleConfig[] = [];
 
 function saveStatus(): void {
   status.heartbeat = new Date().toISOString();
@@ -52,9 +54,9 @@ function getStatus(): DaemonStatus {
 
 // --- Heartbeat ---
 
-async function runHeartbeat(rules: RuleConfig[]): Promise<void> {
+async function runHeartbeat(): Promise<void> {
   try {
-    const tasks = evaluateRules(rules);
+    const tasks = evaluateRules(currentRules);
     if (tasks.length > 0) enqueueTasks(tasks);
   } catch (err) {
     error(`Rule evaluation error: ${err}`);
@@ -84,15 +86,7 @@ function shutdown(): void {
 
 // --- Workflow mode ---
 
-function startWorkflowMode(config: ReturnType<typeof loadDaemonConfig>, stateDir: string): RuleConfig[] {
-  // Discover workflows
-  const workflows = discoverWorkflows(ROOT);
-  const workflowMap = new Map<string, WorkflowConfig>();
-  for (const wf of workflows) {
-    workflowMap.set(wf.name, wf);
-  }
-
-  // Wire workflow runner into queue
+function configureWorkflowRunner(): void {
   setHandlerRunner(async (handler, context) => {
     const workflow = workflowMap.get(handler);
     if (!workflow) {
@@ -112,8 +106,14 @@ function startWorkflowMode(config: ReturnType<typeof loadDaemonConfig>, stateDir
       throw new Error(`Workflow failed after ${result.attempts} attempt(s): exit ${result.exitCode}`);
     }
   });
+}
 
-  // Derive watchers from workflow configs
+function syncWorkflowMode(options: { enqueueStartup: boolean; reason: string }): { workflows: number; watchers: number; rules: number; startupQueued: number } {
+  closeWatchers();
+
+  const workflows = discoverWorkflows(ROOT);
+  workflowMap = new Map(workflows.map((wf) => [wf.name, wf]));
+
   const watcherConfigs = deriveWatchers(workflows);
   setupWatchers(watcherConfigs, ROOT);
   status.watchers = watcherConfigs.map((w) => ({
@@ -123,36 +123,57 @@ function startWorkflowMode(config: ReturnType<typeof loadDaemonConfig>, stateDir
     last_triggered: null,
   }));
 
-  // Derive rules from workflow configs
-  const rules: RuleConfig[] = workflows
-    .filter((wf) => wf.trigger.schedule || wf.trigger.watcher)
-    .map((wf) => ({
-      name: wf.name,
-      handler: wf.name, // handler name = workflow name
-      trigger: wf.trigger.watcher ? `wf-${wf.name}` : undefined,
-      schedule: wf.trigger.schedule,
-    }));
+  currentRules = deriveRules(workflows).map((rule) => ({
+    name: rule.name,
+    handler: rule.workflow,
+    trigger: rule.trigger,
+    schedule: rule.schedule,
+    stale_minutes: rule.stale_minutes,
+  }));
 
-  info(`Workflows: ${workflows.length}`);
-  info(`Watchers: ${watcherConfigs.length}`);
-  info(`Rules: ${rules.length}`);
-
-  // Run startup workflows
-  const startupWorkflows = workflows.filter((wf) => wf.trigger.startup);
-  if (startupWorkflows.length > 0) {
-    info(`Running ${startupWorkflows.length} startup workflow(s)`);
-    for (const wf of startupWorkflows) {
-      enqueueTasks([{
-        id: `${wf.name}-startup-${Date.now()}`,
-        rule: wf.name,
-        handler: wf.name,
-        context: {},
-        priority: "normal",
-      }]);
+  let startupQueued = 0;
+  if (options.enqueueStartup) {
+    const startupWorkflows = workflows.filter((wf) => wf.trigger.startup);
+    startupQueued = startupWorkflows.length;
+    if (startupQueued > 0) {
+      info(`Running ${startupQueued} startup workflow(s)`);
+      for (const wf of startupWorkflows) {
+        enqueueTasks([{
+          id: `${wf.name}-startup-${Date.now()}`,
+          rule: wf.name,
+          handler: wf.name,
+          context: {},
+          priority: "normal",
+        }]);
+      }
     }
   }
 
-  return rules;
+  info(`Workflow sync (${options.reason}): ${workflows.length} workflows, ${watcherConfigs.length} watchers, ${currentRules.length} rules`);
+  saveStatus();
+
+  return {
+    workflows: workflows.length,
+    watchers: watcherConfigs.length,
+    rules: currentRules.length,
+    startupQueued,
+  };
+}
+
+async function reloadWorkflowMode(reason = "control"): Promise<Record<string, unknown>> {
+  const summary = syncWorkflowMode({ enqueueStartup: false, reason });
+  return {
+    success: true,
+    message: `Reloaded ${summary.workflows} workflow(s), ${summary.watchers} watcher(s), ${summary.rules} rule(s)`,
+    ...summary,
+  };
+}
+
+function startWorkflowMode(): RuleConfig[] {
+  configureWorkflowRunner();
+  const summary = syncWorkflowMode({ enqueueStartup: true, reason: "startup" });
+  debug(`Startup workflow sync queued ${summary.startupQueued} startup workflow(s)`);
+  return currentRules;
 }
 
 // --- Main ---
@@ -187,10 +208,10 @@ async function main(): Promise<void> {
   initQueue(stateDir);
 
   // Setup control interface
-  initControl(stateDir, logFile, getStatus);
+  initControl(stateDir, logFile, getStatus, () => reloadWorkflowMode("control"));
   startControl();
 
-  const rules = startWorkflowMode(config, stateDir);
+  const rules = startWorkflowMode();
 
   status.running = true;
   info(`Daemon started (PID: ${process.pid})`);
@@ -208,8 +229,8 @@ async function main(): Promise<void> {
   const interval = config.heartbeat_interval_seconds;
   info(`Starting heartbeat (${interval}s interval)`);
 
-  await runHeartbeat(rules);
-  setInterval(() => runHeartbeat(rules), interval * 1000);
+  await runHeartbeat();
+  setInterval(() => runHeartbeat(), interval * 1000);
 
   // Handle signals
   process.on("SIGINT", shutdown);

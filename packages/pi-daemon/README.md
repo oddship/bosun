@@ -9,6 +9,7 @@ Background automation daemon for [Pi](https://github.com/badlogic/pi-mono) — w
 - **Rules engine**: Evaluate trigger-based and schedule-based rules on heartbeat
 - **Task queue**: Sequential execution with retry, backoff, and crash recovery
 - **Agent runner**: Spawns Pi agents (`pi --print`) or runs scripts for each workflow
+- **Live reload**: `daemon({ action: "reload" })` rediscovers workflows and rebuilds watchers/rules without a daemon restart
 - **Control interface**: Filesystem IPC — agents write JSON commands, daemon writes responses
 - **Pi extension**: `daemon()` tool + auto-start in tmux on `session_start`
 
@@ -88,7 +89,7 @@ The Pi extension registers a `daemon()` tool:
 daemon({ action: "status" })                         — show status, watchers, queue
 daemon({ action: "trigger", handler: "my-workflow" }) — manually trigger a workflow
 daemon({ action: "logs", lines: 100 })               — view recent log lines
-daemon({ action: "reload" })                         — clear handler cache
+daemon({ action: "reload" })                         — rediscover workflows/watchers/rules without restart
 daemon({ action: "stop" })                           — stop daemon
 ```
 
@@ -99,9 +100,13 @@ When Pi starts inside tmux and `.pi/daemon.json` has `enabled: true`, the extens
 ## Architecture
 
 ```
+reload command
+  │
+  └─► rediscover workflows → rebuild watchers/rules → continue heartbeats without restart
+
 heartbeat (every N seconds)
   │
-  ├─► evaluate rules (derived from discovered workflows)
+  ├─► evaluate rules (derived from currently loaded workflows)
   │     ├─ trigger rules: check triggers.json for pending watcher events
   │     └─ schedule rules: check time since last run
   │
