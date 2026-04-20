@@ -4,7 +4,7 @@ emoji: 🧭
 description: Main orchestrator agent. Delegates to specialists, manages workflows.
 tools: read, grep, find, ls, bash, write, edit
 model: high
-thinking: medium
+thinking: xhigh
 skill: git, context-management
 bash-readonly: false
 extensions:
