@@ -14,20 +14,22 @@ Extract insights from Pi session files. Covers session discovery, jq patterns fo
 
 Pi stores sessions as JSONL files:
 ```
-..bosun-home/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl
+.bosun-home/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl
 ```
+
+Tip: use `session_context` first when available so you can analyze the exact active `session_file` instead of guessing paths.
 
 ## Quick Reference
 
 ```bash
 # List recent sessions (newest first)
-ls -lt ..bosun-home/.pi/agent/sessions/*/*.jsonl | head -10
+ls -lt .bosun-home/.pi/agent/sessions/*/*.jsonl | head -10
 
 # Find sessions by date
-find ..bosun-home/.pi/agent/sessions -name "2026-02-01*.jsonl"
+find .bosun-home/.pi/agent/sessions -name "2026-02-01*.jsonl"
 
 # Search sessions for keyword
-rg -l 'keyword' ..bosun-home/.pi/agent/sessions/
+rg -l 'keyword' .bosun-home/.pi/agent/sessions/
 
 # Count messages in session
 wc -l session.jsonl
@@ -120,7 +122,7 @@ jq -s '.[] | select(.type == "message" and .message.role == "assistant" and .mes
 jq -s '.[] | select(.type == "message") | .message.content[]? | select(.type == "toolCall" and .name == "spawn_agent")' session.jsonl
 
 # Subagent artifacts directory
-ls ..bosun-home/.pi/agent/sessions/*/spawn_agent-artifacts/
+ls .bosun-home/.pi/agent/sessions/*/spawn_agent-artifacts/
 ```
 
 ## Trimming for LLM Processing
@@ -140,6 +142,71 @@ jq -s '[.[] | select(.type == "message") | {
 }]' session.jsonl > trimmed.json
 ```
 
+## Evidence-backed Audit Workflow (pickup/review)
+
+Use this when you must produce a grounded audit and call out unsupported claims.
+
+### 1) Extract exact user asks (timeline)
+```bash
+jq -r 'select(.type=="message" and .message.role=="user")
+  | .timestamp + "\t" + ([.message.content[]? | select(.type=="text") | .text] | join("\n"))' \
+  "$FILE" > "$OUT/user-prompts.tsv"
+```
+
+### 2) Extract exact tool-call sequence (with args)
+```bash
+jq -r 'select(.type=="message" and .message.role=="assistant")
+  | .timestamp as $ts
+  | .message.content[]?
+  | select(.type=="toolCall")
+  | [$ts,.name,(.arguments|tojson)]
+  | @tsv' "$FILE" > "$OUT/toolcalls.tsv"
+
+cut -f2 "$OUT/toolcalls.tsv" | sort | uniq -c | sort -nr > "$OUT/tool-counts.txt"
+```
+
+### 3) Extract concrete files touched
+```bash
+# write/edit targets (actual modified paths)
+jq -r 'select(.type=="message" and .message.role=="assistant")
+  | .message.content[]?
+  | select(.type=="toolCall" and (.name=="write" or .name=="edit"))
+  | .arguments.path' "$FILE" | sort -u > "$OUT/write-edit-paths.txt"
+
+# read targets (files inspected)
+jq -r 'select(.type=="message" and .message.role=="assistant")
+  | .message.content[]?
+  | select(.type=="toolCall" and .name=="read")
+  | .arguments.path' "$FILE" | sort -u > "$OUT/read-paths.txt"
+```
+
+### 4) Extract explicit outcome evidence (commits/push/errors)
+```bash
+# commit/push evidence from bash tool results
+jq -r 'select(.type=="message" and .message.role=="toolResult" and .message.toolName=="bash")
+  | .timestamp + "\t" + (.message.content[0].text // "")' "$FILE" \
+  | grep -E '\\[main [0-9a-f]{7,}\\]|git push|To https://' > "$OUT/git-outcomes.txt"
+
+# tool errors (blockers/failures)
+jq -r 'select(.type=="message" and .message.role=="toolResult" and .message.isError==true)
+  | .timestamp + "\t" + .message.toolName + "\t" + (.message.content[0].text // "")' \
+  "$FILE" > "$OUT/errors.tsv"
+```
+
+### 5) Claim validation rule
+For each summary claim, attach at least one evidence line from:
+- user prompt timeline
+- tool-call timeline
+- tool results (especially git/toolResult output)
+
+If no line supports it, mark as inferred/unsupported.
+
+## Common Pitfalls
+
+- Prefer streaming jq filters (`select(...)`) over broad `jq -s` when sessions are large.
+- With `set -euo pipefail`, define shell vars before use in the same command (`FILE='...'; ... "$FILE"`).
+- Save intermediate artifacts (`.tsv/.txt`) under `workspace/scratch/` to keep audits reproducible.
+
 ## When to Use
 
 - Reviewing what happened in a session
@@ -152,7 +219,7 @@ jq -s '[.[] | select(.type == "message") | {
 
 Subagent runs create their own session files in:
 ```
-..bosun-home/.pi/agent/sessions/*/spawn_agent-artifacts/<id>_<agent>.jsonl
+.bosun-home/.pi/agent/sessions/*/spawn_agent-artifacts/<id>_<agent>.jsonl
 ```
 
 Use the same jq patterns to analyze spawn_agent sessions.
