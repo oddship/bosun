@@ -29,10 +29,13 @@ node_modules/
 .pi/pi-memory.json
 .pi/pi-q.json
 .pi/pi-img-gen.json
+.pi/pi-gateway.json
+.pi/pi-gateway.json.bak*
 .pi/prompts/
 .pi/sandbox.json
 pi-session-*.html
 .pi/settings.json
+**/.gateway/
 result
 result-*
 # Root config only (contains API keys) — workflow config.toml files are safe to track

@@ -1,0 +1,9 @@
+{
+  "agent": "bosun",
+  "runtime": {
+    "backend": "tmux",
+    "sessionName": "test-input-site",
+    "command": "python3 -u -c \"import sys; print('assistant ready', flush=True)\nfor line in sys.stdin: print('assistant heard:' + line.strip(), flush=True)\"",
+    "inputMode": "tmux"
+  }
+}

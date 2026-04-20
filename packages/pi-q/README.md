@@ -39,6 +39,18 @@ The `q` agent is an executive assistant that uses these skills for planning and 
 spawn_agent({ agent: "q", session: true, task: "Morning standup" })
 ```
 
+## Sites
+
+`pi-q` now also exposes a package-owned `pi.sites` surface:
+
+- `console` → `./sites/console`
+
+When the gateway is enabled, this is served at:
+
+- `/sites/pi-q/console/`
+
+This site is intended to be a q-owned workbench, not just a generic chat shell. The site launches a real `q` agent session with site-maintainer intent so q can treat the website as part of the maintained user experience.
+
 ## Workspace Structure
 
 ```

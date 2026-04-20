@@ -1,0 +1,14 @@
+{
+  "agent": "deckhand",
+  "runtime": {
+    "backend": "tmux",
+    "sessionName": "pi-gateway-agent-console",
+    "meshName": "pi-gateway-agent-console",
+    "command": "PI_SITE_REPLY_PREFIX='agent-console runtime' bun packages/pi-gateway/src/framed-site-runtime.ts",
+    "inputMode": "queue",
+    "inboxFile": ".gateway/inbox.json",
+    "outboxFile": ".gateway/outbox.json",
+    "framedReplies": true,
+    "resetOnStart": true
+  }
+}

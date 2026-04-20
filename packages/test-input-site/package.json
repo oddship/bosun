@@ -1,0 +1,10 @@
+{
+  "name": "test-input-site",
+  "version": "0.0.0",
+  "type": "module",
+  "pi": {
+    "sites": {
+      "terminal": { "dir": "./sites/terminal" }
+    }
+  }
+}

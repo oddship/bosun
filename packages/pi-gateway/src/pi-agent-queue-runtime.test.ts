@@ -180,7 +180,7 @@ describe("pi-agent queue runtime routing", () => {
     expect(routing.tmuxSessionName).toBe("pi-steward-control-steward");
   });
 
-  test("formats browser user messages with actor metadata before agent delivery", () => {
+  test("formats browser user messages as a single-line metadata wrapper before agent delivery", () => {
     const formatted = formatMessageForAgent(makeMessage({
       role: "user",
       source: "browser",
@@ -190,13 +190,14 @@ describe("pi-agent queue runtime routing", () => {
       visibility: "household",
     }));
 
-    expect(formatted).toContain("Website user turn:");
-    expect(formatted).toContain('"type": "website-user-message"');
-    expect(formatted).toContain('"messageId": "msg_1"');
-    expect(formatted).toContain('"actorId": "actor_owner"');
-    expect(formatted).toContain('"actorLogin": "rhnvrm@github"');
-    expect(formatted).toContain('"visibility": "household"');
-    expect(formatted).toContain("User says:\n\nI want to track my weight daily");
+    expect(formatted).toContain("Website user turn: {");
+    expect(formatted).toContain('"type":"website-user-message"');
+    expect(formatted).toContain('"messageId":"msg_1"');
+    expect(formatted).toContain('"actorId":"actor_owner"');
+    expect(formatted).toContain('"actorLogin":"rhnvrm@github"');
+    expect(formatted).toContain('"visibility":"household"');
+    expect(formatted).toContain('"rawUserText":"I want to track my weight daily"');
+    expect(formatted).not.toContain("\n");
   });
 
   test("leaves non-browser messages unchanged when formatting for agent delivery", () => {

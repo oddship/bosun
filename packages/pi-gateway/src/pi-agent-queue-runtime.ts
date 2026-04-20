@@ -313,21 +313,17 @@ export function parseStructuredSiteAction(content: string): StructuredSiteAction
 export function formatMessageForAgent(message: SiteMessage): string {
   if (message.role !== "user" || message.source !== "browser") return message.content;
 
-  return [
-    "Website user turn:",
-    JSON.stringify({
-      type: "website-user-message",
-      messageId: message.id,
-      role: message.role,
-      source: message.source,
-      ts: message.ts,
-      actorId: message.actorId || null,
-      actorLogin: message.actorLogin || null,
-      visibility: message.visibility || null,
-    }, null, 2),
-    "User says:",
-    message.content,
-  ].join("\n\n");
+  return `Website user turn: ${JSON.stringify({
+    type: "website-user-message",
+    messageId: message.id,
+    role: message.role,
+    source: message.source,
+    ts: message.ts,
+    actorId: message.actorId || null,
+    actorLogin: message.actorLogin || null,
+    visibility: message.visibility || null,
+    rawUserText: message.content,
+  })}`;
 }
 
 export function runBrowserMessageHandler(message: SiteMessage): string | null {

@@ -1,0 +1,10 @@
+{
+  "name": "@scope/test-scoped-site",
+  "version": "0.0.0",
+  "type": "module",
+  "pi": {
+    "sites": {
+      "demo": { "dir": "./sites/demo" }
+    }
+  }
+}

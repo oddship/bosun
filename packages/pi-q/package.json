@@ -12,7 +12,12 @@
   },
   "pi": {
     "skills": ["./skills"],
-    "agents": ["./agents"]
+    "agents": ["./agents"],
+    "sites": {
+      "console": {
+        "dir": "./sites/console"
+      }
+    }
   },
   "dependencies": {
     "gray-matter": "4.0.3",

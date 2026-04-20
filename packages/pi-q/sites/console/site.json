@@ -1,0 +1,24 @@
+{
+  "agent": "q",
+  "runtime": {
+    "backend": "pi-agent",
+    "sessionName": "pi-q-console",
+    "meshName": "pi-q-console",
+    "agentName": "q",
+    "promptTemplate": "site-maintainer",
+    "maintainerIntent": "Maintain pi-q/console as a concrete Q workbench with live task/project/roadmap summaries, drill-down navigation, blocker visibility, review notes, and suggested next actions.",
+    "contextFiles": [
+      "index.md",
+      "site.json",
+      "inbox.md",
+      "active.md",
+      "blocked.md",
+      "projects.md",
+      "roadmaps.md",
+      "review.md"
+    ],
+    "inputMode": "tmux",
+    "framedReplies": true,
+    "resetOnStart": true
+  }
+}

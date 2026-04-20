@@ -1,0 +1,12 @@
+{
+  "agent": "bosun",
+  "runtime": {
+    "backend": "tmux",
+    "sessionName": "pi-gateway-dashboard",
+    "meshName": "pi-gateway-dashboard",
+    "command": "bun packages/pi-gateway/sites/dashboard/runtime.ts",
+    "inputMode": "queue",
+    "inboxFile": ".gateway/inbox.json",
+    "outboxFile": ".gateway/outbox.json"
+  }
+}
