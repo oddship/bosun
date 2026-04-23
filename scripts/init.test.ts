@@ -69,7 +69,7 @@ describe("scripts/init.ts", () => {
       const settings = JSON.parse(readFileSync(join(projectDir, ".pi", "settings.json"), "utf-8"));
       expect(settings.defaultProvider).toBe("openai-codex");
       expect(settings.defaultModel).toBe("gpt-5.4");
-      expect(settings.defaultThinkingLevel).toBe("medium");
+      expect(settings.defaultThinkingLevel).toBe("xhigh");
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
     }
