@@ -13,6 +13,7 @@ const originalCwd = process.cwd();
 const originalAgentName = process.env.PI_AGENT_NAME;
 const originalBackendTarget = process.env.PI_BACKEND_TARGET;
 const originalBackendSession = process.env.PI_BACKEND_SESSION;
+const originalTmuxPane = process.env.TMUX_PANE;
 
 function writeIdentitySyncConfig(dir: string, overrides: Record<string, unknown> = {}): void {
   const piDir = join(dir, ".pi");
@@ -59,6 +60,7 @@ describe("mesh identity sync (backend-neutral)", () => {
     process.env.PI_AGENT_NAME = originalAgentName;
     process.env.PI_BACKEND_TARGET = originalBackendTarget;
     process.env.PI_BACKEND_SESSION = originalBackendSession;
+    process.env.TMUX_PANE = originalTmuxPane;
     for (const dir of tempDirs.splice(0, tempDirs.length)) {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -174,5 +176,52 @@ describe("mesh identity sync (backend-neutral)", () => {
 
     expect(runtimeName.value).toBe("deckhand-zmux-final");
     expect(renameTargets).toEqual(["deckhand-zmux-session", "deckhand-zmux-session"]);
+  });
+
+  test("tmux identity sync prefers TMUX_PANE over name-scoped env targets", async () => {
+    const tempDir = createTempDir("mesh-identity-sync-");
+    tempDirs.push(tempDir);
+    writeIdentitySyncConfig(tempDir, { startupAlign: false, pollIntervalMs: 250 });
+    process.chdir(tempDir);
+
+    process.env.PI_AGENT_NAME = "bosun-5";
+    process.env.PI_BACKEND_TARGET = "bosun-5";
+    process.env.TMUX_PANE = "%42";
+
+    const renameTargets: string[] = [];
+    const readTargets: string[] = [];
+
+    setIdentityBackendForTest({
+      available: true,
+      identityKind: "window",
+      backend: {
+        type: "tmux",
+        readIdentity: async (options?: { target?: string }) => {
+          readTargets.push(options?.target || "");
+          return "bosun-5";
+        },
+        renameIdentity: async (_name: string, options?: { target?: string }) => {
+          renameTargets.push(options?.target || "");
+        },
+      } as unknown as ProcessBackend,
+    });
+
+    const hooks = createHooks({} as any);
+    const state = {
+      agentName: "bosun-5",
+      registered: true,
+      hookState: {},
+    } as any;
+
+    await hooks.onRegistered?.(state, { hasUI: false } as any);
+
+    state.agentName = "bosun-name-sync";
+    await hooks.onRenamed?.(state, { hasUI: false } as any, { success: true } as any, undefined as any);
+
+    state.agentName = "bosun-name-sync-2";
+    await hooks.onRenamed?.(state, { hasUI: false } as any, { success: true } as any, undefined as any);
+
+    expect(readTargets).toEqual(["%42", "%42", "%42"]);
+    expect(renameTargets).toEqual(["%42", "%42"]);
   });
 });

@@ -128,6 +128,22 @@ export function setIdentityBackendForTest(backend?: IdentityBackend): void {
   identityBackendOverride = backend;
 }
 
+function resolveTmuxIdentityTargetFromEnv(): string | undefined {
+  return process.env.TMUX_PANE
+    || process.env.PI_BACKEND_TARGET
+    || process.env.PI_AGENT_NAME
+    || process.env.PI_AGENT
+    || undefined;
+}
+
+function resolveZmuxIdentityTargetFromEnv(): string | undefined {
+  return process.env.PI_BACKEND_SESSION
+    || process.env.PI_BACKEND_TARGET
+    || process.env.PI_AGENT_NAME
+    || process.env.PI_AGENT
+    || undefined;
+}
+
 function resolveIdentityBackend(): IdentityBackend {
   if (identityBackendOverride) return identityBackendOverride;
   const cwd = process.cwd();
@@ -154,17 +170,10 @@ function resolveIdentityBackend(): IdentityBackend {
       identityKind,
       resolveIdentityTarget: () => {
         if (backend.type === "zmux") {
-          return process.env.PI_BACKEND_SESSION
-            || process.env.PI_BACKEND_TARGET
-            || process.env.PI_AGENT_NAME
-            || process.env.PI_AGENT
-            || undefined;
+          return resolveZmuxIdentityTargetFromEnv();
         }
 
-        return process.env.PI_BACKEND_TARGET
-          || process.env.PI_AGENT_NAME
-          || process.env.PI_AGENT
-          || undefined;
+        return resolveTmuxIdentityTargetFromEnv();
       },
       available: true,
     };
@@ -186,11 +195,11 @@ function resolveIdentityTarget(identityBackend: IdentityBackend): string | undef
   }
 
   if (identityBackend.backend?.type === "zmux") {
-    return process.env.PI_BACKEND_SESSION
-      || process.env.PI_BACKEND_TARGET
-      || process.env.PI_AGENT_NAME
-      || process.env.PI_AGENT
-      || undefined;
+    return resolveZmuxIdentityTargetFromEnv();
+  }
+
+  if (identityBackend.backend?.type === "tmux") {
+    return resolveTmuxIdentityTargetFromEnv();
   }
 
   return process.env.PI_BACKEND_TARGET
