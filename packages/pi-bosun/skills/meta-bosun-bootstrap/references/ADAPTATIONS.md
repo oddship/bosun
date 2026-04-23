@@ -123,7 +123,7 @@ update:
     fi
     echo ""
     echo "Updating pi packages..."
-    bun update @mariozechner/pi-coding-agent pi-spawn_agent pi-mcp-adapter pi-interactive-shell pi-mesh
+    bun update --latest @mariozechner/pi-coding-agent pi-spawn_agent pi-mcp-adapter pi-interactive-shell pi-mesh
     UPDATED=$(node -e "console.log(require('./node_modules/@mariozechner/pi-coding-agent/package.json').version)")
     echo ""
     echo "Updated: v$CURRENT → v$UPDATED"

@@ -76,13 +76,15 @@ grep -r "ctx\.\|pi\." .pi/extensions/ --include="*.ts" | head -20
 This CAN be done from inside the sandbox:
 
 ```bash
-bun update @mariozechner/pi-coding-agent
+bun update --latest @mariozechner/pi-coding-agent
 ```
+
+Use `--latest` because bosun pins exact versions in `package.json`, so plain `bun update` will not advance to a newer published release.
 
 To update all pi packages at once:
 
 ```bash
-bun update @mariozechner/pi-coding-agent pi-spawn_agent pi-mcp-adapter pi-interactive-shell pi-mesh
+bun update --latest @mariozechner/pi-coding-agent pi-spawn_agent pi-mcp-adapter pi-interactive-shell pi-mesh
 ```
 
 ### 4. Restart Pi
