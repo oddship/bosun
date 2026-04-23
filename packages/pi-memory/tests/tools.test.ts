@@ -8,7 +8,7 @@ import {
   executeMemorySearch,
   executeMemoryStatus,
 } from "../src/tools.js";
-import { resetMemoryRuntime } from "../src/store.js";
+import { getMemoryRuntime, resetMemoryRuntime } from "../src/store.js";
 
 const tempDirs: string[] = [];
 
@@ -23,7 +23,6 @@ function makeRepo(): string {
   writeFileSync(join(cwd, ".pi", "pi-memory.json"), JSON.stringify({
     enabled: true,
     dbPath: ".cache/memory.sqlite",
-    autoUpdateOnOpen: true,
     allowHybridSearch: true,
     defaultMode: "keyword",
     defaultLimit: 5,
@@ -54,6 +53,11 @@ function makeRepo(): string {
   return cwd;
 }
 
+async function seedIndex(cwd: string): Promise<void> {
+  const runtime = await getMemoryRuntime(cwd);
+  await runtime.store.update();
+}
+
 afterEach(async () => {
   await resetMemoryRuntime();
   while (tempDirs.length > 0) {
@@ -63,21 +67,35 @@ afterEach(async () => {
 });
 
 describe("pi-memory tools", () => {
-  it("searches indexed markdown memory", async () => {
+  it("does not auto-index on search", async () => {
     const cwd = makeRepo();
-    const result = await executeMemorySearch(cwd, {
+
+    const before = await executeMemorySearch(cwd, {
       query: "memory qmd",
       mode: "keyword",
       collections: ["sessions", "docs"],
       limit: 5,
     });
 
-    expect(result.results.length).toBeGreaterThan(0);
-    expect(result.results.some((item) => item.title.includes("Memory Plan") || item.file.includes("architecture"))).toBe(true);
+    expect(before.results).toEqual([]);
+
+    await seedIndex(cwd);
+
+    const after = await executeMemorySearch(cwd, {
+      query: "memory qmd",
+      mode: "keyword",
+      collections: ["sessions", "docs"],
+      limit: 5,
+    });
+
+    expect(after.results.length).toBeGreaterThan(0);
+    expect(after.results.some((item) => item.title.includes("Memory Plan") || item.file.includes("architecture"))).toBe(true);
   });
 
-  it("retrieves a single document after search", async () => {
+  it("retrieves a single document after explicit indexing", async () => {
     const cwd = makeRepo();
+    await seedIndex(cwd);
+
     const search = await executeMemorySearch(cwd, {
       query: "memory package",
       mode: "keyword",
@@ -93,8 +111,10 @@ describe("pi-memory tools", () => {
     }
   });
 
-  it("retrieves multiple documents", async () => {
+  it("retrieves multiple documents after explicit indexing", async () => {
     const cwd = makeRepo();
+    await seedIndex(cwd);
+
     const result = await executeMemoryMultiGet(cwd, {
       pattern: "**/*.md",
     });
@@ -108,7 +128,6 @@ describe("pi-memory tools", () => {
     writeFileSync(join(cwd, ".pi", "pi-memory.json"), JSON.stringify({
       enabled: true,
       dbPath: ".cache/memory.sqlite",
-      autoUpdateOnOpen: true,
       allowHybridSearch: false,
       defaultMode: "keyword",
       defaultLimit: 5,
@@ -135,13 +154,18 @@ describe("pi-memory tools", () => {
     );
   });
 
-  it("reports memory status", async () => {
+  it("reports status without auto-refreshing the index", async () => {
     const cwd = makeRepo();
-    const status = await executeMemoryStatus(cwd);
 
-    expect(status.enabled).toBe(true);
-    expect(status.allowHybridSearch).toBe(true);
-    expect(status.collections.some((collection) => collection.name === "sessions")).toBe(true);
-    expect(status.totalDocuments).toBeGreaterThanOrEqual(2);
+    const before = await executeMemoryStatus(cwd);
+    expect(before.enabled).toBe(true);
+    expect(before.allowHybridSearch).toBe(true);
+    expect(before.totalDocuments).toBe(0);
+
+    await seedIndex(cwd);
+
+    const after = await executeMemoryStatus(cwd);
+    expect(after.collections.some((collection) => collection.name === "sessions")).toBe(true);
+    expect(after.totalDocuments).toBeGreaterThanOrEqual(2);
   });
 });

@@ -28,6 +28,9 @@ async function run(): Promise<void> {
     if (typeof memory.dbPath !== "string" || !String(memory.dbPath).includes(".bosun-home/.cache/qmd/index.sqlite")) {
       throw new Error(`unexpected dbPath: ${String(memory.dbPath)}`);
     }
+    if ("autoUpdateOnOpen" in memory) {
+      throw new Error("generated pi-memory.json should not contain deprecated autoUpdateOnOpen");
+    }
 
     const collections = memory.collections as Record<string, Record<string, unknown>>;
     if (!collections.sessions || collections.sessions.includeByDefault !== true) {

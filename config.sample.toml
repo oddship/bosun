@@ -179,7 +179,6 @@ poll_interval_ms = 2000
 [memory]
 enabled = true
 db_path = ".bosun-home/.cache/qmd/index.sqlite"
-auto_update_on_open = true
 allow_hybrid_search = true               # set false to block hybrid search entirely
 default_mode = "keyword"                 # keyword | hybrid (requires allow_hybrid_search=true for hybrid)
 default_limit = 5
@@ -214,7 +213,7 @@ path = ".pi/agents"
 pattern = "**/*.md"
 include_by_default = false
 
-# Embedding — generates vectors for semantic/hybrid search.
+# Indexing + embedding happen off the read path.
 # Runs as a daemon workflow (memory-embed). First run downloads ~2GB of GGUF models.
 # Disable if you only need keyword search or don't have the disk/compute.
 # [memory.embed]

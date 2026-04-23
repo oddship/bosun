@@ -17,10 +17,11 @@ Check:
 Hybrid search benefits from qmd embeddings. Keyword mode does not require them.
 If you need stronger semantic recall, generate embeddings with qmd separately.
 
-## Search is slower on first use
+## Search results look stale after files changed
 
-`pi-memory` opens the qmd store lazily and refreshes the index on first use
-when `autoUpdateOnOpen` is enabled. That first call can be noticeably slower.
+`pi-memory` does not rescan collections on `memory` reads. Index refresh should
+happen via the `memory-embed` daemon workflow or an explicit/manual qmd update.
+If new markdown is missing from results, refresh the qmd index first.
 
 ## When in doubt
 

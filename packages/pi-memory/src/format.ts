@@ -146,7 +146,6 @@ export function formatStatusResult(
   return {
     enabled: config.enabled,
     gpu: config.gpu,
-    autoUpdateOnOpen: config.autoUpdateOnOpen,
     allowHybridSearch: config.allowHybridSearch,
     dbPath: config.resolvedDbPath,
     defaultMode: config.defaultMode,

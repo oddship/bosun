@@ -98,7 +98,6 @@ export function loadMemoryConfig(cwd: string): LoadedMemoryConfig {
     enabled: asBoolean(raw.enabled, DEFAULT_MEMORY_CONFIG.enabled),
     gpu: asBoolean(raw.gpu, DEFAULT_MEMORY_CONFIG.gpu),
     dbPath: asString(raw.dbPath, DEFAULT_MEMORY_CONFIG.dbPath) || DEFAULT_MEMORY_CONFIG.dbPath,
-    autoUpdateOnOpen: asBoolean(raw.autoUpdateOnOpen, DEFAULT_MEMORY_CONFIG.autoUpdateOnOpen),
     allowHybridSearch: asBoolean(raw.allowHybridSearch, DEFAULT_MEMORY_CONFIG.allowHybridSearch),
     defaultMode: raw.defaultMode === "hybrid" ? "hybrid" : DEFAULT_MEMORY_CONFIG.defaultMode,
     defaultLimit: asNumber(raw.defaultLimit, DEFAULT_MEMORY_CONFIG.defaultLimit),

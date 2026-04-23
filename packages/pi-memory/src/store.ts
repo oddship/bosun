@@ -9,8 +9,6 @@ class RuntimeHandle implements MemoryRuntime {
   public readonly config: LoadedMemoryConfig;
   public readonly store: QMDStore;
 
-  private readyPromise: Promise<void> | null = null;
-
   public constructor(cwd: string, config: LoadedMemoryConfig, store: QMDStore) {
     this.cwd = cwd;
     this.config = config;
@@ -21,19 +19,6 @@ class RuntimeHandle implements MemoryRuntime {
     if (!this.config.enabled) {
       throw new Error("Memory is disabled in .pi/pi-memory.json");
     }
-
-    if (!this.readyPromise) {
-      this.readyPromise = (async () => {
-        if (this.config.autoUpdateOnOpen) {
-          await this.store.update();
-        }
-      })().catch((error) => {
-        this.readyPromise = null;
-        throw error;
-      });
-    }
-
-    await this.readyPromise;
   }
 
   public async close(): Promise<void> {

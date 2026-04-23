@@ -569,7 +569,6 @@ writeJson("pi-memory.json", {
   enabled: memory.enabled ?? DEFAULT_MEMORY_CONFIG.enabled,
   gpu: memory.gpu ?? DEFAULT_MEMORY_CONFIG.gpu,
   dbPath: memory.db_path || DEFAULT_MEMORY_CONFIG.dbPath,
-  autoUpdateOnOpen: memory.auto_update_on_open ?? DEFAULT_MEMORY_CONFIG.autoUpdateOnOpen,
   allowHybridSearch,
   defaultMode: defaultMemoryMode,
   defaultLimit: memory.default_limit || DEFAULT_MEMORY_CONFIG.defaultLimit,

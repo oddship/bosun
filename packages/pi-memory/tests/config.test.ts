@@ -41,7 +41,6 @@ describe("loadMemoryConfig", () => {
       allowHybridSearch: true,
       defaultMode: "hybrid",
       defaultLimit: 9,
-      autoUpdateOnOpen: false,
       collections: {
         notes: {
           path: "notes",
@@ -55,10 +54,21 @@ describe("loadMemoryConfig", () => {
     expect(config.allowHybridSearch).toBe(true);
     expect(config.defaultMode).toBe("hybrid");
     expect(config.defaultLimit).toBe(9);
-    expect(config.autoUpdateOnOpen).toBe(false);
     expect(config.resolvedDbPath).toBe(join(cwd, ".cache", "custom-memory.sqlite"));
     expect(config.resolvedCollections.notes.path).toBe(join(cwd, "notes"));
     expect(config.qmdConfig.collections.notes.includeByDefault).toBe(true);
+  });
+
+  it("ignores legacy autoUpdateOnOpen config", () => {
+    const cwd = makeTempDir();
+    mkdirSync(join(cwd, ".pi"), { recursive: true });
+    writeFileSync(join(cwd, ".pi", "pi-memory.json"), JSON.stringify({
+      autoUpdateOnOpen: false,
+      allowHybridSearch: true,
+    }, null, 2));
+
+    const config = loadMemoryConfig(cwd) as unknown as Record<string, unknown>;
+    expect("autoUpdateOnOpen" in config).toBe(false);
   });
 
   it("loads allowHybridSearch=false when configured", () => {

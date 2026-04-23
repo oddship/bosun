@@ -30,7 +30,6 @@ Example generated config:
 {
   "enabled": true,
   "dbPath": ".bosun-home/.cache/qmd/index.sqlite",
-  "autoUpdateOnOpen": true,
   "allowHybridSearch": true,
   "defaultMode": "keyword",
   "defaultLimit": 5,
@@ -48,6 +47,10 @@ Example generated config:
   }
 }
 ```
+
+Index maintenance is intentionally off the read path: `memory` search/get/status
+open the qmd store, but they do not rescan the filesystem. Keep the index fresh
+via the `memory-embed` daemon workflow or an explicit/manual qmd update.
 
 ## Tool behavior
 
@@ -100,4 +103,4 @@ embedding health.
 - Uses qmd v2 as a library, not via CLI shellouts
 - No MCP server required
 - Collections are configured inline when the qmd store is created
-- The store is lazily opened per Pi process/session and auto-updated on first use
+- The store is lazily opened per Pi process/session; index refresh happens via daemon/manual update paths, not memory reads
