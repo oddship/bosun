@@ -27,7 +27,7 @@
     "pi-mcp-adapter": "2.1.2",
     "pi-mesh": "0.2.3",
     "pi-web-access": "0.10.2",
-    "yaml": "^2.8.3"
+    "yaml": "2.8.3"
   },
   "devDependencies": {
     "@iarna/toml": "3.0.0",
